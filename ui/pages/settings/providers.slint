@@ -1,0 +1,210 @@
+// Settings → Voice providers. Amazon Polly today; later cloud providers add a block each.
+//
+// Polly block: when connected, a status row (region and masked access key) with "Change keys" and "Disconnect";
+// otherwise (or while changing keys) a form: access key ID, secret access key, region, Connect. The drafts live here
+// (never in Rust data): they are cleared when Polly becomes connected. Rust validates and answers through `data`
+// (`busy`, `error`).
+import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, TextField, FormField, Select, Badge, BadgeKind, BadgeDot }
+    from "../../design/index.slint";
+import { PollyData } from "../../models.slint";
+import { SectionHead, WrapText, AlertLine } from "parts.slint";
+
+component ProviderTile inherits Rectangle {
+    in property <image> icon;
+    width: 40px;
+    height: 40px;
+    border-radius: Theme.radius-thumb;
+    background: Theme.chip;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    accessible-role: none;
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: root.icon;
+        size: 18px;
+        color: Theme.text;
+    }
+}
+
+export component ProvidersSection inherits Rectangle {
+    in property <PollyData> polly;
+
+    // Connect with (access key id, secret access key, region index).
+    callback polly-connect(string, string, int);
+    callback polly-disconnect();
+    // Typing clears the error.
+    callback polly-edited();
+    // "Get AWS keys" opens the AWS console.
+    callback open-link(string);
+
+    property <bool> editing: false;
+    property <string> access-draft;
+    property <string> secret-draft;
+    property <int> region-index: root.polly.region-index;
+    property <bool> show-form: !root.polly.connected || root.editing;
+    property <length> body-width: max(0px, root.width - 40px - Theme.space-4);
+
+    changed polly => {
+        if (root.polly.connected && !root.polly.busy && root.polly.error == "") {
+            root.editing = false;
+            root.access-draft = "";
+            root.secret-draft = "";
+        }
+        root.region-index = root.polly.region-index;
+    }
+
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    horizontal-stretch: 1;
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Voice providers";
+
+    VerticalLayout {
+        spacing: Theme.space-5;
+
+        SectionHead {
+            title: "Voice providers";
+        }
+
+        WrapText {
+            width: root.width;
+            text: "Use voices from other services alongside ElevenLabs. Their voices appear on the Voices page, and each service bills its own account.";
+        }
+
+        // ── Amazon Polly ──
+        HorizontalLayout {
+            width: root.width;
+            spacing: Theme.space-4;
+
+            VerticalLayout {
+                alignment: start;
+                ProviderTile { icon: Icons.globe; }
+            }
+
+            VerticalLayout {
+                width: root.body-width;
+                spacing: Theme.space-2;
+
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    Text {
+                        text: "Amazon Polly";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                    }
+                    if root.polly.connected: Badge {
+                        text: "Connected";
+                        dot: BadgeDot.success;
+                        kind: BadgeKind.filled;
+                    }
+                }
+
+                WrapText {
+                    width: root.body-width;
+                    text: root.polly.connected ? root.polly.status
+                        : "Neural and generative voices from AWS. Create an access key for an IAM user with the AmazonPollyReadOnlyAccess permission, then paste it here.";
+                }
+
+                if root.polly.connected && !root.editing: HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    padding-top: Theme.space-2;
+                    Button {
+                        text: "Change keys";
+                        size: ButtonSize.sm;
+                        clicked => { root.editing = true; }
+                    }
+                    Button {
+                        text: "Disconnect";
+                        kind: ButtonKind.danger;
+                        size: ButtonSize.sm;
+                        loading: root.polly.busy;
+                        clicked => { root.polly-disconnect(); }
+                    }
+                }
+
+                if root.show-form: VerticalLayout {
+                    width: root.body-width;
+                    spacing: Theme.space-4;
+                    padding-top: Theme.space-2;
+
+                    FormField {
+                        label: "Access key ID";
+                        TextField {
+                            text <=> root.access-draft;
+                            icon: Icons.user;
+                            placeholder: "AKIA…";
+                            label: "Access key ID";
+                            has-error: root.polly.error != "";
+                            edited => { root.polly-edited(); }
+                        }
+                    }
+                    FormField {
+                        label: "Secret access key";
+                        TextField {
+                            text <=> root.secret-draft;
+                            icon: Icons.key-round;
+                            placeholder: "Secret access key";
+                            password: true;
+                            label: "Secret access key";
+                            has-error: root.polly.error != "";
+                            edited => { root.polly-edited(); }
+                            accepted(t) => { root.polly-connect(root.access-draft, t, root.region-index); }
+                        }
+                    }
+                    FormField {
+                        label: "Region";
+                        hint: "Pick the region closest to you. Most voices are available in US East (N. Virginia).";
+                        Select {
+                            model: root.polly.region-options;
+                            current-index: root.region-index;
+                            label: "Region";
+                            selected(i, v) => { root.region-index = i; }
+                        }
+                    }
+
+                    if root.polly.error != "": AlertLine {
+                        width: root.body-width;
+                        text: root.polly.error;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+                        alignment: start;
+                        Button {
+                            text: root.polly.connected ? "Save keys" : "Connect";
+                            kind: ButtonKind.primary;
+                            size: ButtonSize.sm;
+                            loading: root.polly.busy;
+                            clicked => { root.polly-connect(root.access-draft, root.secret-draft, root.region-index); }
+                        }
+                        if root.polly.connected: Button {
+                            text: "Cancel";
+                            size: ButtonSize.sm;
+                            enabled: !root.polly.busy;
+                            clicked => {
+                                root.editing = false;
+                                root.access-draft = "";
+                                root.secret-draft = "";
+                            }
+                        }
+                        Button {
+                            text: "Get AWS keys";
+                            kind: ButtonKind.ghost;
+                            size: ButtonSize.sm;
+                            trailing-icon: Icons.arrow-up-right;
+                            clicked => { root.open-link("https://console.aws.amazon.com/iam/home#/security_credentials"); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

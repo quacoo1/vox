@@ -86,7 +86,7 @@ use super::art::ArtSize;
 use super::convert::{credits_data, keycaps, strings, CreditsSurface};
 use super::generated::{
     AboutData, AccountData, AccountState, AppearanceData, BadgeData, BadgeTone, ChoiceItem, HotkeyRowData, IntegrationsData,
-    LibraryData, PlaybackData, SettingsData, TriggersData, VoiceModelData, WidgetSettingsData,
+    LibraryData, PlaybackData, PollyData, SettingsData, TriggersData, VoiceModelData, WidgetSettingsData,
 };
 use super::hotkey_recorder::{self, RecorderEvent};
 use super::shell::DeadlineTimer;
@@ -501,6 +501,10 @@ pub struct SettingsController {
     key_warning: Option<String>,
     remove_req: Option<RequestId>,
     get_key_req: Option<RequestId>,
+    // ── Voice providers ──
+    polly_req: Option<RequestId>,
+    polly_disconnect_req: Option<RequestId>,
+    polly_error: Option<String>,
     // ── Voice & model ──
     voices: Loadable<Arc<Vec<Voice>>>,
     models: Loadable<()>,
@@ -837,6 +841,64 @@ impl SettingsController {
         self.key_req = Some(req);
         cx.core.send(Command::SetApiKey { req, key: key.to_string() });
     }
+    /// Voice providers → Amazon Polly "Connect" / "Save keys".
+    pub fn polly_connect(&mut self, cx: &mut UiCtx, access_key_id: &str, secret_access_key: &str, region_index: i32) {
+        if self.polly_req.is_some() {
+            return;
+        }
+        let region = usize::try_from(region_index)
+            .ok()
+            .and_then(|i| vox_core::providers::POLLY_REGIONS.get(i))
+            .map(|(r, _)| r.to_string())
+            .unwrap_or_default();
+        let creds = vox_core::providers::PollyCredentials {
+            access_key_id: access_key_id.to_string(),
+            secret_access_key: secret_access_key.to_string(),
+            region,
+        };
+        match creds.validated() {
+            Err(message) => self.polly_error = Some(message),
+            Ok(creds) => {
+                self.polly_error = None;
+                let req = cx.core.request_id();
+                self.polly_req = Some(req);
+                cx.core.send(Command::ConnectPolly { req, creds });
+            }
+        }
+    }
+    pub fn polly_disconnect(&mut self, cx: &mut UiCtx) {
+        if self.polly_disconnect_req.is_some() || cx.app_info.polly.is_none() {
+            return;
+        }
+        let req = cx.core.request_id();
+        self.polly_disconnect_req = Some(req);
+        cx.core.send(Command::DisconnectPolly { req });
+    }
+    pub fn polly_edited(&mut self, cx: &mut UiCtx) {
+        let _ = cx;
+        self.polly_error = None;
+    }
+    fn polly_data(&self, cx: &UiCtx) -> PollyData {
+        let regions = vox_core::providers::POLLY_REGIONS;
+        let status = cx.app_info.polly.as_ref();
+        let region_index = status
+            .and_then(|s| regions.iter().position(|(r, _)| *r == s.region))
+            .unwrap_or(0);
+        PollyData {
+            connected: status.is_some(),
+            status: status
+                .map(|s| {
+                    let name = regions.iter().find(|(r, _)| *r == s.region).map_or(s.region.as_str(), |(_, n)| n);
+                    format!("{name} \u{00B7} access key {}", s.access_key_hint)
+                })
+                .unwrap_or_default()
+                .into(),
+            busy: self.polly_req.is_some() || self.polly_disconnect_req.is_some(),
+            error: self.polly_error.clone().unwrap_or_default().into(),
+            region_options: strings(regions.iter().map(|(_, n)| n.to_string())),
+            region_index: region_index as i32,
+        }
+    }
     pub fn key_edited(&mut self, cx: &mut UiCtx) {
         let _ = cx;
         self.key_error = None;
@@ -1075,6 +1137,24 @@ impl SettingsController {
     }
 
     fn on_done(&mut self, cx: &mut UiCtx, req: RequestId, result: &Result<(), String>) -> bool {
+        if self.polly_req == Some(req) {
+            self.polly_req = None;
+            match result {
+                Ok(()) => {
+                    self.polly_error = None;
+                    Self::toast(cx, Toast::success("Amazon Polly connected. Its voices are on the Voices page.").with_id("polly"));
+                }
+                Err(e) => self.polly_error = Some(format::clean_error(e)),
+            }
+            return true;
+        }
+        if self.polly_disconnect_req == Some(req) {
+            self.polly_disconnect_req = None;
+            if result.is_ok() {
+                Self::toast(cx, Toast::info("Amazon Polly disconnected").with_id("polly"));
+            }
+            return true;
+        }
         if self.remove_req == Some(req) {
             self.remove_req = None;
             match result {
@@ -1613,6 +1693,7 @@ impl PageController for SettingsController {
             sections: choice_model(vs::SETTINGS_SECTIONS.iter().map(|(id, label)| choice(*id, *label, *label)).collect()),
             revision: self.revision,
             account: self.account_data(cx),
+            polly: self.polly_data(cx),
             voice: self.voice_data(cx, &view),
             playback: Self::playback_data(&view),
             triggers: self.triggers_data(cx, &view),
@@ -1898,8 +1979,9 @@ mod tests {
             let d = c.build(&mut w.cx());
             assert!(!d.loading && !d.saving);
             assert_eq!(d.status, "Saved automatically");
-            assert_eq!(d.sections.row_count(), 9);
-            assert_eq!(d.sections.row_data(6).unwrap().label, "Library & privacy");
+            assert_eq!(d.sections.row_count(), 10);
+            assert_eq!(d.sections.row_data(1).unwrap().label, "Voice providers");
+            assert_eq!(d.sections.row_data(7).unwrap().label, "Library & privacy");
             // Account
             assert_eq!(d.account.state, AccountState::Stored);
             assert_eq!((d.account.badge.text.as_str(), d.account.badge.tone), ("Connected", BadgeTone::Success));

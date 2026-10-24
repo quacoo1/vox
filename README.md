@@ -35,6 +35,23 @@ Demo mode uses a separate profile (`%APPDATA%\Vox-Demo`) with seeded history and
 Command line: `vox.exe --read-text "Hello"`, `--read-clipboard`, `--read-file <path>`, `--hidden` (start in the
 tray). A second launch hands its arguments to the copy that is already running.
 
+## Voice providers
+
+Besides ElevenLabs, Vox can read with **Amazon Polly** voices.
+
+1. In the AWS console, create an IAM user (or use an existing one) with the **AmazonPollyReadOnlyAccess**
+   permission, and create an access key for it.
+2. In Vox, open **Settings → Voice providers**, paste the access key ID and secret access key, pick a region and
+   click **Connect**. Vox checks the key by listing Polly's voices.
+3. Polly voices then appear on the **Voices** page (filter by the "Amazon Polly" category). Pick one with
+   **Use voice**; **Preview** plays a short sample.
+
+Each Polly voice is offered as its neural version (or standard, when there is no neural one), plus a separate
+"(Generative)" entry where AWS has one. Word highlighting uses Polly's speech marks, so it is exact. Polly usage is
+billed to your AWS account (each chunk makes one audio request and one speech-marks request) and does not count
+against your ElevenLabs credits. The keys are stored encrypted with Windows DPAPI in
+`%APPDATA%\Vox\providers-dpapi.bin`.
+
 ## Building the installer
 
 The installer is made with [Inno Setup](https://jrsoftware.org/isinfo.php). It is a per-user install (no

@@ -720,8 +720,9 @@ pub fn hotkeys_changed(a: &Settings, b: &Settings) -> bool {
 // ───────────────────────────── Settings page helpers ─────────────────────────────
 
 /// Settings section ids, in nav order, with their labels (ui-settings-widget.md §2.1).
-pub const SETTINGS_SECTIONS: [(&str, &str); 9] = [
+pub const SETTINGS_SECTIONS: [(&str, &str); 10] = [
     ("account", "Account"),
+    ("providers", "Voice providers"),
     ("voice", "Voice & model"),
     ("playback", "Playback"),
     ("triggers", "Triggers"),

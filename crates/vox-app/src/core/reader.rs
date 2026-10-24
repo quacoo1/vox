@@ -151,9 +151,22 @@ impl Reader for Core {
         self.maybe_recheck_proxy(false);
         let settings = self.settings();
         // 2. API key gate (skipped in mock-TTS mode).
-        if !self.services.engine.is_mock() && !self.services.settings.has_api_key() {
-            self.toast(Toast::error(copy::ADD_KEY_TO_READ).with_action(copy::ADD_KEY_ACTION, Some(AppRoute::settings("account"))));
-            return ReadResult::no_api_key();
+        if !self.services.engine.is_mock() {
+            match vox_core::providers::provider_of(&settings.voice_id) {
+                vox_core::providers::Provider::Polly => {
+                    if self.services.engine.polly().is_none() {
+                        let message = vox_tts::polly::not_connected().message;
+                        self.toast(Toast::error(message.clone()).with_action(copy::ADD_KEY_ACTION, Some(AppRoute::settings("providers"))));
+                        return ReadResult::failed(vox_core::read::ReadErrorCode::NoApiKey, &message);
+                    }
+                }
+                vox_core::providers::Provider::ElevenLabs => {
+                    if !self.services.settings.has_api_key() {
+                        self.toast(Toast::error(copy::ADD_KEY_TO_READ).with_action(copy::ADD_KEY_ACTION, Some(AppRoute::settings("account"))));
+                        return ReadResult::no_api_key();
+                    }
+                }
+            }
         }
         // 3–6. Pre-cut, clean, empty check, truncate.
         let max_chars = settings.text.max_chars as usize;

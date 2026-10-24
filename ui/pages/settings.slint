@@ -28,6 +28,7 @@
 import { Theme, Icons, Icon, NavItem, ScrollArea, Divider, Skeleton, Spinner, Tip } from "../design/index.slint";
 import { SettingsData, Motion } from "../models.slint";
 import { AccountSection } from "settings/account.slint";
+import { ProvidersSection } from "settings/providers.slint";
 import { VoiceModelSection } from "settings/voice-model.slint";
 import { PlaybackSection } from "settings/playback.slint";
 import { TriggersSection } from "settings/triggers.slint";
@@ -141,6 +142,10 @@ export component SettingsPage inherits Rectangle {
     callback remove-key();
     callback get-key();
     callback credits-retry();
+    // Voice providers
+    callback polly-connect(string, string, int);
+    callback polly-disconnect();
+    callback polly-edited();
     // Voice & model
     callback test-voice();
     callback browse-voices();
@@ -200,6 +205,7 @@ export component SettingsPage inherits Rectangle {
         : w-triggers.y + root.cy <= root.spy-line ? "triggers"
         : w-playback.y + root.cy <= root.spy-line ? "playback"
         : w-voice.y + root.cy <= root.spy-line ? "voice"
+        : w-providers.y + root.cy <= root.spy-line ? "providers"
         : "account";
     // A clicked / deep-linked section stays highlighted until the user scrolls by hand.
     property <string> pinned;
@@ -214,11 +220,12 @@ export component SettingsPage inherits Rectangle {
     property <string> focus-after;
 
     pure function valid(id: string) -> bool {
-        id == "account" || id == "voice" || id == "playback" || id == "triggers" || id == "widget"
+        id == "account" || id == "providers" || id == "voice" || id == "playback" || id == "triggers" || id == "widget"
             || id == "appearance" || id == "library" || id == "integrations" || id == "about"
     }
     pure function section-y(id: string) -> length {
         if (id == "account") { return w-account.y; }
+        if (id == "providers") { return w-providers.y; }
         if (id == "voice") { return w-voice.y; }
         if (id == "playback") { return w-playback.y; }
         if (id == "triggers") { return w-triggers.y; }
@@ -231,6 +238,7 @@ export component SettingsPage inherits Rectangle {
     }
     pure function icon-for(id: string) -> image {
         if (id == "account") { return Icons.user; }
+        if (id == "providers") { return Icons.globe; }
         if (id == "voice") { return Icons.mic; }
         if (id == "playback") { return Icons.play; }
         if (id == "triggers") { return Icons.mouse-pointer-click; }
@@ -254,6 +262,7 @@ export component SettingsPage inherits Rectangle {
     // Focus the section's anchor (on screen by now, so this never scrolls).
     function focus-section(id: string) {
         if (id == "account") { a-account.focus(); }
+        if (id == "providers") { a-providers.focus(); }
         if (id == "voice") { a-voice.focus(); }
         if (id == "playback") { a-playback.focus(); }
         if (id == "triggers") { a-triggers.focus(); }
@@ -545,6 +554,16 @@ export component SettingsPage inherits Rectangle {
                             remove-key => { root.remove-key(); }
                             get-key => { root.get-key(); }
                             credits-retry => { root.credits-retry(); }
+                        }
+                    }
+                    w-providers := VerticalLayout {
+                        a-providers := SectionAnchor { label: "Voice providers"; }
+                        ProvidersSection {
+                            polly: root.data.polly;
+                            polly-connect(a, s, r) => { root.polly-connect(a, s, r); }
+                            polly-disconnect => { root.polly-disconnect(); }
+                            polly-edited => { root.polly-edited(); }
+                            open-link(u) => { root.open-link(u); }
                         }
                     }
                     w-voice := VerticalLayout {

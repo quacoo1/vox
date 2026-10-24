@@ -35,9 +35,11 @@ pub mod error;
 mod jsval;
 pub mod mapping;
 pub mod mock;
+pub mod polly;
 pub mod wav;
 
 pub use cancel::CancelToken;
 pub use client::{user_agent, ClientConfig, ElevenLabsClient, KeySource, ProxyConfig, SynthesisRequest, SynthesisResult};
 pub use engine::{EngineEvent, PlayCachedOptions, StartSessionOptions, TtsEngine, TtsSink};
 pub use error::TtsError;
+pub use polly::PollyClient;

@@ -34,6 +34,7 @@ pub mod history_store;
 pub mod json_doc;
 pub mod log;
 pub mod paths;
+pub mod provider_secrets;
 pub mod secrets;
 pub mod settings_store;
 pub mod ui_state;

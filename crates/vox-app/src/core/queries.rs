@@ -53,7 +53,13 @@ pub fn valid_id(id: &str) -> bool {
 }
 
 /// `AppInfo` (contracts.md §3.8) from the runtime, the settings store, the bridge and the last hook status.
-pub fn build_app_info(runtime: &Runtime, settings: &SettingsStore, bridge: &BridgeServer, hook_status: Option<bool>) -> AppInfo {
+pub fn build_app_info(
+    runtime: &Runtime,
+    settings: &SettingsStore,
+    bridge: &BridgeServer,
+    hook_status: Option<bool>,
+    polly: Option<vox_core::providers::PollyStatus>,
+) -> AppInfo {
     let current = settings.get();
     let api_key_notice = settings.key_status().problem.map(|p| match p {
         KeyProblem::MigrationFailed => vox_core::copy::key_migration_failed(),
@@ -74,6 +80,7 @@ pub fn build_app_info(runtime: &Runtime, settings: &SettingsStore, bridge: &Brid
         native_hook_available: vox_core::app::native_hook_available(hook_status),
         explorer_menu_installed: catch_unwind(vox_win::registry::is_explorer_menu_installed).unwrap_or(false),
         demo_mode: runtime.flags.demo,
+        polly,
     }
 }
 

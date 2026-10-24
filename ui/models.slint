@@ -677,6 +677,18 @@ export struct AboutData {
     demo: bool,
 }
 
+// Settings → Voice providers → Amazon Polly.
+export struct PollyData {
+    connected: bool,
+    // "US East (N. Virginia) · access key AKIA…WXYZ"
+    status: string,
+    busy: bool,
+    error: string,
+    // Region display names (PollyRegions order) and the selected one.
+    region-options: [string],
+    region-index: int,
+}
+
 export struct SettingsData {
     loading: bool,
     saving: bool,
@@ -687,6 +699,7 @@ export struct SettingsData {
     // elsewhere): sections re-assert toggles / selects / sliders from data in `changed data` handlers.
     revision: int,
     account: AccountData,
+    polly: PollyData,
     voice: VoiceModelData,
     playback: PlaybackData,
     triggers: TriggersData,

@@ -362,6 +362,8 @@ impl Core {
             Command::UpdateSettings { req, patch } => self.update_settings(req, &patch),
             Command::SetApiKey { req, key } => self.set_api_key(req, key),
             Command::ClearApiKey { req } => self.clear_api_key(req),
+            Command::ConnectPolly { req, creds } => self.connect_polly(req, creds),
+            Command::DisconnectPolly { req } => self.disconnect_polly(req),
             Command::SuspendHotkeys(on) => self.suspend_hotkeys(on),
 
             // ── catalog / credits / previews ──
@@ -504,7 +506,8 @@ impl Core {
     }
 
     fn publish_app_info(&self) {
-        let info = queries::build_app_info(&self.services.runtime, &self.services.settings, &self.services.bridge, self.hook_status);
+        let polly = self.services.engine.polly().map(|p| p.credentials().status());
+        let info = queries::build_app_info(&self.services.runtime, &self.services.settings, &self.services.bridge, self.hook_status, polly);
         self.publish(UiUpdate::AppInfo(Arc::new(info)));
     }
 
@@ -917,6 +920,8 @@ fn command_name(cmd: &Command) -> &'static str {
         Command::UpdateSettings { .. } => "UpdateSettings",
         Command::SetApiKey { .. } => "SetApiKey",
         Command::ClearApiKey { .. } => "ClearApiKey",
+        Command::ConnectPolly { .. } => "ConnectPolly",
+        Command::DisconnectPolly { .. } => "DisconnectPolly",
         Command::SuspendHotkeys(_) => "SuspendHotkeys",
         Command::FetchVoices { .. } => "FetchVoices",
         Command::FetchModels { .. } => "FetchModels",
@@ -1033,6 +1038,7 @@ pub fn owed_answer(cmd: &Command) -> Option<OwedAnswer> {
         C::QueryHistory { req, .. } => A::HistoryPage(*req),
         C::UpdateSettings { req: Some(r), .. } => A::SettingsSaved(*r),
         C::SetApiKey { req, .. } | C::Catalog(crate::command::CatalogResult::ApiKey { req, .. }) => A::ApiKey(*req),
+        C::ConnectPolly { req, .. } | C::DisconnectPolly { req } | C::Catalog(crate::command::CatalogResult::Polly { req, .. }) => A::Done(*req),
         C::ClearApiKey { req } | C::RemoveReads { req, .. } | C::ClearHistory { req } | C::CopyText { req, .. } => A::Done(*req),
         C::OpenExternal { req: Some(r), .. } => A::Done(*r),
         C::ExportHistory { req, .. } => A::Exported(*req),

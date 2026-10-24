@@ -82,7 +82,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Duration;
 
-use parking_lot::{Condvar, Mutex, ReentrantMutex, ReentrantMutexGuard};
+use parking_lot::{Condvar, Mutex, ReentrantMutex, ReentrantMutexGuard, RwLock};
 use vox_core::constants::{
     ESTIMATED_CHARS_PER_SECOND, LOOKAHEAD_FREE_CHUNKS, LOOKAHEAD_SEC, MAX_RETRY_AFTER_MS, MOCK_LATENCY_FIRST_MS,
     MOCK_LATENCY_NEXT_MS, RETRY_DELAYS_MS,
@@ -95,6 +95,8 @@ use crate::client::{ElevenLabsClient, SynthesisRequest, SynthesisResult};
 use crate::duration::chunk_duration;
 use crate::error::TtsError;
 use crate::mock::{mock_synthesize, positive_speed};
+use crate::polly::PollyClient;
+use vox_core::providers::{parse_polly_voice_id, provider_of, Provider};
 
 /// Delivery to the player (vox-app forwards to `vox_audio::Player`).
 pub trait TtsSink: Send + Sync {
@@ -218,6 +220,8 @@ struct EngineInner {
     /// Multiplies retry and mock-latency delays (1 in production; tests shorten them).
     delay_scale: f64,
     state: ReentrantMutex<RefCell<EngineState>>,
+    /// Amazon Polly, when connected (voices `polly:<engine>:<id>` route here).
+    polly: RwLock<Option<PollyClient>>,
 }
 
 /// `positive()`-style speed, then the estimate `len16 / 15 / speed`.
@@ -392,6 +396,13 @@ impl EngineInner {
             }
             return Ok(mock_synthesize(&chunk.text, job.settings.voice.speed));
         }
+        if provider_of(&job.voice_id) == Provider::Polly {
+            let polly = self.polly.read().clone();
+            let (Some(polly), Some(voice)) = (polly, parse_polly_voice_id(&job.voice_id)) else {
+                return Err(crate::polly::not_connected());
+            };
+            return self.with_retries(s, i, || polly.synthesize(&chunk.text, &voice, &s.cancel));
+        }
         let req = SynthesisRequest {
             text: chunk.text.clone(),
             voice_id: job.voice_id.clone(),
@@ -402,9 +413,14 @@ impl EngineInner {
             next_text: vox_text::context_after(job.chunks.get(i + 1).map(|c| c.text.as_str())),
             language_code: Some(job.settings.language_code.clone()).filter(|c| !c.is_empty()),
         };
+        self.with_retries(s, i, || self.client.synthesize(&req, &s.cancel))
+    }
+
+    /// Runs `call` with the engine's retry policy (retryable errors only, backoff, liveness re-checks).
+    fn with_retries(&self, s: &Arc<Session>, i: usize, call: impl Fn() -> Result<SynthesisResult, TtsError>) -> Result<SynthesisResult, TtsError> {
         let mut attempt = 0usize;
         loop {
-            match self.client.synthesize(&req, &s.cancel) {
+            match call() {
                 Ok(result) => return Ok(result),
                 Err(e) => {
                     if e.aborted || !e.retryable || attempt >= RETRY_DELAYS_MS.len() || !self.is_live_now(s) {
@@ -565,6 +581,7 @@ impl TtsEngine {
                 mock,
                 delay_scale: scale,
                 state: ReentrantMutex::new(RefCell::new(EngineState::default())),
+                polly: RwLock::new(None),
             }),
         }
     }
@@ -668,6 +685,16 @@ impl TtsEngine {
         let g = self.inner.lock();
         let st = g.borrow();
         st.current.as_ref().map(|c| c.session.read_id.clone())
+    }
+
+    /// Connects (or with `None` disconnects) Amazon Polly for voices `polly:…`.
+    pub fn set_polly(&self, client: Option<PollyClient>) {
+        *self.inner.polly.write() = client;
+    }
+
+    /// The connected Polly client, if any.
+    pub fn polly(&self) -> Option<PollyClient> {
+        self.inner.polly.read().clone()
     }
 
     pub fn is_mock(&self) -> bool {

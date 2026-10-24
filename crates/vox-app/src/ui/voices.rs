@@ -488,7 +488,7 @@ impl PageController for VoicesController {
         self.active = true;
         self.reset_filters(cx);
         self.sample = Sample::None;
-        self.has_key = Some(cx.settings.has_api_key);
+        self.has_key = Some(has_any_provider(cx));
         self.fetch(cx, false);
     }
 
@@ -509,10 +509,12 @@ impl PageController for VoicesController {
                 }
                 true
             }
-            UiUpdate::Settings(settings) => {
-                // Keyed by `hasApiKey`: a key added or removed refetches (the list stays until the answer).
-                if self.has_key != Some(settings.has_api_key) {
-                    self.has_key = Some(settings.has_api_key);
+            UiUpdate::Settings(_) | UiUpdate::AppInfo(_) => {
+                // Keyed by "any provider connected" (an ElevenLabs key or Amazon Polly): a change refetches (the
+                // list stays until the answer).
+                let has = has_any_provider(cx);
+                if self.has_key != Some(has) {
+                    self.has_key = Some(has);
                     if self.active {
                         self.fetch(cx, false);
                     }
@@ -540,7 +542,7 @@ impl PageController for VoicesController {
     }
 
     fn build(&self, cx: &mut UiCtx) -> VoicesData {
-        let v = self.view(cx.settings.has_api_key, &cx.settings.voice_id, &cx.settings.voice_name);
+        let v = self.view(has_any_provider(cx), &cx.settings.voice_id, &cx.settings.voice_name);
         let next: Vec<(VoiceRowView, Image)> = v
             .rows
             .iter()
@@ -568,6 +570,11 @@ impl PageController for VoicesController {
             revision: self.revision,
         }
     }
+}
+
+/// An ElevenLabs key or a connected Amazon Polly: the page has voices to list.
+fn has_any_provider(cx: &UiCtx) -> bool {
+    cx.settings.has_api_key || cx.app_info.polly.is_some()
 }
 
 #[cfg(test)]
@@ -838,6 +845,7 @@ mod tests {
         assert!(w.sent().is_empty(), "Alice is already in use");
         // A key added or removed refetches.
         let no_key = Arc::new(vox_core::settings::Settings { has_api_key: false, ..(*w.settings).clone() });
+        w.settings = Arc::clone(&no_key); // the dispatcher stores the update before controllers see it
         assert!(c.on_update(&mut w.cx(), &UiUpdate::Settings(no_key)));
         assert!(matches!(w.sent().as_slice(), [Command::FetchVoices { refresh: false }]));
         // Leaving stops the sample and clears the search.

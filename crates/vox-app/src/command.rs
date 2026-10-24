@@ -107,6 +107,8 @@ pub enum CatalogResult {
     Account { generation: u64, forced: bool, seq: u64, result: Result<Option<AccountInfo>, String> },
     ApiKey { req: RequestId, key: String, result: ApiKeyResult },
     Preview { voice_id: String, result: Result<AudioBytes, String> },
+    /// The Polly credential check: `Ok(voice count)`.
+    Polly { req: RequestId, creds: vox_core::providers::PollyCredentials, result: Result<usize, String> },
 }
 
 /// Who asked for a replay (decides the failure feedback when the cached audio turns out to be unusable).
@@ -160,6 +162,10 @@ pub enum Command {
     UpdateSettings { req: Option<RequestId>, patch: serde_json::Value },
     SetApiKey { req: RequestId, key: String },
     ClearApiKey { req: RequestId },
+    /// Settings → Voice providers: validate and store Amazon Polly credentials → `Done{req}`.
+    ConnectPolly { req: RequestId, creds: vox_core::providers::PollyCredentials },
+    /// Forget the Polly credentials → `Done{req}`.
+    DisconnectPolly { req: RequestId },
     /// The hotkey recorder is recording (suspend all global hotkeys; 30 s safety resume → `UiUpdate::HotkeysResumed`).
     SuspendHotkeys(bool),
 

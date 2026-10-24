@@ -31,6 +31,7 @@ pub mod json;
 pub mod listen_log;
 pub mod locale;
 pub mod player;
+pub mod providers;
 pub mod read;
 pub mod settings;
 pub mod text16;
