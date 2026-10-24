@@ -1,0 +1,85 @@
+// Typography presets from DESIGN.md ("Type"). Each is a Text with family, size, weight and colour from Theme;
+// every Text property (text, color, wrap, overflow, horizontal-alignment, ...) can still be overridden.
+//
+//   HeaderTitle    panel header / dialog title     Text 15 / 600, text
+//   HeroText       page hero ("Good evening")      Display 26 / 600, text
+//   NumberText     big numbers (stats, time)       Display 34 / 600, text
+//   SentenceText   widget sentence                 Display 17 / 600, text
+//   RowTitle       list row title                  Text 14 / 600, text, elides
+//   RowSubtitle    list row subtitle               Text 13 / 500, text-secondary, elides
+//   BodyText       body copy                       Text 14 / 400, text-secondary, word-wraps
+//   CaptionText    captions, meta                  Text 12 / 500, text-muted
+//   LabelText      field labels                    Text 13 / 600, text
+//
+// Ticking numbers: give NumberText a fixed width and `horizontal-alignment` so the layout never jitters.
+
+import { Theme } from "theme.slint";
+
+export component HeaderTitle inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-title;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+    overflow: elide;
+    vertical-alignment: center;
+}
+
+export component HeroText inherits Text {
+    font-family: Theme.font-display;
+    font-size: Theme.size-hero;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+}
+
+export component NumberText inherits Text {
+    font-family: Theme.font-display;
+    font-size: Theme.size-number;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+}
+
+export component SentenceText inherits Text {
+    font-family: Theme.font-display;
+    font-size: Theme.size-sentence;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+    wrap: word-wrap;
+}
+
+export component RowTitle inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-body;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+    overflow: elide;
+}
+
+export component RowSubtitle inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-secondary;
+    overflow: elide;
+}
+
+export component BodyText inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-body;
+    font-weight: Theme.weight-regular;
+    color: Theme.text-secondary;
+    wrap: word-wrap;
+}
+
+export component CaptionText inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-caption;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-muted;
+}
+
+export component LabelText inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+}

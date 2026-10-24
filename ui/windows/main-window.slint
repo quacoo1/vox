@@ -1,0 +1,738 @@
+// The main window (DESIGN.md "Screens"; ui-main.md §2; shell.md §6.2): backdrop art with the panel inset 14 px; header
+// row (64 px) with the page title and the page's header actions; sidebar; the current page; toasts; one modal dialog
+// slot; onboarding replaces the shell. Native decorated window (title bar coloured with DWM by Rust). Page callbacks
+// are forwarded with a page prefix so Rust binds them on this one component (docs/ARCHITECTURE.md §7.3).
+//
+// Layers, bottom to top: backdrop (`backdrop` image, cover; a soft placeholder while it is missing) → the panel
+// (inset 14, radius 22, one soft shadow, hairline border) holding the header row, the sidebar and the page host →
+// onboarding (replaces the panel; it draws on the same backdrop) → the dialog slot → the toast stack (above the scrim,
+// so a failure toast stays legible while its dialog is still open).
+// Pages fill the page host (right of the sidebar, below the header) and scroll themselves; each page fades in over
+// 220 ms when it is entered (instant under Motion.reduce).
+//
+// Rules the window owner implements (docs/ARCHITECTURE.md §7.4):
+// - Header: the title (`page-title`) and, right-aligned, the current page's actions rendered **here** from the page
+//   data — History: count eyebrow `history.count-label`, Export (`history.can-export`, `history.exporting` →
+//   `history-export()`) and Clear all (`history-clear-all()`; a ghost pill that turns danger only on hover, the private
+//   `DangerGhostButton` below); Analytics: eyebrow `analytics.range-label` and the range
+//   segmented control (`analytics.ranges`, `analytics.range` → `analytics-set-range(value)`) — plus the shell actions
+//   "Send to tray" (`header-send-to-tray()`) and the theme toggle (`header-toggle-theme()`; label/icon from
+//   `theme-dark`: "Switch to paper theme" + sun / "Switch to night theme" + moon), both hidden during onboarding.
+// - A root FocusScope (`capture-key-pressed`), inert while `dialog.open` or `onboarding`: Ctrl+1..5 → `navigate(page)`
+//   unless `TextInputInterface.text-input-focused` (D-UM-23); Ctrl+K → focus the sidebar search
+//   (`sidebar-focus-nonce += 1`); Ctrl+F (no Alt/Shift/Meta) on History → `history-focus-nonce += 1` even while typing
+//   in another field; `/` on History when no text input has focus → the same.
+// - Focus hand-back: Slint 1.18 drops a focus item that is destroyed or hidden and moves focus nowhere; with no focus
+//   item the root FocusScope never sees a key, so every shortcut above would stop until a click or Tab. Whenever the
+//   holder of focus is about to go away the window gives focus back to the root scope: on a page change (the old page
+//   is destroyed) unless the change came from a sidebar nav item (that item keeps focus), when onboarding starts or
+//   ends, when the dialog closes (Cancel hides after the fade), after a toast's action or close button, and after a
+//   rail search submit (the popup closes). A toast that leaves or vanishes while focused hands focus to the stack's
+//   own sink, which sits inside the root scope too.
+// - Mouse X1/X2 are handled natively (windowing::main_window), not here.
+// - Known accessibility gap: the design Segmented takes plain strings, so each range segment is announced by its
+//   short label ("7D") rather than "Last 7 days" (ui-main.md §5.1); only the group's value carries the long name.
+//   Needs a labelled variant in the design library.
+// - Text fields keep their own text; the in-out `*-draft` / `*-search-text` properties below are their text, written
+//   by Rust only to reset them.
+import {
+    Theme, Icons, Icon, Pressable, FocusRing, HeaderTitle, Button, ButtonKind, ButtonSize, IconButton, IconButtonSize,
+    Segmented, Divider,
+} from "../design/index.slint";
+import {
+    PageId, PlayerAction, SidebarData, ToastData, DialogData,
+    HomeData, HistoryData, AnalyticsData, VoicesData, SettingsData, OnboardingData,
+    ChoiceItem, Brand, Motion,
+} from "../models.slint";
+import { HomePage } from "../pages/home.slint";
+import { HistoryPage } from "../pages/history.slint";
+import { AnalyticsPage } from "../pages/analytics.slint";
+import { VoicesPage } from "../pages/voices.slint";
+import { SettingsPage } from "../pages/settings.slint";
+import { OnboardingPage } from "../pages/onboarding.slint";
+import { Sidebar } from "../pages/shell/sidebar.slint";
+import { ToastStack } from "../pages/shell/toasts.slint";
+import { ConfirmDialog } from "../pages/shell/dialog.slint";
+
+// A page slot: fills the page host and fades in once when created (pages are re-created on every page change).
+component PageFade inherits Rectangle {
+    property <float> shown: 0;
+    init => { root.shown = 1; }
+    animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+    opacity: root.shown;
+    background: transparent;
+}
+
+// The muted text beside the header title ("1,204 reads", "Last 30 days").
+component Eyebrow inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-muted;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// History's "Clear all" (ui-main.md §4.3): a 32-h ghost pill with a leading glyph whose text and glyph turn to
+// `danger` only on hover (the design Button has no such variant). Disabled = 40 % opacity, no interaction.
+component DangerGhostButton {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> enabled: true;
+
+    callback clicked();
+
+    property <color> fg: press.has-hover ? Theme.danger : Theme.text;
+
+    height: 32px;
+    min-width: max(52px, row.preferred-width);
+    preferred-width: self.min-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { press.activated(); }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : transparent;
+        animate background { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible;
+    }
+
+    row := HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 6px;
+        alignment: center;
+
+        Icon {
+            source: root.icon;
+            size: 16px;
+            color: root.fg;
+        }
+        Text {
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: root.fg;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.clicked(); }
+    }
+}
+
+export component MainWindow inherits Window {
+    // ── shell state ──
+    in property <PageId> page: PageId.home;
+    // Show onboarding instead of the shell (not onboarded, or the onboarding route).
+    in property <bool> onboarding;
+    // Header title of the current page ("History").
+    in property <string> page-title;
+    // The resolved main-window theme (drives the header theme toggle's label and icon).
+    in property <bool> theme-dark: true;
+    in property <image> backdrop;
+    in property <SidebarData> sidebar;
+    in property <[ToastData]> toasts;
+    in property <DialogData> dialog;
+    // Settings deep link (section id) and its re-announce nonce.
+    in property <string> settings-scroll-to;
+    in property <int> settings-scroll-nonce;
+    // ── page data ──
+    in property <HomeData> home;
+    in property <HistoryData> history;
+    in property <AnalyticsData> analytics;
+    in property <VoicesData> voices;
+    in property <SettingsData> settings;
+    in property <OnboardingData> onboarding-data;
+    // ── text fields (in-out: the field's own text; Rust writes them only to reset) ──
+    // The onboarding key draft (kept across steps; cleared by Rust after a successful connect).
+    in-out property <string> onboarding-key-draft;
+    // Settings → Account key field.
+    in-out property <string> settings-key-draft;
+    // Settings → Triggers excluded-app input (cleared after a successful add).
+    in-out property <string> settings-exclude-draft;
+    // Settings → Integrations port field (digits only, ≤ 5; reset on Escape and when the stored port changes).
+    in-out property <string> settings-port-draft;
+    // Voices search field (cleared by "Clear filters" and when the page is left).
+    in-out property <string> voices-search-text;
+    // History search field (reset by "Clear filters" and by a sidebar search).
+    in-out property <string> history-search-text;
+    // Sidebar "Search history" field (cleared after submit).
+    in-out property <string> sidebar-search-text;
+    // Focus requests (Slint-local; bumped by the root FocusScope).
+    in-out property <int> sidebar-focus-nonce;
+    in-out property <int> history-focus-nonce;
+    // Sidebar collapses to icons below 1100 px (ui-main.md §2.6 RAIL_QUERY; D-UM-29).
+    out property <bool> rail: root.width < 1100px;
+
+    // ── shell callbacks ──
+    callback navigate(PageId);
+    // Sidebar "Search history" submitted (Enter) → History with that search (applied at once).
+    callback sidebar-search(string);
+    callback mini-action(PlayerAction);
+    callback mini-open();
+    callback credits-open();
+    // Header: send the window to the tray (Command::HideMain) / switch between paper and night.
+    callback header-send-to-tray();
+    callback header-toggle-theme();
+    callback toast-action(string);
+    callback toast-dismiss(string);
+    callback toast-hover(string, bool);
+    callback dialog-confirm(string);
+    callback dialog-cancel(string);
+    // ── Home ──
+    callback home-quick-read(string);
+    callback home-quick-read-edited(string);
+    callback home-read-clipboard();
+    callback home-player-action(PlayerAction);
+    callback home-seek(float);
+    callback home-replay(string);
+    callback home-replay-last();
+    callback home-pause-live();
+    callback home-open-page(PageId);
+    callback home-open-settings(string);
+    callback home-credits-retry();
+    callback home-retry();
+    callback home-resume-live();
+    // ── History ──
+    callback history-search-edited(string);
+    callback history-set-favorites-only(bool);
+    callback history-set-source(string);
+    callback history-clear-filters();
+    callback history-toggle-row(string);
+    callback history-replay(string);
+    callback history-copy-text(string);
+    callback history-toggle-favorite(string);
+    callback history-delete(string);
+    callback history-open-url(string);
+    callback history-load-more();
+    callback history-export();
+    callback history-clear-all();
+    callback history-retry();
+    callback history-paste-and-read();
+    // ── Analytics ──
+    callback analytics-set-range(string);
+    callback analytics-retry();
+    callback analytics-refresh-credits();
+    callback analytics-add-key();
+    // The daily plot's width in logical px (on creation and on every change).
+    callback analytics-daily-width(float);
+    // ── Voices ──
+    callback voices-search-edited(string);
+    callback voices-set-gender(string);
+    callback voices-set-accent(string);
+    callback voices-set-category(string);
+    callback voices-clear-filters();
+    callback voices-refresh();
+    callback voices-preview(string);
+    callback voices-use-voice(string);
+    callback voices-add-key();
+    // ── Settings ──
+    callback settings-section-selected(string);
+    callback settings-set-bool(string, bool);
+    callback settings-set-number(string, float);
+    callback settings-set-choice(string, string);
+    // A slider's live label while dragging (dotted key, value) → formatted text.
+    pure callback settings-format-number(string, float) -> string;
+    callback settings-save-key(string);
+    callback settings-key-edited();
+    callback settings-open-key-form();
+    callback settings-cancel-key-form();
+    callback settings-remove-key();
+    callback settings-get-key();
+    callback settings-credits-retry();
+    callback settings-test-voice();
+    callback settings-browse-voices();
+    callback settings-reset-voice-settings();
+    callback settings-hotkey-start(string);
+    callback settings-hotkey-stop();
+    callback settings-hotkey-clear(string);
+    callback settings-add-excluded(string);
+    callback settings-remove-excluded(string);
+    callback settings-excluded-edited();
+    callback settings-clear-cache();
+    callback settings-export-history();
+    callback settings-clear-history();
+    callback settings-port-edited(string);
+    callback settings-commit-port(string);
+    callback settings-revert-port();
+    callback settings-copy-text(string);
+    callback settings-show-extension-folder();
+    callback settings-open-data-folder();
+    callback settings-open-link(string);
+    // ── Onboarding ──
+    callback onboarding-go-to(int);
+    callback onboarding-next();
+    callback onboarding-back();
+    callback onboarding-skip();
+    callback onboarding-connect-key(string);
+    callback onboarding-key-edited();
+    callback onboarding-get-key();
+    callback onboarding-replace-key();
+    callback onboarding-cancel-replace();
+    callback onboarding-choose-voice(string);
+    callback onboarding-preview-voice(string);
+    callback onboarding-retry-voices();
+    callback onboarding-read-sample();
+
+    // ── header helpers ──
+    property <bool> history-actions: root.page == PageId.history && root.history.actions-visible;
+    property <bool> analytics-actions: root.page == PageId.analytics && root.analytics.ranges.length > 0;
+    property <[ChoiceItem]> ranges: root.analytics.ranges;
+    // Segment labels from the range choices (the design Segmented takes plain strings).
+    property <[string]> range-labels: root.ranges.length >= 6
+        ? [root.ranges[0].label, root.ranges[1].label, root.ranges[2].label, root.ranges[3].label, root.ranges[4].label, root.ranges[5].label]
+        : root.ranges.length == 5
+        ? [root.ranges[0].label, root.ranges[1].label, root.ranges[2].label, root.ranges[3].label, root.ranges[4].label]
+        : root.ranges.length == 4
+        ? [root.ranges[0].label, root.ranges[1].label, root.ranges[2].label, root.ranges[3].label]
+        : root.ranges.length == 3
+        ? [root.ranges[0].label, root.ranges[1].label, root.ranges[2].label]
+        : root.ranges.length == 2
+        ? [root.ranges[0].label, root.ranges[1].label]
+        : root.ranges.length == 1 ? [root.ranges[0].label] : [];
+    property <int> range-index: root.ranges.length > 0 && root.ranges[0].value == root.analytics.range ? 0
+        : root.ranges.length > 1 && root.ranges[1].value == root.analytics.range ? 1
+        : root.ranges.length > 2 && root.ranges[2].value == root.analytics.range ? 2
+        : root.ranges.length > 3 && root.ranges[3].value == root.analytics.range ? 3
+        : root.ranges.length > 4 && root.ranges[4].value == root.analytics.range ? 4
+        : root.ranges.length > 5 && root.ranges[5].value == root.analytics.range ? 5
+        : -1;
+    property <string> eyebrow: root.page == PageId.history ? root.history.count-label
+        : root.page == PageId.analytics ? root.analytics.range-label : "";
+    property <string> theme-label: root.theme-dark ? "Switch to paper theme" : "Switch to night theme";
+    // Inert to shortcuts while a dialog is open or onboarding shows.
+    property <bool> inert: root.dialog.open || root.onboarding;
+    // Focus hand-back (see the header). Set by the sidebar nav for a page change it asked for, so the nav item keeps
+    // its focus; any other page change sends focus to the root scope.
+    property <bool> nav-from-sidebar;
+    property <bool> dialog-open: root.dialog.open;
+
+    changed page => {
+        if (!root.nav-from-sidebar) {
+            keys.focus();
+        }
+        root.nav-from-sidebar = false;
+    }
+    changed onboarding => {
+        keys.focus();
+    }
+    changed dialog-open => {
+        if (!self.dialog-open) {
+            keys.focus();
+        }
+    }
+
+    function nav-page(n: int) -> PageId {
+        if (n == 1) { return PageId.home; }
+        if (n == 2) { return PageId.history; }
+        if (n == 3) { return PageId.analytics; }
+        if (n == 4) { return PageId.voices; }
+        return PageId.settings;
+    }
+
+    title: Brand.app-name;
+    min-width: 940px;
+    min-height: 640px;
+    preferred-width: 1180px;
+    preferred-height: 780px;
+    background: Theme.backdrop;
+    default-font-family: Theme.font-text;
+    forward-focus: keys;
+
+    keys := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+
+        capture-key-pressed(event) => {
+            if (root.inert) {
+                return reject;
+            }
+            if (event.modifiers.control && !event.modifiers.alt && !event.modifiers.shift && !event.modifiers.meta) {
+                if (event.text == "1" || event.text == "2" || event.text == "3" || event.text == "4" || event.text == "5") {
+                    if (TextInputInterface.text-input-focused) {
+                        return reject;
+                    }
+                    if (!event.repeat) {
+                        root.navigate(root.nav-page(event.text.to-float()));
+                    }
+                    return accept;
+                }
+                if (event.text == "k" || event.text == "K") {
+                    root.sidebar-focus-nonce += 1;
+                    return accept;
+                }
+                if ((event.text == "f" || event.text == "F") && root.page == PageId.history) {
+                    root.history-focus-nonce += 1;
+                    return accept;
+                }
+            }
+            if (event.text == "/" && !event.modifiers.control && !event.modifiers.alt && !event.modifiers.meta
+                && root.page == PageId.history && !TextInputInterface.text-input-focused) {
+                root.history-focus-nonce += 1;
+                return accept;
+            }
+            reject
+        }
+
+        // ── backdrop ──
+        if root.backdrop.width == 0: Rectangle {
+            // Placeholder "silk" until the art arrives: two soft out-of-focus highlights.
+            Rectangle {
+                x: parent.width * 0.55;
+                y: -parent.height * 0.45;
+                width: parent.width * 0.9;
+                height: parent.height * 1.1;
+                background: @radial-gradient(circle, Theme.art-sheen 0%, Theme.art-sheen.with-alpha(0) 65%);
+            }
+            Rectangle {
+                x: -parent.width * 0.3;
+                y: parent.height * 0.35;
+                width: parent.width * 0.7;
+                height: parent.height;
+                background: @radial-gradient(circle, Theme.art-sheen.with-alpha(0.06) 0%, Theme.art-sheen.with-alpha(0) 70%);
+            }
+        }
+        if root.backdrop.width > 0: Image {
+            width: 100%;
+            height: 100%;
+            source: root.backdrop;
+            image-fit: cover;
+            accessible-role: none;
+        }
+
+        // ── onboarding (replaces the panel) ──
+        if root.onboarding: OnboardingPage {
+            data: root.onboarding-data;
+            backdrop: root.backdrop;
+            key-draft <=> root.onboarding-key-draft;
+            go-to(i) => { root.onboarding-go-to(i); }
+            next => { root.onboarding-next(); }
+            back => { root.onboarding-back(); }
+            skip => { root.onboarding-skip(); }
+            connect-key(k) => { root.onboarding-connect-key(k); }
+            key-edited => { root.onboarding-key-edited(); }
+            get-key => { root.onboarding-get-key(); }
+            replace-key => { root.onboarding-replace-key(); }
+            cancel-replace => { root.onboarding-cancel-replace(); }
+            choose-voice(id) => { root.onboarding-choose-voice(id); }
+            preview-voice(id) => { root.onboarding-preview-voice(id); }
+            retry-voices => { root.onboarding-retry-voices(); }
+            read-sample => { root.onboarding-read-sample(); }
+        }
+
+        // ── the panel ──
+        if !root.onboarding: Rectangle {
+            x: Theme.panel-inset;
+            y: Theme.panel-inset;
+            width: root.width - 2 * Theme.panel-inset;
+            height: root.height - 2 * Theme.panel-inset;
+            border-radius: Theme.radius-panel;
+            background: Theme.panel;
+            drop-shadow-blur: 40px;
+            drop-shadow-offset-y: 12px;
+            drop-shadow-color: Theme.shadow;
+
+            Rectangle {
+                border-radius: Theme.radius-panel;
+                clip: true;
+
+                VerticalLayout {
+                    // Header row: title (+ eyebrow), the page's actions, then Send to tray and the theme toggle.
+                    HorizontalLayout {
+                        height: Theme.header-height;
+                        padding-left: Theme.space-6;
+                        padding-right: Theme.space-4;
+                        spacing: Theme.space-2;
+
+                        HorizontalLayout {
+                            horizontal-stretch: 1;
+                            spacing: Theme.space-3;
+                            HeaderTitle {
+                                text: root.page-title;
+                                horizontal-stretch: 0;
+                                accessible-role: AccessibleRole.text;
+                                accessible-label: root.page-title;
+                            }
+                            if root.eyebrow != "": HorizontalLayout {
+                                spacing: Theme.space-1;
+                                Eyebrow {
+                                    horizontal-stretch: 0;
+                                    min-width: 0px;
+                                    text: root.eyebrow;
+                                    accessible-live-region: AccessibleLiveness.polite;
+                                }
+                                if root.page == PageId.analytics && root.analytics.refresh-failed: Eyebrow {
+                                    horizontal-stretch: 0;
+                                    min-width: 0px;
+                                    text: "· Couldn’t refresh";
+                                    color: Theme.danger;
+                                }
+                            }
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
+                        }
+
+                        if root.history-actions: HorizontalLayout {
+                            spacing: Theme.space-2;
+                            alignment: center;
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    text: "Export";
+                                    icon: Icons.download;
+                                    size: ButtonSize.sm;
+                                    kind: ButtonKind.secondary;
+                                    enabled: root.history.can-export;
+                                    loading: root.history.exporting;
+                                    clicked => { root.history-export(); }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                DangerGhostButton {
+                                    text: "Clear all";
+                                    icon: Icons.trash-2;
+                                    enabled: root.history.can-export && !root.history.clearing;
+                                    clicked => { root.history-clear-all(); }
+                                }
+                            }
+                        }
+
+                        if root.analytics-actions: VerticalLayout {
+                            alignment: center;
+                            range-seg := Segmented {
+                                small: true;
+                                segment-width: 52px;
+                                model: root.range-labels;
+                                current-index: root.range-index;
+                                label: "Time range";
+                                accessible-value: root.range-index >= 0 ? root.ranges[root.range-index].accessible-label : "";
+                                selected(i, v) => {
+                                    if (i >= 0 && i < root.ranges.length) {
+                                        root.analytics-set-range(root.ranges[i].value);
+                                    }
+                                }
+                                // Re-assert from data (an answer that keeps or reverts the range).
+                                property <int> want: root.range-index;
+                                changed want => { self.current-index = self.want; }
+                            }
+                        }
+
+                        if root.history-actions || root.analytics-actions: HorizontalLayout {
+                            padding-left: Theme.space-2;
+                            padding-right: Theme.space-1;
+                            VerticalLayout {
+                                alignment: center;
+                                Divider {
+                                    vertical: true;
+                                    height: 20px;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                icon: Icons.panel-bottom;
+                                label: "Send to tray";
+                                tooltip: "Send to tray";
+                                clicked => { root.header-send-to-tray(); }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                icon: root.theme-dark ? Icons.sun : Icons.moon;
+                                label: root.theme-label;
+                                tooltip: root.theme-label;
+                                clicked => { root.header-toggle-theme(); }
+                            }
+                        }
+                    }
+                    Divider { }
+
+                    HorizontalLayout {
+                        Sidebar {
+                            width: root.rail ? 72px : Theme.sidebar-width;
+                            data: root.sidebar;
+                            page: root.page;
+                            rail: root.rail;
+                            search-text <=> root.sidebar-search-text;
+                            focus-search-nonce: root.sidebar-focus-nonce;
+                            navigate(p) => {
+                                root.nav-from-sidebar = p != root.page;
+                                root.navigate(p);
+                            }
+                            search(t) => {
+                                root.sidebar-search(t);
+                                if (root.rail) {
+                                    keys.focus();
+                                }
+                            }
+                            mini-action(a) => { root.mini-action(a); }
+                            mini-open => { root.mini-open(); }
+                            credits-open => { root.credits-open(); }
+                        }
+                        Divider {
+                            vertical: true;
+                        }
+
+                        // Page host: the current page fills it and scrolls itself.
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            if root.page == PageId.home: PageFade {
+                                HomePage {
+                                    data: root.home;
+                                    quick-read(t) => { root.home-quick-read(t); }
+                                    quick-read-edited(t) => { root.home-quick-read-edited(t); }
+                                    read-clipboard => { root.home-read-clipboard(); }
+                                    player-action(a) => { root.home-player-action(a); }
+                                    seek(f) => { root.home-seek(f); }
+                                    replay(id) => { root.home-replay(id); }
+                                    replay-last => { root.home-replay-last(); }
+                                    pause-live => { root.home-pause-live(); }
+                                    open-page(p) => { root.home-open-page(p); }
+                                    open-settings(s) => { root.home-open-settings(s); }
+                                    credits-retry => { root.home-credits-retry(); }
+                                    retry => { root.home-retry(); }
+                                    resume-live => { root.home-resume-live(); }
+                                }
+                            }
+                            if root.page == PageId.history: PageFade {
+                                HistoryPage {
+                                    data: root.history;
+                                    search-text <=> root.history-search-text;
+                                    focus-search-nonce: root.history-focus-nonce;
+                                    search-edited(t) => { root.history-search-edited(t); }
+                                    set-favorites-only(b) => { root.history-set-favorites-only(b); }
+                                    set-source(s) => { root.history-set-source(s); }
+                                    clear-filters => { root.history-clear-filters(); }
+                                    toggle-row(id) => { root.history-toggle-row(id); }
+                                    replay(id) => { root.history-replay(id); }
+                                    copy-text(id) => { root.history-copy-text(id); }
+                                    toggle-favorite(id) => { root.history-toggle-favorite(id); }
+                                    delete(id) => { root.history-delete(id); }
+                                    open-url(id) => { root.history-open-url(id); }
+                                    load-more => { root.history-load-more(); }
+                                    retry => { root.history-retry(); }
+                                    paste-and-read => { root.history-paste-and-read(); }
+                                }
+                            }
+                            if root.page == PageId.analytics: PageFade {
+                                AnalyticsPage {
+                                    data: root.analytics;
+                                    retry => { root.analytics-retry(); }
+                                    refresh-credits => { root.analytics-refresh-credits(); }
+                                    add-key => { root.analytics-add-key(); }
+                                    daily-width-changed(w) => { root.analytics-daily-width(w); }
+                                }
+                            }
+                            if root.page == PageId.voices: PageFade {
+                                VoicesPage {
+                                    data: root.voices;
+                                    search-text <=> root.voices-search-text;
+                                    search-edited(t) => { root.voices-search-edited(t); }
+                                    set-gender(v) => { root.voices-set-gender(v); }
+                                    set-accent(v) => { root.voices-set-accent(v); }
+                                    set-category(v) => { root.voices-set-category(v); }
+                                    clear-filters => { root.voices-clear-filters(); }
+                                    refresh => { root.voices-refresh(); }
+                                    preview(id) => { root.voices-preview(id); }
+                                    use-voice(id) => { root.voices-use-voice(id); }
+                                    add-key => { root.voices-add-key(); }
+                                }
+                            }
+                            if root.page == PageId.settings: PageFade {
+                                SettingsPage {
+                                    data: root.settings;
+                                    scroll-to: root.settings-scroll-to;
+                                    scroll-nonce: root.settings-scroll-nonce;
+                                    key-draft <=> root.settings-key-draft;
+                                    exclude-draft <=> root.settings-exclude-draft;
+                                    port-draft <=> root.settings-port-draft;
+                                    format-number(k, v) => { root.settings-format-number(k, v) }
+                                    section-selected(s) => { root.settings-section-selected(s); }
+                                    set-bool(k, v) => { root.settings-set-bool(k, v); }
+                                    set-number(k, v) => { root.settings-set-number(k, v); }
+                                    set-choice(k, v) => { root.settings-set-choice(k, v); }
+                                    save-key(k) => { root.settings-save-key(k); }
+                                    key-edited => { root.settings-key-edited(); }
+                                    open-key-form => { root.settings-open-key-form(); }
+                                    cancel-key-form => { root.settings-cancel-key-form(); }
+                                    remove-key => { root.settings-remove-key(); }
+                                    get-key => { root.settings-get-key(); }
+                                    credits-retry => { root.settings-credits-retry(); }
+                                    test-voice => { root.settings-test-voice(); }
+                                    browse-voices => { root.settings-browse-voices(); }
+                                    reset-voice-settings => { root.settings-reset-voice-settings(); }
+                                    hotkey-start(a) => { root.settings-hotkey-start(a); }
+                                    hotkey-stop => { root.settings-hotkey-stop(); }
+                                    hotkey-clear(a) => { root.settings-hotkey-clear(a); }
+                                    add-excluded(n) => { root.settings-add-excluded(n); }
+                                    remove-excluded(n) => { root.settings-remove-excluded(n); }
+                                    excluded-edited => { root.settings-excluded-edited(); }
+                                    clear-cache => { root.settings-clear-cache(); }
+                                    export-history => { root.settings-export-history(); }
+                                    clear-history => { root.settings-clear-history(); }
+                                    port-edited(t) => { root.settings-port-edited(t); }
+                                    commit-port(t) => { root.settings-commit-port(t); }
+                                    revert-port => { root.settings-revert-port(); }
+                                    copy-text(t) => { root.settings-copy-text(t); }
+                                    show-extension-folder => { root.settings-show-extension-folder(); }
+                                    open-data-folder => { root.settings-open-data-folder(); }
+                                    open-link(l) => { root.settings-open-link(l); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Outer hairline drawn last so it sits above the clipped content.
+            Rectangle {
+                border-radius: Theme.radius-panel;
+                border-width: Theme.hairline;
+                border-color: Theme.panel-border;
+            }
+        }
+
+        ConfirmDialog {
+            data: root.dialog;
+            confirm(id) => { root.dialog-confirm(id); }
+            cancel(id) => { root.dialog-cancel(id); }
+        }
+
+        ToastStack {
+            toasts: root.toasts;
+            centered: root.onboarding;
+            action(id) => {
+                root.toast-action(id);
+                keys.focus();
+            }
+            dismiss(id) => {
+                root.toast-dismiss(id);
+                keys.focus();
+            }
+            hover(id, h) => { root.toast-hover(id, h); }
+        }
+    }
+}

@@ -1,0 +1,39 @@
+// Settings page preview: SettingsPage standalone on the panel. Page sizes (the main window's content area):
+// 892 x 700 (1180 x 780 window, the default), 811 x 548 (1100 x 640: the narrowest page, full sidebar) and 839 x 548
+// (940 x 640, the minimum window, rail sidebar); 720 wide shows the icon-rail fallback no real window reaches.
+// Fixtures: ui/previews/settings-<state>.json, written and rendered by tools/previews/settings_fixtures.py:
+//   vox-shot ui/previews/settings.slint --data ui/previews/settings-populated.json --size 892x700 \
+//            --out shots/ui/settings/populated-dark.png [--set Theme.dark=false]
+// `scroll-to` deep-links a section (the page scrolls to it and pins it), which is how each section is rendered.
+import { Theme } from "../design/theme.slint";
+import { SettingsData } from "../models.slint";
+import { SettingsPage } from "../pages/settings.slint";
+
+export { Theme }
+
+export component SettingsPreview inherits Window {
+    in property <SettingsData> data;
+    in property <string> scroll-to;
+    in-out property <string> key-draft;
+    in-out property <string> exclude-draft;
+    in-out property <string> port-draft;
+
+    title: "Settings";
+    preferred-width: 892px;
+    preferred-height: 700px;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    SettingsPage {
+        // vox-shot sets `scroll-to` after the page's `init` and does not animate between frames, so the section index
+        // starts on the deep-linked section here (the page pins it on its own as soon as it scrolls).
+        active-section: root.scroll-to != "" ? root.scroll-to : "account";
+        width: 100%;
+        height: 100%;
+        data: root.data;
+        scroll-to: root.scroll-to;
+        key-draft <=> root.key-draft;
+        exclude-draft <=> root.exclude-draft;
+        port-draft <=> root.port-draft;
+    }
+}

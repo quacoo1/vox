@@ -1,0 +1,208 @@
+{
+  "data": {
+    "step": 0,
+    "furthest": 0,
+    "step-labels": [
+      "Welcome",
+      "API key",
+      "Voice",
+      "Try it",
+      "Done"
+    ],
+    "crumb": "",
+    "next-label": "Get started",
+    "next-secondary": false,
+    "show-back": false,
+    "show-skip": true,
+    "finishing": false,
+    "key": {
+      "has-key": false,
+      "form-visible": true,
+      "replacing": false,
+      "busy": false,
+      "error": "",
+      "hint": "Find it under Settings → API keys on elevenlabs.io.",
+      "connected-caption": "",
+      "warning": "",
+      "notice": ""
+    },
+    "voices": {
+      "state": {
+        "$enum": "LoadState.ready"
+      },
+      "title": "",
+      "body": "",
+      "items": [
+        {
+          "id": "george",
+          "name": "George",
+          "art": {
+            "$image": "art/small-george.png"
+          },
+          "subtitle": "british · middle aged · narration",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": true,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "charlotte",
+          "name": "Charlotte",
+          "art": {
+            "$image": "art/small-charlotte.png"
+          },
+          "subtitle": "swedish · female · conversational",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.none"
+          }
+        },
+        {
+          "id": "aria",
+          "name": "Aria",
+          "art": {
+            "$image": "art/small-aria.png"
+          },
+          "subtitle": "american · female · social media",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.playing"
+          }
+        },
+        {
+          "id": "roger",
+          "name": "Roger",
+          "art": {
+            "$image": "art/small-roger.png"
+          },
+          "subtitle": "american · male · conversational",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "sarah",
+          "name": "Sarah",
+          "art": {
+            "$image": "art/small-sarah.png"
+          },
+          "subtitle": "american · female · news",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "laura",
+          "name": "Laura",
+          "art": {
+            "$image": "art/small-laura.png"
+          },
+          "subtitle": "american · female · social media",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "charlie",
+          "name": "Charlie",
+          "art": {
+            "$image": "art/small-charlie.png"
+          },
+          "subtitle": "australian · male · conversational",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "river",
+          "name": "River",
+          "art": {
+            "$image": "art/small-river.png"
+          },
+          "subtitle": "american · neutral · narration",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        },
+        {
+          "id": "callum",
+          "name": "Callum",
+          "art": {
+            "$image": "art/small-callum.png"
+          },
+          "subtitle": "transatlantic · male · characters",
+          "description": "",
+          "tags": [],
+          "caption": "",
+          "in-use": false,
+          "preview": {
+            "$enum": "PreviewState.ready"
+          }
+        }
+      ]
+    },
+    "try-it": {
+      "can-read": true,
+      "caption": "Or hear it right here:",
+      "busy": false,
+      "sample": "Hi, I’m George. Select any text on your screen, right-click it, and choose Read with Vox. I’ll read emails, articles and documents aloud while you keep working.",
+      "keys": [
+        "Ctrl",
+        "Alt",
+        "R"
+      ]
+    },
+    "tips": [
+      {
+        "label": "Click the tray icon to open Vox",
+        "keys": []
+      },
+      {
+        "label": "Read selection",
+        "keys": [
+          "Ctrl",
+          "Alt",
+          "R"
+        ]
+      },
+      {
+        "label": "Play / pause",
+        "keys": [
+          "Ctrl",
+          "Alt",
+          "P"
+        ]
+      }
+    ]
+  },
+  "key-draft": ""
+}

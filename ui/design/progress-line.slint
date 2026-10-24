@@ -1,0 +1,150 @@
+// ProgressLine: the playback line (widget, now-playing rows). Seek by click or drag.
+//
+//   in    value: float                 played fraction 0..1
+//   in    buffered: float              buffered fraction 0..1 (drawn in `buffered`, under the played part)
+//   in    interactive: bool            true (default) = hover grows the line 3 -> 5 px and shows a 12 px knob;
+//                                      click / drag seeks; arrow keys seek +-5 %, Home / End
+//   in    enabled: bool
+//   in    label: string                accessible label (default "Playback position")
+//   in    value-text: string           accessible value ("0:42 of 2:10"); default is a percentage
+//   in    show-focus: bool             draw the focus ring without focus (previews)
+//   in    force-hover: bool            draw the hovered look (previews)
+//   out   dragging: bool               a drag is in progress (the line shows `drag-value` meanwhile)
+//   out   drag-value: float            the fraction under the pointer while dragging
+//   out   has-focus: bool
+//   callback scrub(value: float)       live while dragging (preview the time)
+//   callback seek(value: float)        commit: on click, on drag release, on keys
+// Height: 16 px hit area (the line itself is 3 px, centred). Stretches horizontally.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+
+export component ProgressLine inherits Rectangle {
+    in property <float> value: 0;
+    in property <float> buffered: 0;
+    in property <bool> interactive: true;
+    in property <bool> enabled: true;
+    in property <string> label: "Playback position";
+    in property <string> value-text;
+    in property <bool> show-focus: false;
+    in property <bool> force-hover: false;
+    out property <bool> dragging: false;
+    out property <float> drag-value: 0;
+    out property <bool> has-focus: press.has-focus;
+
+    callback scrub(value: float);
+    callback seek(value: float);
+
+    property <bool> hot: root.interactive && root.enabled
+        && (press.has-hover || root.dragging || press.focus-visible || root.force-hover || root.show-focus);
+    property <float> shown: max(0, min(1, root.dragging ? root.drag-value : root.value));
+    property <float> buf: max(root.shown, min(1, root.buffered));
+
+    function fraction-at(px: length) -> float {
+        return max(0, min(1, px / max(1px, root.width)));
+    }
+
+    height: 16px;
+    min-width: 40px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: slider;
+    accessible-label: root.label;
+    accessible-value: root.value-text != "" ? root.value-text : round(root.value * 100) + "%";
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 1;
+    accessible-value-step: 0.05;
+    accessible-enabled: root.enabled;
+    accessible-action-increment => { root.seek(min(1, root.value + 0.05)); }
+    accessible-action-decrement => { root.seek(max(0, root.value - 0.05)); }
+
+    track := Rectangle {
+        property <length> thickness: root.hot ? 5px : 3px;
+        width: root.width;
+        height: self.thickness;
+        y: (root.height - self.height) / 2;
+        border-radius: self.height / 2;
+        background: Theme.track;
+        clip: true;
+        animate thickness { duration: Theme.fast; easing: ease-out; }
+
+        Rectangle {
+            x: 0;
+            width: parent.width * root.buf;
+            height: 100%;
+            background: Theme.buffered;
+        }
+        Rectangle {
+            x: 0;
+            width: parent.width * root.shown;
+            height: 100%;
+            border-radius: parent.border-radius;
+            background: Theme.primary;
+        }
+    }
+
+    knob := Rectangle {
+        property <length> d: root.hot ? 12px : 0px;
+        width: self.d;
+        height: self.d;
+        x: max(0px, min(root.width - self.width, root.width * root.shown - self.width / 2));
+        y: (root.height - self.height) / 2;
+        border-radius: self.width / 2;
+        background: Theme.primary;
+        animate d { duration: Theme.fast; easing: ease-out; }
+
+        // Keyboard focus rings the knob (like Slider), not the whole 16-px hit strip.
+        FocusRing {
+            radius: knob.width / 2;
+            gap: 2px;
+            shown: root.interactive && (press.focus-visible || root.show-focus);
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled && root.interactive;
+        activate-on-enter: false;
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                root.dragging = true;
+                root.drag-value = root.fraction-at(self.mouse-x);
+                root.scrub(root.drag-value);
+            } else if (event.button == PointerEventButton.left && event.kind == PointerEventKind.up) {
+                if (root.dragging) {
+                    root.dragging = false;
+                    root.seek(root.drag-value);
+                }
+            } else if (event.kind == PointerEventKind.cancel) {
+                root.dragging = false;
+            }
+        }
+        moved => {
+            if (root.dragging) {
+                root.drag-value = root.fraction-at(self.mouse-x);
+                root.scrub(root.drag-value);
+            }
+        }
+        key(event) => {
+            if (event.text == Key.RightArrow) {
+                root.seek(min(1, root.value + 0.05));
+                return accept;
+            }
+            if (event.text == Key.LeftArrow) {
+                root.seek(max(0, root.value - 0.05));
+                return accept;
+            }
+            if (event.text == Key.Home) {
+                root.seek(0);
+                return accept;
+            }
+            if (event.text == Key.End) {
+                root.seek(1);
+                return accept;
+            }
+            reject
+        }
+    }
+}

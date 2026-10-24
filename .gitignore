@@ -1,0 +1,17 @@
+# Build output
+/target/
+/dist/
+/tools/bin/
+
+# Generated screenshots (regenerate with scripts/shots.ps1 and vox-shot)
+/shots/
+
+# Local secrets and editor/OS noise
+*.env
+.env*
+secrets*.bin
+*.log
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

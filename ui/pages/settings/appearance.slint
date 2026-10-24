@@ -1,0 +1,272 @@
+// Settings → Appearance (ui-settings-widget.md §2.7). Copy from data: `intro` and one `theme-notes` entry per tile
+// (D-USW-20: the floating player and the chip always stay dark).
+// The segmented control "Theme" is the accessible control; the three preview tiles are a mouse shortcut only (not
+// focusable, hidden from assistive tech). Tiles draw a miniature window in the light and dark looks with Theme tokens
+// only: `primary` / `on-primary` are the inverse pair, so the other look's colours are always at hand.
+import { Theme, Icons, Icon } from "../../design/index.slint";
+import { AppearanceData } from "../../models.slint";
+import { SectionHead, Row, WrapText, ChoiceSegmented } from "parts.slint";
+
+// A miniature main window: sidebar, text lines, and the (always dark) floating player.
+component MiniWindow inherits Rectangle {
+    in property <bool> light;
+
+    property <brush> surface: root.light ? (Theme.dark ? Theme.primary : Theme.panel)
+        : (Theme.dark ? Theme.panel : Theme.primary);
+    property <color> ink: root.light ? (Theme.dark ? Theme.on-primary : Theme.text)
+        : (Theme.dark ? Theme.text : Theme.on-primary);
+    // The floating player is always dark: the dark surface in both looks.
+    property <brush> player: Theme.dark ? Theme.panel : Theme.primary;
+    property <color> player-ink: Theme.dark ? Theme.text : Theme.on-primary;
+
+    background: root.surface;
+    accessible-role: none;
+
+    // Sidebar.
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width * 0.28;
+        height: root.height;
+        background: root.ink.with-alpha(0.04);
+        for i in 3: Rectangle {
+            x: 8px;
+            y: 12px + i * 10px;
+            width: parent.width - 16px;
+            height: 4px;
+            border-radius: 2px;
+            background: root.ink.with-alpha(i == 0 ? 0.32 : 0.14);
+        }
+    }
+    Rectangle {
+        x: root.width * 0.28;
+        y: 0;
+        width: 1px;
+        height: root.height;
+        background: root.ink.with-alpha(0.08);
+    }
+    // Content.
+    Rectangle {
+        x: root.width * 0.28 + 10px;
+        y: 12px;
+        width: root.width * 0.34;
+        height: 5px;
+        border-radius: 2.5px;
+        background: root.ink.with-alpha(0.55);
+    }
+    Rectangle {
+        x: root.width * 0.28 + 10px;
+        y: 23px;
+        width: root.width * 0.48;
+        height: 4px;
+        border-radius: 2px;
+        background: root.ink.with-alpha(0.16);
+    }
+    Rectangle {
+        x: root.width * 0.28 + 10px;
+        y: 33px;
+        width: root.width * 0.40;
+        height: 4px;
+        border-radius: 2px;
+        background: root.ink.with-alpha(0.16);
+    }
+    // Floating player (always dark).
+    Rectangle {
+        x: root.width - self.width - 8px;
+        y: root.height - self.height - 8px;
+        width: 40px;
+        height: 14px;
+        border-radius: 7px;
+        background: root.player;
+        border-width: 1px;
+        border-color: root.player-ink.with-alpha(0.22);
+        Rectangle {
+            x: 4px;
+            y: 4px;
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.player-ink.with-alpha(0.7);
+        }
+        Rectangle {
+            x: 14px;
+            y: 6px;
+            width: 20px;
+            height: 2px;
+            border-radius: 1px;
+            background: root.player-ink.with-alpha(0.45);
+        }
+    }
+}
+
+// One preview tile: the miniature (System = light and dark halves), a glyph + label and the note.
+component ThemeTile inherits VerticalLayout {
+    // 0 system, 1 paper, 2 night.
+    in property <int> mode;
+    in property <string> label;
+    in property <string> note;
+    in property <bool> selected;
+
+    callback picked();
+
+    spacing: Theme.space-2;
+    min-width: 0px;
+    preferred-width: 0px;
+    horizontal-stretch: 1;
+    accessible-role: none;
+
+    frame := Rectangle {
+        height: 92px;
+        border-radius: 12px;
+        background: Theme.field;
+        clip: true;
+
+        if root.mode != 0: MiniWindow {
+            width: parent.width;
+            height: parent.height;
+            light: root.mode == 1;
+        }
+        if root.mode == 0: Rectangle {
+            x: 0;
+            width: parent.width / 2;
+            height: parent.height;
+            clip: true;
+            MiniWindow {
+                x: 0;
+                width: frame.width;
+                height: frame.height;
+                light: true;
+            }
+        }
+        if root.mode == 0: Rectangle {
+            x: parent.width / 2;
+            width: parent.width / 2;
+            height: parent.height;
+            clip: true;
+            MiniWindow {
+                x: -frame.width / 2;
+                width: frame.width;
+                height: frame.height;
+                light: false;
+            }
+        }
+
+        // Ring: hairline at rest, a 2-px `text` ring when selected.
+        Rectangle {
+            border-radius: parent.border-radius;
+            border-width: root.selected ? 2px : Theme.hairline;
+            border-color: root.selected ? Theme.text : touch.has-hover ? Theme.field-border-focus : Theme.field-border;
+            animate border-color { duration: Theme.fast; easing: ease-out; }
+        }
+
+        touch := TouchArea {
+            mouse-cursor: MouseCursor.pointer;
+            clicked => { root.picked(); }
+        }
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        Icon {
+            source: root.mode == 0 ? Icons.globe : root.mode == 1 ? Icons.sun : Icons.moon;
+            size: 14px;
+            color: root.selected ? Theme.text : Theme.text-secondary;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+    WrapText {
+        text: root.note;
+        text-color: Theme.text-muted;
+        size: Theme.size-caption;
+        accessible-role: none;
+    }
+}
+
+export component AppearanceSection inherits Rectangle {
+    in property <AppearanceData> data;
+
+    // key = "app.theme"; value = "system" | "paper" | "night".
+    callback set-choice(string, string);
+
+    pure function mode-of(value: string) -> int {
+        value == "system" ? 0 : value == "paper" ? 1 : 2
+    }
+    function pick(i: int) {
+        if (i >= 0 && i < root.data.theme-options.length && i != theme.current-index) {
+            theme.current-index = i;
+            root.set-choice("app.theme", root.data.theme-options[i].value);
+        }
+    }
+
+    // Re-assert from data (ARCHITECTURE.md §7.1); the page also calls this when `SettingsData.revision` changes.
+    public function reassert() {
+        theme.current-index = root.data.theme-index;
+    }
+    changed data => { root.reassert(); }
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Appearance";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Appearance";
+            intro: root.data.intro;
+        }
+        Rectangle { height: Theme.space-2; }
+
+        Row {
+            divider: false;
+            title: "Theme";
+
+            theme := ChoiceSegmented {
+                segment-width: 84px;
+                model: root.data.theme-options;
+                current-index: root.data.theme-index;
+                label: "Theme";
+                selected(i, v) => { root.set-choice("app.theme", v); }
+            }
+        }
+
+        // The three modes are fixed (System / Paper / Night); the tiles are unrolled because wrapped notes inside a
+        // `for` are measured before their width is known.
+        HorizontalLayout {
+            spacing: Theme.space-4;
+            padding-top: Theme.space-1;
+            padding-bottom: Theme.space-2;
+
+            ThemeTile {
+                mode: root.mode-of(root.data.theme-options[0].value);
+                label: root.data.theme-options[0].label;
+                note: root.data.theme-notes[0];
+                selected: theme.current-index == 0;
+                picked => { root.pick(0); }
+            }
+            ThemeTile {
+                mode: root.mode-of(root.data.theme-options[1].value);
+                label: root.data.theme-options[1].label;
+                note: root.data.theme-notes[1];
+                selected: theme.current-index == 1;
+                picked => { root.pick(1); }
+            }
+            ThemeTile {
+                mode: root.mode-of(root.data.theme-options[2].value);
+                label: root.data.theme-options[2].label;
+                note: root.data.theme-notes[2];
+                selected: theme.current-index == 2;
+                picked => { root.pick(2); }
+            }
+        }
+    }
+}

@@ -1,0 +1,36 @@
+// Onboarding preview: OnboardingPage filling a 1180×780 main window (it replaces the shell and draws on the backdrop).
+//   vox-shot ui/previews/onboarding.slint --component OnboardingPreview --data ui/previews/onboarding-<state>.json
+//            --size 1180x780 --out shots/ui/onboarding/<state>-dark.png   (... --set Theme.dark=false for -light)
+// The fixtures carry both backdrops; the wrapper picks the one for the theme (Rust sends the matching one).
+// States (ui-settings-widget.md §5, ui-main.md §10): welcome; key empty / typed / validating / error / blank / migration
+// notice / connected / connected with a warning / replacing; voice loading / list with a preview playing (Charlotte
+// has no preview) / a preview loading / error / no key / empty; try ready / busy / playing / no key; done / finishing /
+// no shortcuts; long text; missing art and backdrop (welcome-no-art, key-connected-no-art, done-no-art); narrow
+// (940×640, the window minimum). Step art follows the contract in pages/onboarding/steps.slint: a non-voice seed on
+// welcome, steel seeds on the key and done steps, the in-use voice (George) on the voice and try steps.
+
+import { Theme } from "../design/theme.slint";
+import { OnboardingData } from "../models.slint";
+import { OnboardingPage } from "../pages/onboarding.slint";
+
+export { Theme }
+
+export component OnboardingPreview inherits Window {
+    in property <OnboardingData> data;
+    in property <image> backdrop-dark;
+    in property <image> backdrop-light;
+    in-out property <string> key-draft;
+
+    preferred-width: 1180px;
+    preferred-height: 780px;
+    background: Theme.backdrop;
+    default-font-family: Theme.font-text;
+
+    OnboardingPage {
+        width: 100%;
+        height: 100%;
+        data: root.data;
+        backdrop: Theme.dark ? root.backdrop-dark : root.backdrop-light;
+        key-draft <=> root.key-draft;
+    }
+}

@@ -1,0 +1,199 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.list"
+  },
+  "dimmed": false,
+  "count-label": "2 of 214 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": true,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "",
+  "state-title": "",
+  "state-body": "",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "",
+  "rows": [
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Today",
+    "header-label": "Today",
+    "header-meta": "1 read · 2m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r2",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-charlotte.png"
+    },
+    "source-icon": "keyboard",
+    "source-label": "Hotkey",
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen, and the moment it began to speak back.",
+    "meta": "Chrome · Charlotte · 2:10 · 1 hour ago",
+    "time-tooltip": "Friday, October 17, 2026 at 7:41 PM",
+    "favorite": true,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Yesterday",
+    "header-label": "Yesterday",
+    "header-meta": "1 read · 3m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r6",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-aria.png"
+    },
+    "source-icon": "type",
+    "source-label": "Typed in app",
+    "title": "Remember to call the pharmacy before five, then pick up the parcel at the post office.",
+    "meta": "Typed in app · Aria · 3:47 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 6:30 PM",
+    "favorite": true,
+    "badges": [
+     "Paused"
+    ],
+    "progress": 0.74,
+    "percent": "74%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   }
+  ],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

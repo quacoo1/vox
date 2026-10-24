@@ -1,0 +1,80 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.no-matches"
+  },
+  "dimmed": false,
+  "count-label": "0 of 214 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": false,
+  "source": "hotkey",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "mouse-pointer-click",
+  "state-title": "No reads here",
+  "state-body": "No reads came from Hotkey yet.",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "Clear filters",
+  "rows": [],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

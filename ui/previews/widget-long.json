@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.full"
+    },
+    "body": {
+      "$enum": "WidgetBody.sentence"
+    },
+    "art": {
+      "$image": "art/small-charlotte.png"
+    },
+    "source": "Microsoft Edge WebView2 Runtime Host Process",
+    "voice": "Charlotte — warm multilingual narrator (cloned)",
+    "phase": {
+      "$enum": "PlayerPhase.playing"
+    },
+    "status": "Reading",
+    "status-loading": false,
+    "rate": "1.75×",
+    "show-rate": true,
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+    "spoken": "When the committee finally published its findings, after eighteen months of hearings, site visits and more than four hundred written submissions from residents, businesses and",
+    "current": "independent",
+    "upcoming": "experts, the conclusion was surprisingly modest; the river would be left alone.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "−1:02:03",
+    "time-estimate": false,
+    "time-accessible": "1:02:03 left",
+    "progress": 0.41,
+    "buffered": 0.93,
+    "progress-accessible": "43:11 of 1:45:14",
+    "seekable": true,
+    "previous-enabled": true,
+    "next-enabled": true,
+    "previous-label": "Previous sentence",
+    "next-label": "Next sentence",
+    "main-action": {
+      "$enum": "MainAction.pause"
+    },
+    "compact-loading": false,
+    "warning-visible": false,
+    "warning-lead": "",
+    "warning-reason": "",
+    "warning-link": false,
+    "warning-tooltip": "",
+    "warning-dot-tooltip": "",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "",
+      "tone": {
+        "$enum": "ToastTone.info"
+      },
+      "title": "",
+      "message": "",
+      "action-label": "",
+      "leaving": false,
+      "key": 0
+    },
+    "toast-visible": false
+  }
+}

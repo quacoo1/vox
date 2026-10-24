@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.full"
+    },
+    "body": {
+      "$enum": "WidgetBody.banner"
+    },
+    "art": {
+      "$image": "art/small-george.png"
+    },
+    "source": "Chrome",
+    "voice": "George",
+    "phase": {
+      "$enum": "PlayerPhase.playing"
+    },
+    "status": "Reading",
+    "status-loading": false,
+    "rate": "1×",
+    "show-rate": true,
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+    "spoken": "The quiet revolution in personal",
+    "current": "computing",
+    "upcoming": "was never about faster chips.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "≈0:31",
+    "time-estimate": true,
+    "time-accessible": "about 0:31 left",
+    "progress": 0.34,
+    "buffered": 0.48,
+    "progress-accessible": "0:10 of about 0:41",
+    "seekable": true,
+    "previous-enabled": true,
+    "next-enabled": true,
+    "previous-label": "Previous sentence",
+    "next-label": "Next sentence",
+    "main-action": {
+      "$enum": "MainAction.pause"
+    },
+    "compact-loading": false,
+    "warning-visible": true,
+    "warning-lead": "Stops early",
+    "warning-reason": "connection lost",
+    "warning-link": false,
+    "warning-tooltip": "The connection to ElevenLabs was reset.",
+    "warning-dot-tooltip": "Stops early: The connection to ElevenLabs was reset.",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "t",
+      "tone": {
+        "$enum": "ToastTone.error"
+      },
+      "title": "",
+      "message": "Couldn’t save that setting. Try again from Settings.",
+      "action-label": "Open",
+      "leaving": false,
+      "key": 1
+    },
+    "toast-visible": true
+  }
+}

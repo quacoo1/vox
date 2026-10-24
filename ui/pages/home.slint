@@ -1,0 +1,1632 @@
+// Home (ui-main.md §3; DESIGN.md "Screens → Home"). The interface below is final (docs/ARCHITECTURE.md §7.4); the
+// body is built from ui/design.
+//
+// Layout, top to bottom, in one scrolling column (40 px gutters; 32 px below 860 px of content):
+//   hero         date line + greeting (Display 26), the voice pill on the right (→ Voices; tooltip = the voice name)
+//   Now playing  110×82 art, badges, the read's sentence, meta, transport (Stop · Previous · Play/Pause · Next) and a
+//                full-width seek line with the remaining time (right-aligned in a box sized for "-00:00", growing for
+//                hour-long and estimated times); idle: cursor badge on the art, the idle copy with the read-selection
+//                keycaps and "Replay last". The sentence / meta column is capped at 680 px so wide windows keep a
+//                readable measure; the transport stays on the right gutter.
+//   stats        three quiet blocks separated by vertical hairlines (no boxes), always in the same columns:
+//                Today vs goal · Credits · Last 7 days. Big Display numbers over a thin line meter; the week block
+//                draws its days as small columns on a hairline baseline with the day initials underneath (today
+//                emphasised; a day without listening is a 3 px stub).
+//   Quick read   TextArea + hint (Ctrl Enter) + "Read clipboard" (secondary) and "Read" (primary); the live word count
+//                in the section label is also announced politely.
+//   Recent       compact rows: voice art, excerpt, "Outlook · George · 10 h ago", filled star / Cached / Failed /
+//                duration, and the row's play button (Replay; Pause for the live read; Resume for the paused one)
+//   Ways to read compact rows with a glyph tile, keycaps for the hotkeys ("Not set" for an empty accelerator), an
+//                "Off" tag, → Settings
+// States: `state` loading (skeletons in Today / Week / Recent); error (R-Home: the page keeps its structure, Today and
+// Week show a quiet static "—" form, and the inline error with Retry sits under the "Recent" label, which keeps
+// "All history"); ready. Credits: loading / ready (low = danger number and meter) / no-key / restricted / error
+// (Retry spins while `refreshing`). Player: idle / loading / playing / paused / ended / error (the error meta wraps to
+// two lines and is announced assertively).
+// Keyboard: the seek line takes Right/Up +0.02, Left/Down −0.02, PageUp +0.1, PageDown −0.1, Home 0, End 1 (D-UM-31)
+// only while the read is seekable; Ctrl+Enter in Quick read reads. Tab order follows the reading order.
+import { Theme } from "../design/theme.slint";
+import {
+    Icons, Icon, Pressable, FocusRing, HeroText, Button, ButtonKind, ButtonSize, IconButton,
+    IconButtonKind, IconButtonSize, KeyCombo, SectionLabel, ListRow, ListRowSize, Badge, ProgressLine,
+    Skeleton, SkeletonRow, SkeletonRowSize, ArtThumb, Tip, ScrollArea, Divider, Spinner, TextArea
+} from "../design/index.slint";
+import {
+    Brand, Motion, HomeData, PageId, PlayerAction, PlayerPhase, MainAction, LoadState, CreditsState, NowPlayingData,
+    StatBlockData, CreditsData, WeekData, BarData, RecentRow, WayRow
+} from "../models.slint";
+
+// ───────────────────────────── small private helpers ─────────────────────────────
+
+// A Lucide icon by name (WayRow.icon). Unknown names fall back to `info`.
+global HomeIcons {
+    pure public function by-name(name: string) -> image {
+        return name == "mouse-pointer-click" ? Icons.mouse-pointer-click
+            : name == "keyboard" ? Icons.keyboard
+            : name == "globe" ? Icons.globe
+            : name == "text-select" ? Icons.text-select
+            : name == "text-cursor-input" ? Icons.text-cursor-input
+            : name == "clipboard" ? Icons.clipboard
+            : name == "clipboard-paste" ? Icons.clipboard-paste
+            : name == "puzzle" ? Icons.puzzle
+            : name == "folder-open" ? Icons.folder-open
+            : name == "terminal" ? Icons.terminal
+            : name == "type" ? Icons.type
+            : Icons.info;
+    }
+
+    // Keycaps read aloud, as KeyCombo does ("Ctrl plus Alt plus R"; empty → "Not set").
+    pure public function spoken(keys: [string]) -> string {
+        return keys.length == 0 ? "Not set"
+            : keys[0]
+              + (keys.length > 1 ? " plus " + keys[1] : "")
+              + (keys.length > 2 ? " plus " + keys[2] : "")
+              + (keys.length > 3 ? " plus " + keys[3] : "")
+              + (keys.length > 4 ? " plus " + keys[4] : "");
+    }
+}
+
+// Three small bars that move while audio plays (the "level" of the original); still when paused or when the OS asks
+// for reduced motion.
+component LevelBars {
+    in property <bool> active;
+
+    property <bool> moving: root.active && !Motion.reduce;
+    property <float> t: root.moving ? mod(animation-tick() / 1ms, 900) / 900 : 0;
+
+    width: 14px;
+    height: 14px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.active ? "Playing" : "";
+
+    for i in 3: Rectangle {
+        property <float> level: root.moving ? 0.5 + 0.5 * sin((root.t + i * 0.27) * 360deg)
+            : root.active ? (i == 1 ? 0.9 : 0.55) : (i == 1 ? 0.6 : 0.35);
+        x: i * 5px;
+        width: 3px;
+        height: 4px + 10px * self.level;
+        y: root.height - self.height;
+        border-radius: 1.5px;
+        background: root.active ? Theme.text : Theme.text-muted;
+    }
+}
+
+// A filled star (Lucide "star" geometry, filled), the favourite mark. Same drawing as History's.
+component StarMark {
+    in property <length> size: 13px;
+    in property <brush> color: Theme.text-secondary;
+
+    width: root.size;
+    height: root.size;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "Favorite";
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z";
+        fill: root.color;
+        stroke: root.color;
+        stroke-width: 1px;
+        accessible-role: none;
+    }
+}
+
+// A 44×44 glyph tile for quiet list states (empty Recent, the inline load error): a hairline outline, no fill.
+component StateTile inherits Rectangle {
+    in property <image> icon;
+    in property <brush> glyph: Theme.text-muted;
+
+    width: 44px;
+    height: 44px;
+    border-radius: Theme.radius-thumb;
+    background: transparent;
+    border-width: Theme.hairline;
+    border-color: Theme.divider;
+
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: root.icon;
+        size: 20px;
+        color: root.glyph;
+    }
+}
+
+// The voice in use as a pill: round art, name, model · speed, chevron. The whole pill → Voices.
+component VoicePill inherits Rectangle {
+    in property <string> name;
+    in property <string> meta;
+    in property <image> art;
+    in property <string> accessible;
+
+    callback clicked();
+
+    height: 48px;
+    min-width: 48px;
+    preferred-width: lay.preferred-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    border-radius: self.height / 2;
+    background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+    border-width: Theme.hairline;
+    border-color: press.has-hover ? Theme.field-border-focus : Theme.field-border;
+    forward-focus: press;
+    animate background, border-color { duration: Theme.fast; easing: ease-out; }
+
+    accessible-role: button;
+    accessible-label: root.accessible;
+    accessible-action-default => { press.activated(); }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible;
+    }
+
+    lay := HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 14px;
+        spacing: 10px;
+
+        VerticalLayout {
+            alignment: center;
+            ArtThumb {
+                width: 32px;
+                height: 32px;
+                round: true;
+                source: root.art;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 1px;
+            max-width: 220px;
+            Text {
+                text: root.name;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.meta != "": Text {
+                text: root.meta;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-muted;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+        Icon {
+            source: Icons.chevron-right;
+            size: 16px;
+            color: press.has-hover ? Theme.text : Theme.text-secondary;
+        }
+    }
+
+    press := Pressable {
+        activated => { root.clicked(); }
+    }
+
+    Tip { text: root.name; }
+}
+
+// ───────────────────────────── Now playing ─────────────────────────────
+
+// The meta line under the sentence ("George · Outlook"), or the error: a danger glyph beside the first line, the
+// message in `text` on up to two lines (tooltip: the whole message), announced as an alert.
+component MetaLine inherits HorizontalLayout {
+    in property <string> text;
+    in property <bool> error;
+
+    spacing: 6px;
+
+    if root.error: VerticalLayout {
+        alignment: start;
+        padding-top: 2px;
+        Icon {
+            source: Icons.circle-alert;
+            size: 14px;
+            color: Theme.danger;
+        }
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: root.error ? Theme.text : Theme.text-secondary;
+        wrap: root.error ? TextWrap.word-wrap : TextWrap.no-wrap;
+        max-lines: root.error ? 2 : 1;
+        overflow: elide;
+        accessible-role: AccessibleRole.text;
+        accessible-label: self.text;
+        accessible-live-region: root.error ? AccessibleLiveness.assertive : AccessibleLiveness.off;
+
+        Tip { text: root.text; }
+    }
+}
+
+// Idle copy: "Select text, then right-click" and "Choose “Read with Vox” or press [Ctrl][Alt][R]".
+component IdleCopy inherits VerticalLayout {
+    in property <NowPlayingData> now;
+
+    alignment: center;
+    spacing: 6px;
+
+    Text {
+        text: root.now.idle-title;
+        font-family: Theme.font-display;
+        font-size: Theme.size-sentence;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        wrap: word-wrap;
+        max-lines: 2;
+        overflow: elide;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Text {
+            text: root.now.idle-sub;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 0;
+        }
+        if root.now.idle-keys.length > 0: KeyCombo {
+            keys: root.now.idle-keys;
+            accessible-label: root.now.idle-keys-spoken;
+        }
+    }
+}
+
+// Player copy: status (spinner / level bars) + badges, the sentence (two lines, tooltip = the raw title), meta.
+component PlayerCopy inherits VerticalLayout {
+    in property <NowPlayingData> now;
+
+    alignment: center;
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        alignment: start;
+        if root.now.phase == PlayerPhase.loading: VerticalLayout {
+            alignment: center;
+            padding-right: 2px;
+            Spinner {
+                size: 14px;
+                label: "Preparing audio";
+            }
+        }
+        if root.now.phase == PlayerPhase.playing || root.now.phase == PlayerPhase.paused: VerticalLayout {
+            alignment: center;
+            padding-right: 2px;
+            LevelBars {
+                active: root.now.phase == PlayerPhase.playing;
+            }
+        }
+        for badge in root.now.badges: Badge {
+            text: badge;
+        }
+    }
+    Text {
+        text: root.now.title;
+        font-family: Theme.font-display;
+        font-size: Theme.size-sentence;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        wrap: word-wrap;
+        max-lines: 2;
+        overflow: elide;
+
+        Tip {
+            text: root.now.title-tooltip;
+        }
+    }
+    MetaLine {
+        text: root.now.meta;
+        error: root.now.meta-is-error;
+    }
+}
+
+
+component NowPlayingView inherits VerticalLayout {
+    in property <NowPlayingData> now;
+    in property <bool> narrow;
+
+    callback player-action(PlayerAction);
+    callback seek(float);
+    callback replay-last();
+
+    property <bool> idle: root.now.idle;
+    property <bool> can-seek: !root.idle && root.now.seekable;
+    property <image> main-icon: root.now.main-action == MainAction.pause ? Icons.pause-fill
+        : root.now.main-action == MainAction.play ? Icons.play-fill : Icons.rotate-ccw;
+    property <string> main-label: root.now.main-action == MainAction.pause ? "Pause"
+        : root.now.main-action == MainAction.play ? "Play"
+        : root.now.main-action == MainAction.play-again ? "Play again" : "Try again";
+    // A readable measure for the sentence and meta on wide windows.
+    property <length> copy-max: 680px;
+
+    spacing: Theme.space-5;
+    accessible-role: groupbox;
+    accessible-label: "Now playing";
+
+    HorizontalLayout {
+        spacing: root.narrow ? Theme.space-5 : Theme.space-6;
+
+        // Art (idle: the cursor badge on the art's corner, like an app icon with a status badge). Top-aligned so a
+        // two-line sentence grows downwards from the art's top edge.
+        VerticalLayout {
+            alignment: start;
+            ArtThumb {
+                width: 110px;
+                height: 82px;
+                source: root.now.art;
+
+                if root.idle: Rectangle {
+                    x: parent.width - 30px;
+                    y: parent.height - 30px;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: Theme.panel;
+                    Rectangle {
+                        x: 4px;
+                        y: 4px;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: Theme.chip;
+                        border-width: Theme.hairline;
+                        border-color: Theme.field-border;
+                        Icon {
+                            width: 100%;
+                            height: 100%;
+                            source: Icons.mouse-pointer-click;
+                            size: 16px;
+                            color: Theme.text;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Idle copy / player copy. (Components, not bare conditional layouts: a component passes its real width down
+        // to its wrapped text, so a two-line sentence or error reports its full height to the row.)
+        if root.idle: IdleCopy {
+            now: root.now;
+            horizontal-stretch: 1;
+            min-width: 120px;
+            max-width: root.copy-max;
+        }
+        if !root.idle: PlayerCopy {
+            now: root.now;
+            horizontal-stretch: 1;
+            min-width: 120px;
+            max-width: root.copy-max;
+        }
+
+        // Right cluster: Replay last (idle) and / or the transport. Its leading spacer takes the room left once the
+        // copy reaches its measure, so the cluster stays on the right gutter.
+        HorizontalLayout {
+            horizontal-stretch: 0;
+            spacing: 0px;
+
+            Rectangle {
+                horizontal-stretch: 0;
+            }
+            if root.now.replay-last-visible: VerticalLayout {
+                alignment: center;
+                Button {
+                    text: "Replay last";
+                    icon: Icons.rotate-ccw;
+                    size: ButtonSize.sm;
+                    loading: root.now.replay-last-busy;
+                    clicked => {
+                        if (!root.now.replay-last-busy) {
+                            root.replay-last();
+                        }
+                    }
+                    Tip { text: root.now.replay-last-tooltip; }
+                }
+            }
+            if !root.idle: VerticalLayout {
+                alignment: center;
+                HorizontalLayout {
+                    spacing: 4px;
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            icon: Icons.square;
+                            label: "Stop";
+                            tooltip: "Stop";
+                            enabled: root.now.can-stop;
+                            clicked => { root.player-action(PlayerAction.stop); }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            icon: Icons.skip-back;
+                            label: "Previous sentence";
+                            tooltip: "Previous sentence";
+                            enabled: root.now.can-previous;
+                            clicked => { root.player-action(PlayerAction.previous); }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        padding-left: 4px;
+                        padding-right: 4px;
+                        IconButton {
+                            icon: root.main-icon;
+                            label: root.main-label;
+                            kind: IconButtonKind.primary;
+                            size: IconButtonSize.lg;
+                            enabled: root.now.main-enabled;
+                            clicked => { root.player-action(PlayerAction.toggle); }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            icon: Icons.skip-forward;
+                            label: "Next sentence";
+                            tooltip: "Next sentence";
+                            enabled: root.now.can-next;
+                            clicked => { root.player-action(PlayerAction.next); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Seek line + remaining time. The FocusScope adds the fine keyboard steps (D-UM-31) before ProgressLine's own.
+    HorizontalLayout {
+        spacing: Theme.space-3;
+
+        seek-keys := FocusScope {
+            horizontal-stretch: 1;
+            height: 16px;
+            focus-on-click: false;
+            focus-on-tab-navigation: false;
+
+            capture-key-pressed(event) => {
+                if (!root.can-seek) {
+                    return reject;
+                }
+                if (event.text == Key.RightArrow || event.text == Key.UpArrow) {
+                    root.seek(clamp(root.now.progress + 0.02, 0, 1));
+                    return accept;
+                }
+                if (event.text == Key.LeftArrow || event.text == Key.DownArrow) {
+                    root.seek(clamp(root.now.progress - 0.02, 0, 1));
+                    return accept;
+                }
+                if (event.text == Key.PageUp) {
+                    root.seek(clamp(root.now.progress + 0.1, 0, 1));
+                    return accept;
+                }
+                if (event.text == Key.PageDown) {
+                    root.seek(clamp(root.now.progress - 0.1, 0, 1));
+                    return accept;
+                }
+                if (event.text == Key.Home) {
+                    root.seek(0);
+                    return accept;
+                }
+                if (event.text == Key.End) {
+                    root.seek(1);
+                    return accept;
+                }
+                reject
+            }
+
+            // Not seekable (idle, preparing, ended, error): not focusable, exposed as disabled, and the accessible
+            // increment / decrement actions are dropped; the line keeps full strength (a finished read stays a full
+            // white line) instead of the generic 40 % disabled dim.
+            ProgressLine {
+                width: parent.width;
+                value: root.idle ? 0 : root.now.progress;
+                buffered: root.idle ? 0 : root.now.buffered;
+                interactive: root.can-seek;
+                accessible-enabled: root.can-seek;
+                label: root.idle ? "Nothing playing" : "Seek";
+                value-text: root.now.time-accessible;
+                seek(v) => {
+                    if (root.can-seek) {
+                        root.seek(v);
+                    }
+                }
+            }
+        }
+        // Remaining time: right-aligned on the gutter, in a box at least as wide as "-00:00" (so the line does not
+        // jitter while it ticks) that grows for "~-1:02:03".
+        if !root.idle: Rectangle {
+            horizontal-stretch: 0;
+            width: max(time-template.preferred-width, time-label.preferred-width);
+
+            time-template := Text {
+                visible: false;
+                text: root.now.time-estimate ? "~-00:00" : "-00:00";
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                accessible-role: none;
+            }
+            time-label := Text {
+                width: 100%;
+                height: 100%;
+                text: root.now.time;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text-secondary;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                accessible-role: AccessibleRole.text;
+                accessible-label: root.now.time-accessible;
+            }
+        }
+    }
+}
+
+// ───────────────────────────── stat blocks ─────────────────────────────
+
+// Label row of a stat block: muted label + optional small badge.
+component BlockHeader inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> badge;
+
+    spacing: 8px;
+    alignment: start;
+    height: 22px;
+
+    Text {
+        text: root.label;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-label;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    if root.badge != "": Badge {
+        text: root.badge;
+    }
+}
+
+// The thin line meter under a big number.
+component LineMeter inherits Rectangle {
+    in property <float> fraction;
+    in property <brush> fill: Theme.primary;
+
+    height: 3px;
+    border-radius: 1.5px;
+    background: Theme.track;
+    clip: true;
+
+    Rectangle {
+        x: 0;
+        width: parent.width * max(0, min(1, root.fraction));
+        height: 100%;
+        border-radius: 1.5px;
+        background: root.fill;
+    }
+}
+
+// Placeholders shaped like a block's number, meter and two caption lines.
+component BlockSkeleton inherits VerticalLayout {
+    spacing: 0px;
+    Rectangle {
+        height: 46px;
+        Skeleton { x: 0; y: 10px; width: 92px; height: 28px; radius: 8px; }
+    }
+    Rectangle { height: 12px; }
+    Skeleton { height: 3px; }
+    Rectangle { height: 14px; }
+    Rectangle {
+        height: 18px;
+        Skeleton { x: 0; y: 4px; width: parent.width * 0.7; height: 10px; }
+    }
+    Rectangle {
+        height: 18px;
+        Skeleton { x: 0; y: 4px; width: parent.width * 0.45; height: 10px; }
+    }
+}
+
+// Caption line (13 / 500 secondary) with an optional leading glyph.
+component CaptionLine inherits HorizontalLayout {
+    in property <string> text;
+    in property <image> icon;
+    in property <brush> icon-color: Theme.text-secondary;
+    in property <bool> muted;
+    in property <string> tooltip;
+
+    spacing: 5px;
+    alignment: start;
+    height: 18px;
+
+    if root.icon.width > 0: Icon {
+        source: root.icon;
+        size: 13px;
+        color: root.icon-color;
+    }
+    Text {
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: root.muted ? Theme.size-caption : Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: root.muted ? Theme.text-muted : Theme.text-secondary;
+        vertical-alignment: center;
+        overflow: elide;
+
+        Tip { text: root.tooltip; }
+    }
+}
+
+// Big number box: Display 34, a fixed 46-px line so the three blocks share one baseline.
+component BigNumber inherits Text {
+    font-family: Theme.font-display;
+    font-size: Theme.size-number;
+    font-weight: Theme.weight-semibold;
+    color: Theme.text;
+    height: 46px;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// The value of a block whose data could not load (R-Home): a quiet dash.
+component Unavailable inherits BigNumber {
+    text: "—";
+    color: Theme.text-muted;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "Not available";
+}
+
+component TodayBlock inherits VerticalLayout {
+    in property <StatBlockData> stat;
+    in property <bool> force-loading;
+    // First load failed: the static form ("—", an empty meter, no captions).
+    in property <bool> unavailable;
+
+    property <bool> loading: !root.unavailable && (root.stat.loading || root.force-loading);
+
+    alignment: start;
+    spacing: 0px;
+    horizontal-stretch: 1;
+    min-width: 120px;
+    accessible-role: groupbox;
+    accessible-label: root.stat.label;
+
+    BlockHeader {
+        label: root.stat.label;
+        badge: root.stat.badge;
+    }
+    Rectangle { height: 12px; }
+    if root.loading: BlockSkeleton { }
+    if root.unavailable: VerticalLayout {
+        spacing: 0px;
+        Unavailable { }
+        Rectangle { height: 12px; }
+        LineMeter { fraction: 0; }
+    }
+    if !root.loading && !root.unavailable: VerticalLayout {
+        spacing: 0px;
+        BigNumber {
+            text: root.stat.value;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.stat.value-accessible;
+        }
+        Rectangle { height: 12px; }
+        LineMeter {
+            fraction: root.stat.fraction;
+            accessible-role: progress-indicator;
+            // DAILY_GOAL_SEC is a product constant (15 minutes), so the meter's name is static copy (ui-main.md §3.5).
+            accessible-label: "Daily goal of 15 minutes";
+            accessible-value: root.stat.accessible-value;
+        }
+        Rectangle { height: 14px; }
+        CaptionLine { text: root.stat.caption; }
+        CaptionLine {
+            text: root.stat.sub;
+            muted: true;
+            icon: root.stat.done ? Icons.circle-check : @image-url("");
+            icon-color: Theme.text;
+        }
+    }
+}
+
+// The credits block's no-key / restricted / error body: glyph beside the title (wraps to two lines), the message
+// (three lines) and the action ("Add key" primary, "Manage key", "Retry" spinning while `refreshing`).
+component CreditsNotice inherits VerticalLayout {
+    in property <CreditsData> credits;
+
+    callback open-settings(string);
+    callback retry();
+
+    spacing: 0px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        VerticalLayout {
+            alignment: start;
+            padding-top: 2px;
+            Icon {
+                source: root.credits.state == CreditsState.no-key ? Icons.circle-alert : Icons.info;
+                size: 16px;
+                color: root.credits.state == CreditsState.no-key ? Theme.danger : Theme.text-secondary;
+            }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.credits.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-title;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+        }
+    }
+    Rectangle { height: 6px; }
+    Text {
+        text: root.credits.message;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-regular;
+        color: Theme.text-secondary;
+        wrap: word-wrap;
+        max-lines: 3;
+        overflow: elide;
+    }
+    if root.credits.action-label != "": Rectangle { height: 14px; }
+    if root.credits.action-label != "": HorizontalLayout {
+        alignment: start;
+        Button {
+            text: root.credits.action-label;
+            size: ButtonSize.sm;
+            kind: root.credits.state == CreditsState.no-key ? ButtonKind.primary : ButtonKind.secondary;
+            icon: root.credits.state == CreditsState.error ? Icons.refresh-cw
+                : root.credits.state == CreditsState.no-key ? Icons.key-round : @image-url("");
+            loading: root.credits.state == CreditsState.error && root.credits.refreshing;
+            clicked => {
+                if (root.credits.state == CreditsState.error) {
+                    if (!root.credits.refreshing) {
+                        root.retry();
+                    }
+                } else {
+                    root.open-settings("account");
+                }
+            }
+        }
+    }
+}
+
+component CreditsBlock inherits VerticalLayout {
+    in property <CreditsData> credits;
+
+    callback open-settings(string);
+    callback retry();
+
+    property <bool> numbers: root.credits.state == CreditsState.ready || root.credits.state == CreditsState.demo;
+    property <bool> notice: root.credits.state == CreditsState.no-key || root.credits.state == CreditsState.restricted
+        || root.credits.state == CreditsState.error;
+
+    alignment: start;
+    spacing: 0px;
+    horizontal-stretch: 1;
+    min-width: 120px;
+    accessible-role: groupbox;
+    accessible-label: "ElevenLabs credits";
+
+    BlockHeader {
+        label: "Credits";
+        badge: root.numbers ? root.credits.tier : "";
+    }
+    Rectangle { height: 12px; }
+
+    if root.credits.state == CreditsState.loading: BlockSkeleton { }
+
+    if root.numbers: VerticalLayout {
+        spacing: 0px;
+        BigNumber {
+            text: root.credits.percent;
+            color: root.credits.low ? Theme.danger : Theme.text;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.credits.percent-accessible;
+        }
+        Rectangle { height: 12px; }
+        LineMeter {
+            fraction: root.credits.fraction;
+            fill: root.credits.low ? Theme.danger : Theme.primary;
+            accessible-role: progress-indicator;
+            accessible-label: "Credits left this period";
+            accessible-value: root.credits.detail;
+        }
+        Rectangle { height: 14px; }
+        CaptionLine {
+            text: root.credits.facts;
+            tooltip: root.credits.detail;
+        }
+        CaptionLine {
+            text: root.credits.reset;
+            muted: true;
+        }
+    }
+
+    // No key / usage hidden / unavailable: glyph + title, message, action.
+    if root.notice: CreditsNotice {
+        credits: root.credits;
+        open-settings(s) => { root.open-settings(s); }
+        retry => { root.retry(); }
+    }
+}
+
+// The last seven days as small columns standing on a hairline baseline, with the day initials underneath (today's
+// emphasised). A day without listening is a 3 px stub so the seven-day structure always shows. `placeholder` draws
+// seven stubs and no initials (the static error form). Columns sit in equal slots across the full width; the bar
+// width follows the column (6–14 px).
+component WeekChart {
+    in property <[BarData]> bars;
+    in property <bool> placeholder;
+    in property <string> description;
+
+    property <int> count: root.placeholder ? 7 : root.bars.length;
+    property <length> slot: root.width / max(1, root.count);
+    property <length> bar-w: clamp(root.width / 26, 6px, 12px);
+    property <length> plot-h: 40px;
+    property <length> label-gap: 6px;
+    property <length> label-h: 14px;
+
+    height: root.plot-h + Theme.hairline + root.label-gap + root.label-h;
+    min-width: 100px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.image;
+    accessible-label: root.placeholder ? "" : root.description;
+
+    // Baseline.
+    Rectangle {
+        x: 0;
+        y: root.plot-h;
+        width: root.width;
+        height: Theme.hairline;
+        background: Theme.divider;
+    }
+
+    if root.placeholder: Rectangle {
+        for i in 7: Rectangle {
+            x: (i + 0.5) * root.slot - root.bar-w / 2;
+            y: root.plot-h - 2px - self.height;
+            width: root.bar-w;
+            height: 3px;
+            border-radius: 1.5px;
+            background: Theme.track;
+        }
+    }
+
+    for bar[i] in root.bars: Rectangle {
+        property <bool> empty: bar.zero || bar.level <= 0;
+        x: i * root.slot;
+        y: 0;
+        width: root.slot;
+        height: root.height;
+        visible: !root.placeholder;
+
+        Rectangle {
+            x: (parent.width - root.bar-w) / 2;
+            y: root.plot-h - 2px - self.height;
+            width: root.bar-w;
+            height: parent.empty ? 3px : max(4px, (root.plot-h - 2px) * min(1, bar.level));
+            border-radius: parent.empty ? 1.5px : min(3px, root.bar-w / 2);
+            background: parent.empty ? (bar.today ? Theme.text-muted : Theme.track)
+                : bar.today ? Theme.primary : Theme.text-muted;
+        }
+        Text {
+            x: 0;
+            y: root.plot-h + Theme.hairline + root.label-gap;
+            width: parent.width;
+            height: root.label-h;
+            text: bar.label;
+            font-family: Theme.font-text;
+            font-size: 10px;
+            font-weight: Theme.weight-semibold;
+            color: bar.today ? Theme.text : Theme.text-muted;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Tip { text: bar.tooltip-title + " · " + bar.tooltip-value; }
+    }
+}
+
+// Loading placeholder for the week block: number, seven column stubs on the baseline, two caption lines.
+component WeekSkeleton inherits VerticalLayout {
+    spacing: 0px;
+    Rectangle {
+        height: 46px;
+        Skeleton { x: 0; y: 10px; width: 92px; height: 28px; radius: 8px; }
+    }
+    Rectangle { height: 10px; }
+    chart := Rectangle {
+        property <length> slot: self.width / 7;
+        property <length> bar-w: clamp(self.width / 26, 6px, 12px);
+        property <[float]> levels: [0.35, 0.6, 0.45, 0.85, 0.3, 0.55, 0.4];
+        height: 40px + Theme.hairline + 6px + 14px;
+        for level[i] in chart.levels: Skeleton {
+            x: (i + 0.5) * chart.slot - chart.bar-w / 2;
+            y: 38px - self.height;
+            width: chart.bar-w;
+            height: 38px * level;
+            radius: 3px;
+        }
+        Rectangle {
+            y: 40px;
+            height: Theme.hairline;
+            background: Theme.divider;
+        }
+    }
+    Rectangle { height: 14px; }
+    Rectangle {
+        height: 18px;
+        Skeleton { x: 0; y: 4px; width: parent.width * 0.6; height: 10px; }
+    }
+    Rectangle {
+        height: 18px;
+        Skeleton { x: 0; y: 4px; width: parent.width * 0.3; height: 10px; }
+    }
+}
+
+component WeekBlock inherits VerticalLayout {
+    in property <WeekData> week;
+    in property <bool> force-loading;
+    // First load failed: the static form ("—", seven empty stubs, no captions).
+    in property <bool> unavailable;
+
+    property <bool> loading: !root.unavailable && (root.week.loading || root.force-loading);
+
+    alignment: start;
+    spacing: 0px;
+    horizontal-stretch: 1;
+    min-width: 120px;
+    accessible-role: groupbox;
+    accessible-label: root.week.title;
+
+    BlockHeader {
+        label: root.week.title;
+    }
+    Rectangle { height: 12px; }
+    if root.loading: WeekSkeleton { }
+    if !root.loading: VerticalLayout {
+        spacing: 0px;
+        if root.unavailable: Unavailable { }
+        if !root.unavailable: BigNumber {
+            text: root.week.total;
+        }
+        Rectangle { height: 10px; }
+        WeekChart {
+            bars: root.week.bars;
+            placeholder: root.unavailable;
+            description: root.week.accessible-description;
+        }
+        if !root.unavailable: Rectangle { height: 14px; }
+        if !root.unavailable: CaptionLine {
+            text: root.week.streak;
+            icon: Icons.zap;
+            icon-color: root.week.streak-active ? Theme.text : Theme.text-muted;
+        }
+        if !root.unavailable: CaptionLine {
+            text: root.week.best;
+            muted: true;
+        }
+    }
+}
+
+// ───────────────────────────── lists ─────────────────────────────
+
+// The first-load error (R-Home), in the Recent list's place: a danger tile, the title (wraps to two lines), the
+// body and Retry (spins while `retrying`).
+component LoadError inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> body;
+    in property <bool> retrying;
+
+    callback retry();
+
+    spacing: Theme.space-4;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    accessible-role: groupbox;
+    accessible-label: root.title;
+
+    VerticalLayout {
+        alignment: start;
+        StateTile {
+            icon: Icons.circle-alert;
+            glyph: Theme.danger;
+        }
+    }
+    VerticalLayout {
+        alignment: start;
+        spacing: 4px;
+        horizontal-stretch: 1;
+        padding-top: 2px;
+
+        Text {
+            text: root.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: self.text;
+            accessible-live-region: AccessibleLiveness.polite;
+        }
+        Text {
+            text: root.body;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+            max-lines: 3;
+            overflow: elide;
+        }
+        Rectangle { height: 8px; }
+        HorizontalLayout {
+            alignment: start;
+            Button {
+                text: "Retry";
+                size: ButtonSize.sm;
+                icon: Icons.refresh-cw;
+                loading: root.retrying;
+                clicked => {
+                    if (!root.retrying) {
+                        root.retry();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// No reads yet: a quiet row (outlined tile with a muted glyph, secondary title, muted body), not another option.
+component EmptyRecent inherits HorizontalLayout {
+    spacing: Theme.space-4;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "No reads yet";
+
+    VerticalLayout {
+        alignment: center;
+        StateTile {
+            icon: Icons.library;
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 3px;
+        horizontal-stretch: 1;
+        Text {
+            text: "No reads yet";
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text-secondary;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Text {
+            text: "Select text anywhere, right-click and choose “" + Brand.read-with-label + "”.";
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+        }
+    }
+}
+
+component RecentItem inherits ListRow {
+    in property <RecentRow> item;
+
+    callback replay(string);
+    callback pause-live();
+    callback resume-live();
+
+    size: ListRowSize.compact;
+    interactive: false;
+    art: root.item.art;
+    title: root.item.title;
+    subtitle: root.item.meta;
+
+    if root.item.favorite: StarMark {
+        size: 13px;
+        color: Theme.text-secondary;
+    }
+    if root.item.cached: Rectangle {
+        width: cached.preferred-width;
+        cached := Badge {
+            y: (parent.height - self.height) / 2;
+            text: "Cached";
+        }
+        Tip { text: "Audio cached: replays are free"; }
+    }
+    if root.item.failed: Rectangle {
+        width: failed.preferred-width;
+        failed := Badge {
+            y: (parent.height - self.height) / 2;
+            text: "Failed";
+            icon: Icons.circle-alert;
+        }
+        Tip { text: root.item.failed-tooltip; }
+    }
+    if !root.item.failed: Text {
+        min-width: 36px;
+        text: root.item.duration;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-muted;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+    Rectangle {
+        width: 32px;
+        if root.item.busy: Spinner {
+            width: 100%;
+            height: 100%;
+            size: 16px;
+            label: "Starting";
+        }
+        if !root.item.busy: IconButton {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            size: IconButtonSize.sm;
+            kind: (root.item.live || root.item.resumable) ? IconButtonKind.primary : IconButtonKind.ghost;
+            icon: root.item.live ? Icons.pause-fill : root.item.resumable ? Icons.play-fill : Icons.play;
+            label: root.item.accessible-label != "" ? root.item.accessible-label
+                : root.item.live ? "Pause" : root.item.resumable ? "Resume" : "Replay";
+            tooltip: root.item.live ? "Pause" : root.item.resumable ? "Resume" : "Replay";
+            clicked => {
+                if (root.item.live) {
+                    root.pause-live();
+                } else if (root.item.resumable) {
+                    root.resume-live();
+                } else {
+                    root.replay(root.item.id);
+                }
+            }
+        }
+    }
+}
+
+// A "Ways to read" entry: glyph tile, title (+ Off tag), body or keycap groups, chevron. The row → Settings.
+component WayItem {
+    in property <WayRow> way;
+
+    callback clicked();
+
+    property <length> bleed: 10px;
+    property <float> dim: root.way.off ? 0.5 : 1;
+    property <int> groups: root.way.key-groups.length;
+    // The row's description for assistive tech: the body, or the shortcuts spelled out
+    // ("Selection Ctrl plus Alt plus R, Clipboard Ctrl plus Alt plus V").
+    property <string> spoken: root.way.body != "" ? root.way.body
+        : (root.groups > 0 ? root.way.key-groups[0].label + " " + HomeIcons.spoken(root.way.key-groups[0].keys) : "")
+          + (root.groups > 1 ? ", " + root.way.key-groups[1].label + " " + HomeIcons.spoken(root.way.key-groups[1].keys) : "")
+          + (root.groups > 2 ? ", " + root.way.key-groups[2].label + " " + HomeIcons.spoken(root.way.key-groups[2].keys) : "");
+
+    min-height: 60px;
+    preferred-height: max(60px, content.preferred-height);
+    min-width: 200px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    forward-focus: press;
+
+    accessible-role: button;
+    accessible-label: root.way.off ? root.way.title + ", Off" : root.way.title;
+    accessible-description: root.spoken;
+    accessible-action-default => { press.activated(); }
+
+    Rectangle {
+        x: -root.bleed;
+        width: root.width + 2 * root.bleed;
+        height: root.height;
+        border-radius: Theme.radius-row;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : transparent;
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        FocusRing {
+            radius: Theme.radius-row;
+            gap: 0px;
+            shown: press.focus-visible;
+        }
+    }
+
+    content := HorizontalLayout {
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: Theme.space-4;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: Theme.radius-thumb;
+                background: Theme.chip;
+                border-width: Theme.hairline;
+                border-color: Theme.field-border;
+                opacity: root.dim;
+                Icon {
+                    width: 100%;
+                    height: 100%;
+                    source: HomeIcons.by-name(root.way.icon);
+                    size: 20px;
+                    color: Theme.text;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4px;
+            horizontal-stretch: 1;
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Text {
+                    text: root.way.title;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    opacity: root.dim;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                if root.way.off: Badge {
+                    text: "Off";
+                }
+            }
+            if root.groups == 0: Text {
+                text: root.way.body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                opacity: root.dim;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.groups > 0: HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                opacity: root.dim;
+                for group in root.way.key-groups: HorizontalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: group.label;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: group.label;
+                    }
+                    KeyCombo {
+                        keys: group.keys;
+                        small: true;
+                    }
+                }
+            }
+        }
+
+        Icon {
+            source: Icons.chevron-right;
+            size: 16px;
+            color: press.has-hover ? Theme.text : Theme.text-muted;
+        }
+    }
+
+    press := Pressable {
+        activated => { root.clicked(); }
+    }
+}
+
+// ───────────────────────────── the page ─────────────────────────────
+
+export component HomePage inherits Rectangle {
+    in property <HomeData> data;
+
+    // Quick read: "Read" / Ctrl+Enter with the untrimmed text, enabled while `data.quick-read-can-read`; live word
+    // count on every edit (`quick-read-edited`).
+    callback quick-read(string);
+    callback quick-read-edited(string);
+    callback read-clipboard();
+    // Now playing transport. The main button always sends `toggle` (Rust maps it: playing/paused → toggle; ended or
+    // error with a read → replay); stop / previous / next as labelled.
+    callback player-action(PlayerAction);
+    // Seek committed at a 0..1 fraction (only while playing or paused). Keyboard (D-UM-31): wrap the design
+    // ProgressLine in a FocusScope whose `capture-key-pressed` handles Right/Up +0.02, Left/Down −0.02, PageUp +0.1,
+    // PageDown −0.1, Home 0, End 1, each sent at once with `seek(clamp(value ± step, 0, 1))`; `value-text` =
+    // `data.now.time-accessible`.
+    callback seek(float);
+    // Replay a Recent row's read.
+    callback replay(string);
+    // "Replay last" (its own spinner: `data.now.replay-last-busy`).
+    callback replay-last();
+    // Recent row of the live read: pause.
+    callback pause-live();
+    // "All history" / voice block → Voices.
+    callback open-page(PageId);
+    // Ways-to-read rows and credits buttons → a settings section.
+    callback open-settings(string);
+    // Credits "Retry".
+    callback credits-retry();
+    // Inline load error "Retry" (data.state == error).
+    callback retry();
+    // Recent row of the paused read: resume.
+    callback resume-live();
+
+    // Below 860 px of content the page tightens (gutters 32, gaps 20). The real range is 811 px (1100 px window with
+    // the full sidebar) up; 860 rather than the spec's 900 (ui-main.md §3.3, the bento grid collapse) keeps the
+    // default 892 px content area on the same 40 px gutter as Analytics, History and Settings.
+    property <bool> narrow: root.width < 860px;
+    property <bool> first-loading: root.data.state == LoadState.loading;
+    property <bool> failed: root.data.state == LoadState.error;
+    property <length> gutter: root.narrow ? Theme.space-8 : Theme.space-10;
+    // The stats row: three equal columns around two hairlines.
+    property <length> stat-gap: root.narrow ? Theme.space-5 : Theme.space-6;
+    property <length> stat-col: (root.width - 2 * root.gutter - 4 * root.stat-gap - 2 * Theme.hairline) / 3;
+
+    function submit-quick-read() {
+        if (root.data.quick-read-can-read && !root.data.read-busy && !root.data.clipboard-busy) {
+            root.quick-read(quick-text.text);
+        }
+    }
+
+    background: transparent;
+
+    ScrollArea {
+        width: 100%;
+        height: 100%;
+        edge-fade: true;
+
+        VerticalLayout {
+            padding-left: root.gutter;
+            padding-right: root.gutter;
+            padding-top: Theme.space-8;
+            padding-bottom: Theme.space-10;
+            spacing: 0px;
+            alignment: start;
+
+            // ── Hero ──
+            HorizontalLayout {
+                spacing: Theme.space-6;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.data.date-line;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-label;
+                        overflow: elide;
+                    }
+                    HeroText {
+                        text: root.data.greeting;
+                        overflow: elide;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: self.text;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    VoicePill {
+                        name: root.data.voice-name;
+                        meta: root.data.voice-meta;
+                        art: root.data.voice-art;
+                        accessible: root.data.voice-accessible;
+                        clicked => { root.open-page(PageId.voices); }
+                    }
+                }
+            }
+
+            // ── Now playing ──
+            Rectangle { height: Theme.space-8; }
+            SectionLabel { text: "Now playing"; }
+            Rectangle { height: Theme.space-3; }
+            NowPlayingView {
+                now: root.data.now;
+                narrow: root.narrow;
+                player-action(a) => { root.player-action(a); }
+                seek(f) => { root.seek(f); }
+                replay-last => { root.replay-last(); }
+            }
+
+            // ── Today · Credits · Last 7 days (the same columns in every state) ──
+            Rectangle { height: Theme.space-10; }
+            HorizontalLayout {
+                spacing: root.stat-gap;
+                alignment: start;
+
+                TodayBlock {
+                    width: root.stat-col;
+                    stat: root.data.today;
+                    force-loading: root.first-loading;
+                    unavailable: root.failed;
+                }
+                Divider { vertical: true; }
+                CreditsBlock {
+                    width: root.stat-col;
+                    credits: root.data.credits;
+                    open-settings(s) => { root.open-settings(s); }
+                    retry => { root.credits-retry(); }
+                }
+                Divider { vertical: true; }
+                WeekBlock {
+                    width: root.stat-col;
+                    week: root.data.week;
+                    force-loading: root.first-loading;
+                    unavailable: root.failed;
+                }
+            }
+
+            // ── Quick read ──
+            Rectangle { height: Theme.space-10; }
+            SectionLabel {
+                text: "Quick read";
+                trailing-text: root.data.quick-read-words;
+            }
+            Rectangle { height: Theme.space-3; }
+            FocusScope {
+                height: 112px;
+                focus-on-click: false;
+                focus-on-tab-navigation: false;
+                capture-key-pressed(event) => {
+                    if (event.text == Key.Return && (event.modifiers.control || event.modifiers.meta)) {
+                        root.submit-quick-read();
+                        return accept;
+                    }
+                    reject
+                }
+                quick-text := TextArea {
+                    width: parent.width;
+                    height: parent.height;
+                    placeholder: "Paste or type text…";
+                    label: "Quick read";
+                    edited(t) => { root.quick-read-edited(t); }
+                }
+                // The live word count, announced politely (ui-main.md §3.7).
+                Text {
+                    x: 0;
+                    y: 0;
+                    width: 1px;
+                    height: 1px;
+                    text: "";
+                    color: transparent;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: root.data.quick-read-words;
+                    accessible-live-region: AccessibleLiveness.polite;
+                }
+            }
+            Rectangle { height: Theme.space-3; }
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    horizontal-stretch: 1;
+                    KeyCombo { keys: ["Ctrl", "Enter"]; small: true; }
+                    Text {
+                        text: "to read";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        vertical-alignment: center;
+                    }
+                }
+                Button {
+                    text: "Read clipboard";
+                    icon: Icons.clipboard-paste;
+                    loading: root.data.clipboard-busy;
+                    clicked => {
+                        if (!root.data.read-busy && !root.data.clipboard-busy) {
+                            root.read-clipboard();
+                        }
+                    }
+                }
+                Button {
+                    text: "Read";
+                    kind: ButtonKind.primary;
+                    icon: Icons.play-fill;
+                    enabled: root.data.quick-read-can-read || root.data.read-busy;
+                    loading: root.data.read-busy;
+                    clicked => { root.submit-quick-read(); }
+                }
+            }
+
+            // ── Recent (always present; the first-load error sits here, under its label) ──
+            Rectangle { height: Theme.space-10; }
+            SectionLabel {
+                text: "Recent";
+                link-text: "All history";
+                link-clicked => { root.open-page(PageId.history); }
+            }
+            Rectangle { height: Theme.space-2; }
+            if root.failed: LoadError {
+                title: root.data.error-title;
+                body: root.data.error-body;
+                retrying: root.data.retrying;
+                retry => { root.retry(); }
+            }
+            if !root.failed: VerticalLayout {
+                spacing: 2px;
+                accessible-role: list;
+                accessible-label: "Recent reads";
+
+                if root.data.recent-loading || root.first-loading: VerticalLayout {
+                    spacing: 2px;
+                    SkeletonRow { size: SkeletonRowSize.compact; title-width: 62%; subtitle-width: 34%; }
+                    SkeletonRow { size: SkeletonRowSize.compact; title-width: 48%; subtitle-width: 28%; }
+                    SkeletonRow { size: SkeletonRowSize.compact; title-width: 56%; subtitle-width: 31%; }
+                    SkeletonRow { size: SkeletonRowSize.compact; title-width: 40%; subtitle-width: 26%; }
+                }
+                if !(root.data.recent-loading || root.first-loading) && root.data.recent.length == 0: EmptyRecent { }
+                if !(root.data.recent-loading || root.first-loading): VerticalLayout {
+                    spacing: 2px;
+                    for row in root.data.recent: RecentItem {
+                        item: row;
+                        replay(id) => { root.replay(id); }
+                        pause-live => { root.pause-live(); }
+                        resume-live => { root.resume-live(); }
+                    }
+                }
+            }
+
+            // ── Ways to read ──
+            Rectangle { height: Theme.space-10; }
+            SectionLabel { text: "Ways to read"; }
+            Rectangle { height: Theme.space-2; }
+            VerticalLayout {
+                spacing: 2px;
+                accessible-role: list;
+                accessible-label: "Ways to read";
+                for way in root.data.ways: WayItem {
+                    way: way;
+                    clicked => { root.open-settings(way.section); }
+                }
+            }
+        }
+    }
+}

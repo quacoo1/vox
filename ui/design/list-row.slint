@@ -1,0 +1,176 @@
+// ListRow: art + title + subtitle + trailing slot. The building block of Voices, History, Home and Analytics.
+//
+//   in    size: ListRowSize          large (110x82 art, 24 px gap, 106 h, default) | compact (44x44 art, 16 px gap, 60 h)
+//   in    art: image                 the voice / source art; empty = placeholder gradient (see ArtThumb)
+//   in    icon: image                optional glyph tile shown instead of art (compact "Ways to read" rows)
+//   in    show-art: bool             false = no leading art or icon at all (text-only rows)
+//   in    art-round: bool            circular art (small voice dots)
+//   in    title: string              14 / 600 text, one line, elides
+//   in    subtitle: string           13 / 500 text-secondary, one line, elides ("Male · American · Narration")
+//   in    title-lines: int           max lines for the title (default 1; History excerpts may use 2)
+//   in    meta: string               optional trailing meta before the slot (duration, "10 h ago"), 12 / 500 muted
+//   in    selected: bool             keeps the hover fill (current item / expanded row)
+//   in    interactive: bool          true (default) = hover fill, focus, clicked(); false = static row
+//   in    enabled: bool              false dims the row to 40 % and blocks interaction
+//   in    show-focus: bool           draw the focus ring without focus (previews)
+//   in    accessible-text: string    overrides the accessible label (default "title, subtitle")
+//   out   has-hover: bool, has-focus: bool
+//   callback clicked()               the row itself was activated (click, Enter or Space)
+//   @children                        the trailing slot: buttons, badges, toggles (right-aligned, vertically centred,
+//                                    8 px apart). Children stay clickable above the row.
+// Layout: content starts at x = 0 so art lines up with section labels; the hover fill (radius 14) bleeds 12 px
+// (compact: 10 px) to the left and right, so keep at least that much gutter around lists.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { ArtThumb } from "art-thumb.slint";
+import { Icon } from "icon.slint";
+
+export enum ListRowSize { large, compact }
+
+export component ListRow {
+    in property <ListRowSize> size: ListRowSize.large;
+    in property <image> art;
+    in property <image> icon;
+    in property <bool> show-art: true;
+    in property <bool> art-round: false;
+    in property <string> title;
+    in property <string> subtitle;
+    in property <int> title-lines: 1;
+    in property <string> meta;
+    in property <bool> selected: false;
+    in property <bool> interactive: true;
+    in property <bool> enabled: true;
+    in property <bool> show-focus: false;
+    in property <string> accessible-text;
+    out property <bool> has-hover: press.has-hover;
+    out property <bool> has-focus: press.has-focus;
+
+    callback clicked();
+
+    property <bool> large: root.size == ListRowSize.large;
+    property <length> bleed: root.large ? 12px : 10px;
+    property <length> art-w: root.large ? 110px : 44px;
+    property <length> art-h: root.large ? 82px : 44px;
+    property <length> pad-v: root.large ? 12px : 8px;
+    property <bool> has-icon: root.icon.width > 0;
+
+    min-height: max(root.art-h + 2 * root.pad-v, content.min-height);
+    preferred-height: max(root.art-h + 2 * root.pad-v, content.preferred-height);
+    min-width: 200px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: list-item;
+    accessible-label: root.accessible-text != "" ? root.accessible-text
+        : root.subtitle != "" ? root.title + ", " + root.subtitle : root.title;
+    accessible-item-selectable: root.interactive;
+    accessible-item-selected: root.selected;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { press.activated(); }
+
+    fill := Rectangle {
+        x: -root.bleed;
+        width: root.width + 2 * root.bleed;
+        height: root.height;
+        border-radius: Theme.radius-row;
+        background: !root.interactive ? transparent
+            : press.pressed ? Theme.pressed
+            : (press.has-hover || root.selected) ? Theme.hover : transparent;
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        FocusRing {
+            radius: Theme.radius-row;
+            gap: 0px;
+            shown: root.interactive && (press.focus-visible || root.show-focus);
+        }
+
+        press := Pressable {
+            enabled: root.enabled && root.interactive;
+            activated => { root.clicked(); }
+        }
+    }
+
+    content := HorizontalLayout {
+        padding-top: root.pad-v;
+        padding-bottom: root.pad-v;
+        spacing: root.large ? Theme.space-6 : Theme.space-4;
+
+        if root.show-art && !root.has-icon: VerticalLayout {
+            alignment: center;
+            ArtThumb {
+                width: root.art-w;
+                height: root.art-h;
+                source: root.art;
+                round: root.art-round;
+            }
+        }
+        if root.show-art && root.has-icon: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.art-w;
+                height: root.art-h;
+                border-radius: root.large ? Theme.radius-thumb-large : Theme.radius-thumb;
+                background: Theme.chip;
+                border-width: Theme.hairline;
+                border-color: Theme.field-border;
+                Icon {
+                    width: 100%;
+                    height: 100%;
+                    source: root.icon;
+                    size: root.large ? 28px : 20px;
+                    color: Theme.text;
+                }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: root.large ? 6px : 3px;
+
+            Text {
+                text: root.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                wrap: root.title-lines > 1 ? word-wrap : no-wrap;
+                max-lines: root.title-lines;
+                accessible-role: none;
+            }
+            if root.subtitle != "": Text {
+                text: root.subtitle;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+
+        if root.meta != "": Text {
+            text: root.meta;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+            accessible-role: none;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                @children
+            }
+        }
+    }
+}

@@ -1,0 +1,33 @@
+[package]
+name = "vox-app"
+description = "vox.exe: the core thread (read controller and services), Slint UI glue, tray, native window treatment, CLI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "vox"
+path = "src/main.rs"
+
+[dependencies]
+vox-core.workspace = true
+vox-text.workspace = true
+vox-store.workspace = true
+vox-tts.workspace = true
+vox-audio.workspace = true
+vox-win.workspace = true
+vox-bridge.workspace = true
+vox-art.workspace = true
+slint.workspace = true
+muda.workspace = true
+anyhow.workspace = true
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true

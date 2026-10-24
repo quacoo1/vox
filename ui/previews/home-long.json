@@ -1,0 +1,270 @@
+{
+ "data": {
+  "state": {
+   "$enum": "LoadState.ready"
+  },
+  "error-title": "",
+  "error-body": "",
+  "retrying": false,
+  "greeting": "Good afternoon",
+  "date-line": "Wednesday, September 30",
+  "now": {
+   "idle": false,
+   "art": {
+    "$image": "art/thumb-matilda.png"
+   },
+   "title": "Section 4.3 of the Supplementary Agreement on Cross-Border Data Processing between Hallström-Vandenberghe Logistics Aktiengesellschaft and its subsidiaries stipulates that all personal data shall remain within the European Economic Area unless explicitly authorised in writing.",
+   "meta": "Matilda (expressive storyteller, British) · Microsoft Edge WebView2",
+   "meta-is-error": false,
+   "badges": [
+    "Microsoft Edge WebView2",
+    "Live"
+   ],
+   "phase": {
+    "$enum": "PlayerPhase.playing"
+   },
+   "time": "~-1:02:03",
+   "time-estimate": true,
+   "time-accessible": "about 1:02:03 left",
+   "progress": 0.06,
+   "buffered": 0.09,
+   "seekable": true,
+   "can-stop": true,
+   "can-previous": true,
+   "can-next": true,
+   "main-action": {
+    "$enum": "MainAction.pause"
+   },
+   "main-enabled": true,
+   "title-tooltip": "Section 4.3 of the Supplementary Agreement on Cross-Border Data Processing between Hallström-Vandenberghe Logistics Aktiengesellschaft and its subsidiaries stipulates that all personal data shall remain within the European Economic Area unless explicitly authorised in writing.",
+   "idle-title": "Select text, then right-click",
+   "idle-sub": "Choose “Read with Vox” or press",
+   "idle-keys": [
+    "Ctrl",
+    "Alt",
+    "R"
+   ],
+   "idle-keys-spoken": "Ctrl plus Alt plus R",
+   "replay-last-visible": false,
+   "replay-last-tooltip": "",
+   "replay-last-busy": false
+  },
+  "today": {
+   "loading": false,
+   "label": "Today",
+   "badge": "Goal 15m",
+   "value": "13h 25m",
+   "value-accessible": "13 hours 25 minutes listened today",
+   "caption": "148 reads · 312.4K words",
+   "sub": "Daily goal reached",
+   "fraction": 1,
+   "accessible-value": "Goal reached: 13 hours 25 minutes listened",
+   "done": true
+  },
+  "credits": {
+   "state": {
+    "$enum": "CreditsState.ready"
+   },
+   "title": "",
+   "tier": "Pro Plus",
+   "percent": "100%",
+   "percent-accessible": "100 percent of credits left",
+   "fraction": 1,
+   "low": false,
+   "facts": "2,000,000 of 2,000,000 left",
+   "reset": "Resets in 29 days",
+   "detail": "2,000,000 of 2,000,000 characters left. Resets in 29 days",
+   "message": "",
+   "action-label": "",
+   "refreshing": false
+  },
+  "week": {
+   "loading": false,
+   "title": "Last 7 days",
+   "total": "62h 35m",
+   "bars": [
+    {
+     "level": 0.6459627329192547,
+     "label": "S",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Saturday",
+     "tooltip-value": "8h 40m",
+     "tooltip-sub": "",
+     "accessible": "Saturday: 8 hours 40 minutes"
+    },
+    {
+     "level": 0.5590062111801242,
+     "label": "S",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Sunday",
+     "tooltip-value": "7h 30m",
+     "tooltip-sub": "",
+     "accessible": "Sunday: 7 hours 30 minutes"
+    },
+    {
+     "level": 0.0,
+     "label": "M",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Monday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Monday: 0 seconds"
+    },
+    {
+     "level": 0.8944099378881988,
+     "label": "T",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Tuesday",
+     "tooltip-value": "12h",
+     "tooltip-sub": "",
+     "accessible": "Tuesday: 12 hours"
+    },
+    {
+     "level": 0.8198757763975155,
+     "label": "W",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Wednesday",
+     "tooltip-value": "11h",
+     "tooltip-sub": "",
+     "accessible": "Wednesday: 11 hours"
+    },
+    {
+     "level": 0.7453416149068323,
+     "label": "T",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Thursday",
+     "tooltip-value": "10h",
+     "tooltip-sub": "",
+     "accessible": "Thursday: 10 hours"
+    },
+    {
+     "level": 1.0,
+     "label": "F",
+     "today": true,
+     "zero": false,
+     "tooltip-title": "Friday",
+     "tooltip-value": "13h 25m",
+     "tooltip-sub": "",
+     "accessible": "Friday: 13 hours 25 minutes"
+    }
+   ],
+   "streak": "128 day streak",
+   "best": "best 241",
+   "streak-active": true,
+   "accessible-description": "Listening per day. Saturday: 8 hours 40 minutes, Sunday: 7 hours 30 minutes, Monday: 0 seconds, Tuesday: 12 hours, Wednesday: 11 hours, Thursday: 10 hours, Friday: 13 hours 25 minutes"
+  },
+  "quick-read-words": "",
+  "quick-read-can-read": false,
+  "read-busy": false,
+  "clipboard-busy": false,
+  "recent-loading": false,
+  "recent": [
+   {
+    "id": "r1",
+    "art": {
+     "$image": "art/small-matilda.png"
+    },
+    "title": "Section 4.3 of the Supplementary Agreement on Cross-Border Data Processing between Hallström-Vandenberghe Logistics Aktiengesellschaft and…",
+    "meta": "Microsoft Edge WebView2 · Matilda (expressive storyteller, British) · just now",
+    "duration": "1:02:03",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": true,
+    "favorite": true,
+    "live": true,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Pause"
+   },
+   {
+    "id": "r2",
+    "art": {
+     "$image": "art/small-brian.png"
+    },
+    "title": "Tenancy agreement for 14 Harrowgate Gardens, clause 14.2 (b): the tenant shall give not less than one calendar month’s written notice, endi…",
+    "meta": "File Explorer · Charlotte (multilingual, warm narration) · 2 days ago",
+    "duration": "12:45",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": true,
+    "favorite": true,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Tenancy agreement for 14 Harrowgate Gardens, clause 14.2 (b…"
+   },
+   {
+    "id": "r3",
+    "art": {
+     "$image": "art/small-roger.png"
+    },
+    "title": "Untitled selection",
+    "meta": "Roger · 3 days ago",
+    "duration": "0:00",
+    "failed": true,
+    "failed-tooltip": "ElevenLabs rejected the request: the text was empty after cleaning.",
+    "cached": false,
+    "favorite": false,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Untitled selection"
+   }
+  ],
+  "ways": [
+   {
+    "title": "Right-click chip",
+    "body": "Select text, right-click, then pick “Read with Vox” beside the menu.",
+    "key-groups": [],
+    "icon": "mouse-pointer-click",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Hotkeys",
+    "body": "",
+    "key-groups": [
+     {
+      "label": "Selection",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "R"
+      ]
+     },
+     {
+      "label": "Clipboard",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "V"
+      ]
+     }
+    ],
+    "icon": "keyboard",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Browser extension",
+    "body": "Adds “Read with Vox” to the Chrome and Edge right-click menu.",
+    "key-groups": [],
+    "icon": "globe",
+    "section": "integrations",
+    "off": false
+   }
+  ],
+  "voice-name": "Matilda (expressive storyteller, British)",
+  "voice-meta": "Multilingual v2 · 0.85×",
+  "voice-art": {
+   "$image": "art/small-matilda.png"
+  },
+  "voice-accessible": "Voice: Matilda (expressive storyteller, British). Multilingual v2, speed 0.85 times. Change voice"
+ }
+}

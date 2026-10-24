@@ -1,0 +1,101 @@
+// NavItem: a sidebar / settings navigation entry.
+//
+//   in    icon: image               20 px glyph (optional for small items)
+//   in    text: string              label (14 / 600; small: 13 / 600)
+//   in    selected: bool            current page: a pill with a 1 px hairline (reference "This File")
+//   in    small: bool               36 h, 16 px glyph, for second-level lists (Settings sections)
+//   in    collapsed: bool           icon only (44 x 44 pill), for the narrow sidebar; the label becomes a tooltip-less
+//                                   accessible label
+//   in    trailing: string          optional right-aligned meta (a count, "New"), text-muted 12 / 600
+//   in    enabled: bool
+//   in    show-focus: bool          draw the focus ring without focus (previews)
+//   out   has-hover: bool, has-focus: bool
+//   callback clicked()              click, Enter or Space
+// Hover = `hover` fill pill. Labels are always `text`; the glyph is `text` when selected or hovered, else
+// `text-secondary`.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+
+export component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> selected: false;
+    in property <bool> small: false;
+    in property <bool> collapsed: false;
+    in property <string> trailing;
+    in property <bool> enabled: true;
+    in property <bool> show-focus: false;
+    out property <bool> has-hover: press.has-hover;
+    out property <bool> has-focus: press.has-focus;
+
+    callback clicked();
+
+    property <bool> has-icon: root.icon.width > 0;
+
+    height: root.small ? 36px : 44px;
+    min-width: root.collapsed ? self.height : 120px;
+    max-width: root.collapsed ? self.height : 4000px;
+    horizontal-stretch: root.collapsed ? 0 : 1;
+    vertical-stretch: 0;
+    border-radius: self.height / 2;
+    background: press.pressed ? Theme.pressed : (press.has-hover && !root.selected) ? Theme.hover : transparent;
+    border-width: Theme.hairline;
+    border-color: root.selected ? Theme.field-border : transparent;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: tab;
+    accessible-label: root.text;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { press.activated(); }
+
+    animate background, border-color { duration: Theme.fast; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    HorizontalLayout {
+        padding-left: root.collapsed ? 0px : (root.small ? 14px : 18px);
+        padding-right: root.collapsed ? 0px : 16px;
+        spacing: root.small ? 12px : 18px;
+        alignment: root.collapsed ? LayoutAlignment.center : LayoutAlignment.stretch;
+
+        if root.has-icon: Icon {
+            source: root.icon;
+            size: root.small ? 16px : 20px;
+            color: root.selected || press.has-hover ? Theme.text : Theme.text-secondary;
+        }
+        if !root.collapsed: Text {
+            horizontal-stretch: 1;
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label : Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+            animate color { duration: Theme.fast; easing: ease-out; }
+        }
+        if !root.collapsed && root.trailing != "": Text {
+            text: root.trailing;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.clicked(); }
+    }
+}

@@ -1,0 +1,1299 @@
+// Onboarding steps (ui-main.md §10, ui-settings-widget.md §5.3). Keep each interface.
+//
+// The frame (../onboarding.slint) hosts one step at a time in the panel body, full panel width: every step applies
+// its own side gutter (`StepMetrics.gutter`, 32 px; the frame's header and footer share that edge) so lists can let
+// their row hover fill bleed into it. On steps 1–3 the frame draws the step's art (110×82, `OnboardingData.art`, with
+// a step glyph) at the top-right of the body; the heading block of those steps (`StepHead`) keeps
+// `StepMetrics.art-reserve` free on its right for it. On step 4 the frame draws that art as a centred hero (148×110,
+// with the check badge) above DoneStep, which centres its own text under it: the flow is book-ended by the welcome
+// hero and the done hero.
+//
+// Which art Rust sends in `OnboardingData.art` (art is tied to its seed, DESIGN.md "Art"):
+//   step 0 (Welcome)   a vivid non-voice seed rendered at the hero size (496×196 logical: about 992×392 at 2×), not the
+//                      220×164 thumb, which the wide banner would crop and upscale.
+//   step 1 (API key)   a neutral seed from the backdrop palette (steel), never a voice id: it must not read as a voice.
+//   step 2 (Voice)     the in-use voice's art (seed = its voice id), so it follows `choose` and matches the selected
+//   step 3 (Try it)    row; on step 3 it is the voice the sample is read with.
+//   step 4 (Done)      a neutral backdrop-palette seed at the hero size (148×110 logical: 296×220 at 2×).
+// While the art is not ready yet (empty image) every art slot draws a quiet placeholder, as does the page backdrop.
+//
+// Reading of the data (Rust fills ready-made strings; copy that is static lives here, the product name comes from
+// `Brand`):
+//   KeyStepData    form-visible  the key form (no key stored, or "Replace key" pressed); false = the connected panel.
+//                  replacing     the form shows Cancel.   busy  connecting: field disabled, Connect spins, Cancel off.
+//                  error         under the field (replaces `hint`).   hint  "Find it under Settings → API keys…".
+//                  connected-caption  "Creator plan · 38.8K characters left (39%)" / "Ready to read.".
+//                  warning       the connect result's warning (restricted key…); empty = none.
+//                  notice        the migration / unreadable-key notice (R-API-key); empty = none.
+//                  has-key       not read here (Rust folds it into form-visible).
+//   VoiceStepData  state         loading → 6 placeholder rows; ready → the list (API order, compact rows, filling the
+//                                panel's free height, at least 268 px); error → title / body /
+//                                "Try again"; empty → title / body (no key: "Connect a key to browse voices", or
+//                                "No voices on this account").
+//                  items         VoiceRow: name, art, `subtitle` = the tag line ("british · middle aged · narration"),
+//                                `in-use` = the current voice (selected), `preview` (none = no preview button).
+//   TryStepData    sample        the sample sentence, always shown in curly quotes (empty = no quote line).
+//                  can-read      key stored or demo mode: caption + "Read this" under the sample; else the add-key line
+//                                ("Connect your ElevenLabs key to hear it." + "Add a key").
+//                  caption       "Or hear it right here:" / "Playing in the floating player…".   busy  "Read this" spins.
+//                  keys          read-selection keycaps; empty = no "or press" line.
+//   tips           [KeyGroup], in a hairline card: a tip without keys gets the tray glyph ("Click the tray icon to open
+//                  Vox"), a tip with keys the keyboard glyph and its keycaps ("Read selection", "Play / pause").
+// Focus: a rejected key puts focus back in the field; a successful connect (the form giving way to the connected
+// panel) moves it to "Replace key", so keyboard users never fall back to the top of the page.
+import {
+    Theme, Icons, Icon, Button, ButtonKind, ButtonSize, IconButton, IconButtonKind, TextField, FormField, ListRow,
+    ListRowSize, KeyCombo, ArtThumb, Skeleton, SkeletonRow, SkeletonRowSize, Spinner, ScrollArea, Card, CardKind,
+    Divider
+} from "../../design/index.slint";
+import { KeyStepData, VoiceStepData, TryStepData, KeyGroup, LoadState, PreviewState, Brand, Motion } from "../../models.slint";
+
+// Shared metrics between the frame and the steps.
+export global StepMetrics {
+    // Side gutter of the panel body (the frame's header / footer use their own).
+    out property <length> gutter: Theme.space-8;
+    // Vertical padding of the panel body.
+    out property <length> body-pad: 28px;
+    // The step art the frame draws at the top-right of steps 1–4, and the room the heading block leaves for it.
+    out property <length> art-width: 110px;
+    out property <length> art-height: 82px;
+    out property <length> art-reserve: 110px + Theme.space-6;
+    // The done hero (step 4): the step art, centred above DoneStep.
+    out property <length> hero-art-width: 148px;
+    out property <length> hero-art-height: 110px;
+    // The voice list's minimum visible height (spec: about 268 px; it grows into the panel's free height).
+    out property <length> list-height: 268px;
+    // Row hover fills bleed this far past the text column (ListRow compact).
+    out property <length> row-bleed: 10px;
+}
+
+// ───────────────────────────── shared pieces ─────────────────────────────
+
+// The brand mark: a rounded tile (primary fill) with five bars set along a "V" — the wave in the product's name.
+// `animated` lets the bars breathe (still under Motion.reduce). Exported for the frame's breadcrumb.
+export component LogoMark {
+    in property <length> size: 24px;
+    in property <bool> animated: false;
+
+    property <bool> moving: root.animated && !Motion.reduce;
+    property <float> t: root.moving ? animation-tick() / 1ms : 0;
+    property <length> bar-w: max(1.5px, root.size * 0.085);
+    property <length> pitch: root.size * 0.135;
+
+    width: root.size;
+    height: root.size;
+    accessible-role: image;
+    accessible-label: Brand.app-name + " logo";
+
+    Rectangle {
+        border-radius: root.size * 0.3;
+        background: Theme.primary-fill;
+        drop-shadow-blur: root.size > 40px ? 24px : 0px;
+        drop-shadow-offset-y: root.size > 40px ? 8px : 0px;
+        drop-shadow-color: Theme.shadow;
+    }
+
+    for i in 5: Rectangle {
+        // Centres follow a V: highest at the edges, lowest in the middle.
+        property <float> depth: i == 0 || i == 4 ? 0 : i == 1 || i == 3 ? 0.5 : 1;
+        property <float> rest: i == 2 ? 0.30 : i == 1 || i == 3 ? 0.36 : 0.30;
+        // Mirrored bars share a phase (the wave runs from the centre out), so the V stays symmetric in every frame.
+        property <float> phase: abs(i - 2) * 0.9;
+        property <float> level: root.moving
+            ? self.rest * (0.80 + 0.20 * sin((root.t * 0.0042 - self.phase) * 1rad))
+            : self.rest;
+        width: root.bar-w;
+        height: root.size * self.level;
+        x: root.width / 2 + (i - 2) * root.pitch - self.width / 2;
+        y: root.size * (0.40 + 0.20 * self.depth) - self.height / 2;
+        border-radius: self.width / 2;
+        background: Theme.on-primary;
+    }
+}
+
+// Eyebrow, heading and body of a step. Leaves `StepMetrics.art-reserve` free on the right for the frame's step art.
+component StepHead inherits VerticalLayout {
+    in property <string> eyebrow;
+    in property <string> title;
+    in property <string> body;
+    in property <bool> reserve-art: true;
+
+    padding-right: root.reserve-art ? StepMetrics.art-reserve : 0px;
+    min-height: root.reserve-art ? StepMetrics.art-height : 0px;
+    alignment: start;
+    spacing: 0px;
+    vertical-stretch: 0;
+
+    if root.eyebrow != "": Text {
+        text: root.eyebrow;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-label;
+        overflow: elide;
+        accessible-role: none;
+    }
+    if root.eyebrow != "": Rectangle { height: 6px; }
+    Text {
+        text: root.title;
+        font-family: Theme.font-display;
+        font-size: Theme.size-hero;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.title;
+    }
+    if root.body != "": Rectangle { height: 10px; }
+    if root.body != "": Text {
+        text: root.body;
+        font-family: Theme.font-text;
+        font-size: Theme.size-body;
+        font-weight: Theme.weight-regular;
+        color: Theme.text-secondary;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.body;
+    }
+}
+
+// A quiet inline notice: field fill, hairline, a glyph and wrapped text. `warning` = danger triangle.
+component Notice inherits Rectangle {
+    in property <bool> warning: false;
+    in property <string> text;
+
+    border-radius: Theme.radius-row;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+    accessible-live-region: polite;
+
+    HorizontalLayout {
+        padding-left: Theme.space-4;
+        padding-right: Theme.space-4;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: Theme.space-3;
+
+        VerticalLayout {
+            alignment: start;
+            Icon {
+                source: root.warning ? Icons.triangle-alert : Icons.info;
+                size: 18px;
+                color: root.warning ? Theme.danger : Theme.text;
+            }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+}
+
+// A 40-px round glyph tile (chip fill, hairline).
+component GlyphTile inherits Rectangle {
+    in property <image> icon;
+    in property <length> side: 40px;
+    in property <brush> glyph-color: Theme.text;
+
+    width: root.side;
+    height: root.side;
+    border-radius: root.side / 2;
+    background: Theme.chip;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    accessible-role: none;
+
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: root.icon;
+        size: root.side * 0.45;
+        color: root.glyph-color;
+    }
+}
+
+// ───────────────────────────── Step 1: Welcome ─────────────────────────────
+
+// Step 1: logo, `VOX`, tagline, body.
+export component WelcomeStep inherits Rectangle {
+    in property <image> art;
+
+    background: transparent;
+    vertical-stretch: 1;
+    accessible-role: groupbox;
+    accessible-label: Brand.app-name;
+
+    VerticalLayout {
+        padding-left: StepMetrics.gutter;
+        padding-right: StepMetrics.gutter;
+        alignment: center;
+        spacing: 0px;
+
+        // The hero: the step art as a wide banner with the brand mark resting on it. Until the art arrives, a quiet
+        // placeholder of its own: ArtThumb's sheen is sized for thumbnails and would be cut by a 2.5:1 banner.
+        hero := Rectangle {
+            height: 196px;
+            horizontal-stretch: 1;
+            accessible-role: none;
+
+            if root.art.width > 0: ArtThumb {
+                width: 100%;
+                height: 100%;
+                source: root.art;
+                radius: Theme.radius-card;
+            }
+            if root.art.width == 0: Rectangle {
+                border-radius: Theme.radius-card;
+                clip: true;
+                background: @linear-gradient(120deg, Theme.art-placeholder-a 0%, Theme.art-placeholder-b 55%,
+                    Theme.art-placeholder-c 100%);
+                // A square sheen: its circle fades out before the square's edges, so nothing is ever cut.
+                Rectangle {
+                    width: parent.height * 1.7;
+                    height: self.width;
+                    x: parent.width * 0.22 - self.width / 2;
+                    y: parent.height * 0.18 - self.height / 2;
+                    background: @radial-gradient(circle, Theme.art-sheen 0%, Theme.art-sheen.with-alpha(0) 66%);
+                }
+                Rectangle {
+                    border-radius: Theme.radius-card;
+                    border-width: Theme.hairline;
+                    border-color: Theme.art-border;
+                    background: transparent;
+                }
+            }
+
+            LogoMark {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: 76px;
+                animated: true;
+            }
+        }
+        Rectangle { height: 28px; }
+        Text {
+            // The product name in capitals, read as the plain name.
+            text: Brand.app-name.to-uppercase();
+            font-family: Theme.font-display;
+            font-size: Theme.size-number;
+            font-weight: Theme.weight-semibold;
+            letter-spacing: 6px;
+            color: Theme.text;
+            horizontal-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: Brand.app-name;
+        }
+        Rectangle { height: 6px; }
+        Text {
+            text: "Select any text. Hear it read aloud.";
+            font-family: Theme.font-display;
+            font-size: Theme.size-sentence;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Rectangle { height: 10px; }
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                max-width: 420px;
+                text: Brand.app-name
+                    + " turns anything on your screen into natural speech with ElevenLabs voices. Setup takes about a minute.";
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+// ───────────────────────────── Step 2: API key ─────────────────────────────
+
+// The connected panel (an outline card, a polite status region): check tile with the success dot on its ring, "Key
+// connected", the caption, "Replace key" (ghost, as the spec has it), and the connect warning under a hairline when
+// there is one. `grab-focus` moves focus to "Replace key" when the panel replaces the form after a connect.
+component KeyConnected inherits Card {
+    in property <string> caption;
+    in property <string> warning;
+    in property <bool> grab-focus: false;
+
+    callback replace();
+
+    kind: CardKind.outline;
+    content-padding: Theme.space-5;
+    content-spacing: Theme.space-4;
+    accessible-label: "Key connected";
+    accessible-description: root.caption;
+    accessible-live-region: polite;
+
+    // Whichever comes first (this panel being created, or the flag turning on), focus lands on "Replace key".
+    init => {
+        if (root.grab-focus) {
+            replace-btn.focus();
+        }
+    }
+    changed grab-focus => {
+        if (root.grab-focus) {
+            replace-btn.focus();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: Theme.space-4;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                background: Theme.chip;
+                border-width: Theme.hairline;
+                border-color: Theme.field-border;
+                Icon {
+                    width: 100%;
+                    height: 100%;
+                    source: Icons.check;
+                    size: 18px;
+                    color: Theme.text;
+                }
+                // The one success accent: a small dot sitting on the tile's ring at 45° (centre on the ring).
+                Rectangle {
+                    width: 9px;
+                    height: 9px;
+                    x: parent.width / 2 + parent.width / 2 * 0.7071 - self.width / 2;
+                    y: parent.height / 2 - parent.height / 2 * 0.7071 - self.height / 2;
+                    border-radius: self.width / 2;
+                    background: Theme.success;
+                    border-width: 1.5px;
+                    border-color: Theme.panel;
+                }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 3px;
+            Text {
+                text: "Key connected";
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.caption != "": Text {
+                text: root.caption;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            replace-btn := Button {
+                text: "Replace key";
+                kind: ButtonKind.ghost;
+                size: ButtonSize.sm;
+                icon: Icons.key-round;
+                clicked => { root.replace(); }
+            }
+        }
+    }
+
+    if root.warning != "": Divider { }
+    if root.warning != "": HorizontalLayout {
+        spacing: Theme.space-3;
+        VerticalLayout {
+            alignment: start;
+            padding-top: 1px;
+            Icon {
+                source: Icons.info;
+                size: 16px;
+                color: Theme.text-secondary;
+            }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.warning;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.warning;
+        }
+    }
+}
+
+// Step 2: connect the ElevenLabs key. The draft text lives in the frame (OnboardingPage) so Back/Continue keep it.
+export component ApiKeyStep inherits Rectangle {
+    in property <KeyStepData> data;
+    in-out property <string> draft;
+
+    // "Connect" with the raw draft: Rust trims it and answers `Paste your API key first.` when it is blank (Slint has
+    // no trim).
+    callback connect(string);
+    // Typing clears the error.
+    callback edited();
+    callback get-key();
+    callback replace-key();
+    callback cancel-replace();
+
+    // The connected panel takes focus only when it replaces the form (a connect, or Cancel while replacing), never
+    // on the step's first paint: the frame's step anchor has focus then.
+    property <bool> form-shown: root.data.form-visible;
+    property <bool> grab-replace: false;
+    changed form-shown => {
+        root.grab-replace = !root.form-shown;
+    }
+
+    background: transparent;
+    vertical-stretch: 0;
+    accessible-role: groupbox;
+    accessible-label: "Connect your account";
+
+    // Measures "Connect" so the pill keeps the width it has with its spinner (Button `loading` adds a 16-px spinner
+    // and a 6-px gap): nothing beside it moves while a key is checked.
+    connect-measure := Text {
+        visible: false;
+        text: "Connect";
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-semibold;
+        accessible-role: none;
+    }
+
+    VerticalLayout {
+        padding-left: StepMetrics.gutter;
+        padding-right: StepMetrics.gutter;
+        alignment: start;
+        spacing: Theme.space-6;
+
+        StepHead {
+            eyebrow: "ElevenLabs";
+            title: "Connect your account";
+            body: Brand.app-name
+                + " speaks with your own ElevenLabs API key. It is stored encrypted on this PC and only ever sent to ElevenLabs.";
+        }
+
+        // The stored key could not be migrated / read (R-API-key): ask for it again, clearly.
+        if root.data.notice != "": Notice {
+            warning: true;
+            text: root.data.notice;
+        }
+
+        if root.data.form-visible: key-form := VerticalLayout {
+            // A rejected key puts focus back in the field (it was disabled, so focus dropped, while connecting).
+            property <bool> busy: root.data.busy;
+            property <string> error: root.data.error;
+            changed busy => {
+                if (!key-form.busy && key-form.error != "") {
+                    field.focus-input();
+                }
+            }
+            changed error => {
+                if (!key-form.busy && key-form.error != "") {
+                    field.focus-input();
+                }
+            }
+
+            spacing: Theme.space-4;
+            accessible-role: AccessibleRole.form;
+            accessible-label: "API key";
+
+            FormField {
+                label: "API key";
+                hint: root.data.hint;
+                error: root.data.error;
+
+                field := TextField {
+                    text <=> root.draft;
+                    placeholder: "sk_…";
+                    password: true;
+                    label: "API key";
+                    icon: Icons.key-round;
+                    enabled: !root.data.busy;
+                    has-error: root.data.error != "";
+                    edited => { root.edited(); }
+                    accepted(t) => { root.connect(t); }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                alignment: start;
+                Button {
+                    min-width: connect-measure.preferred-width + 50px;
+                    text: "Connect";
+                    kind: ButtonKind.primary;
+                    size: ButtonSize.sm;
+                    loading: root.data.busy;
+                    enabled: root.draft != "" || root.data.busy;
+                    clicked => { root.connect(root.draft); }
+                }
+                if root.data.replacing: Button {
+                    text: "Cancel";
+                    kind: ButtonKind.secondary;
+                    size: ButtonSize.sm;
+                    enabled: !root.data.busy;
+                    clicked => { root.cancel-replace(); }
+                }
+                Button {
+                    text: "Get a key";
+                    kind: ButtonKind.ghost;
+                    size: ButtonSize.sm;
+                    trailing-icon: Icons.arrow-up-right;
+                    accessible-text: "Get a key on elevenlabs.io";
+                    clicked => { root.get-key(); }
+                }
+            }
+        }
+
+        if !root.data.form-visible: KeyConnected {
+            grab-focus: root.grab-replace;
+            caption: root.data.connected-caption;
+            warning: root.data.warning;
+            replace => { root.replace-key(); }
+        }
+    }
+}
+
+// ───────────────────────────── Step 3: Voice ─────────────────────────────
+
+// Four bars moving out of step: "this sample is playing". Still (at varied heights) under Motion.reduce.
+component PlayingBars {
+    in property <brush> color: Theme.text;
+
+    property <bool> moving: !Motion.reduce;
+    property <float> t: root.moving ? animation-tick() / 1ms : 0;
+
+    width: 16px;
+    height: 14px;
+    accessible-role: none;
+
+    for i in 4: Rectangle {
+        property <float> rest: i == 0 ? 0.45 : i == 1 ? 0.9 : i == 2 ? 0.6 : 0.75;
+        property <float> level: root.moving
+            ? 0.3 + 0.7 * (0.5 + 0.5 * sin((root.t * (0.011 + i * 0.0023) + i * 1.7) * 1rad))
+            : self.rest;
+        x: i * 4px + 0.5px;
+        width: 2.5px;
+        height: max(3px, root.height * self.level);
+        y: (root.height - self.height) / 2;
+        border-radius: 1.25px;
+        background: root.color;
+    }
+}
+
+// The round preview button: play glyph; a spinner while the sample loads and moving bars while it plays (both
+// pressed, and both stop the sample when clicked).
+component PreviewButton {
+    in property <PreviewState> phase;
+    in property <string> name;
+
+    callback clicked();
+
+    property <bool> active: root.phase == PreviewState.loading || root.phase == PreviewState.playing;
+    property <image> no-icon;
+
+    width: 36px;
+    height: 36px;
+    forward-focus: btn;
+
+    btn := IconButton {
+        icon: root.active ? root.no-icon : Icons.play;
+        label: root.active ? "Stop " + root.name + " preview" : "Preview " + root.name;
+        kind: IconButtonKind.secondary;
+        checked: root.active;
+        clicked => { root.clicked(); }
+    }
+    if root.phase == PreviewState.loading: Spinner {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        size: 16px;
+        color: Theme.text;
+        track-color: transparent;
+        arc: 270deg;
+        label: "";
+    }
+    if root.phase == PreviewState.playing: PlayingBars {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+    }
+}
+
+// The selection mark at the end of a voice row: an empty ring, or a filled disc with a check for the current voice.
+component RadioMark inherits Rectangle {
+    in property <bool> checked;
+
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: root.checked ? Theme.primary : transparent;
+    border-width: root.checked ? 0px : 1.5px;
+    border-color: Theme.field-border-focus;
+    accessible-role: none;
+    animate background { duration: Theme.fast; easing: ease-out; }
+
+    if root.checked: Icon {
+        width: 100%;
+        height: 100%;
+        source: Icons.check;
+        size: 12px;
+        color: Theme.on-primary;
+    }
+}
+
+// A state in place of the list (error / empty / no key): an outline card (the same card as the key step's connected
+// panel and the try step's sample) about the list's height with a glyph, title, body and an optional "Try again".
+// `glyph-color`: danger for a load error (as on the Voices page), text otherwise.
+component ListState inherits Card {
+    in property <image> icon;
+    in property <brush> glyph-color: Theme.text;
+    in property <string> title;
+    in property <string> body;
+    in property <string> action-text;
+
+    callback action();
+
+    kind: CardKind.outline;
+    content-padding: Theme.space-6;
+    content-spacing: 0px;
+    accessible-label: root.title;
+    accessible-description: root.body;
+    accessible-live-region: polite;
+
+    VerticalLayout {
+        min-height: StepMetrics.list-height - 48px - 2 * Theme.space-6;
+        alignment: center;
+        spacing: 0px;
+
+        HorizontalLayout {
+            alignment: center;
+            GlyphTile {
+                icon: root.icon;
+                glyph-color: root.glyph-color;
+            }
+        }
+        Rectangle { height: Theme.space-4; }
+        Text {
+            text: root.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-title;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: none;
+        }
+        if root.body != "": Rectangle { height: 6px; }
+        if root.body != "": HorizontalLayout {
+            alignment: center;
+            Text {
+                max-width: 400px;
+                text: root.body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+        }
+        if root.action-text != "": Rectangle { height: Theme.space-5; }
+        if root.action-text != "": HorizontalLayout {
+            alignment: center;
+            Button {
+                text: root.action-text;
+                kind: ButtonKind.secondary;
+                size: ButtonSize.sm;
+                icon: Icons.refresh-cw;
+                clicked => { root.action(); }
+            }
+        }
+    }
+}
+
+// Step 3: pick a voice (API order) with previews.
+export component VoiceStep inherits Rectangle {
+    in property <VoiceStepData> data;
+
+    callback choose(string);
+    callback preview(string);
+    callback retry();
+
+    background: transparent;
+    // A list (or its placeholder rows) takes the panel's free height (at least `StepMetrics.list-height` when it has
+    // that much content); a state box keeps its own height.
+    vertical-stretch: root.data.state == LoadState.ready || root.data.state == LoadState.loading ? 1 : 0;
+    accessible-role: groupbox;
+    accessible-label: "Pick a voice";
+
+    VerticalLayout {
+        spacing: Theme.space-5;
+
+        HorizontalLayout {
+            padding-left: StepMetrics.gutter;
+            padding-right: StepMetrics.gutter;
+            vertical-stretch: 0;
+            StepHead {
+                eyebrow: "Voice";
+                title: "Pick a voice";
+                body: "Preview a few and choose the one you like. You can switch any time on the Voices page.";
+            }
+        }
+
+        // Loading: six placeholder rows in the list's box.
+        if root.data.state == LoadState.loading: HorizontalLayout {
+            padding-left: StepMetrics.gutter - StepMetrics.row-bleed;
+            padding-right: StepMetrics.gutter - StepMetrics.row-bleed;
+            ScrollArea {
+                min-height: StepMetrics.list-height;
+                vertical-stretch: 1;
+                edge-fade: true;
+                accessible-role: progress-indicator;
+                accessible-label: "Loading voices";
+
+                VerticalLayout {
+                    alignment: start;
+                    padding-left: StepMetrics.row-bleed;
+                    padding-right: StepMetrics.row-bleed;
+                    for i in 6: HorizontalLayout {
+                        spacing: Theme.space-2;
+                        SkeletonRow {
+                            horizontal-stretch: 1;
+                            size: SkeletonRowSize.compact;
+                            title-width: i == 0 ? 28% : i == 1 ? 22% : i == 2 ? 32% : i == 3 ? 24% : i == 4 ? 30% : 20%;
+                            subtitle-width: i == 0 ? 46% : i == 1 ? 38% : i == 2 ? 42% : i == 3 ? 50% : i == 4 ? 36% : 44%;
+                        }
+                        // The preview button and the selection mark.
+                        VerticalLayout {
+                            alignment: center;
+                            Skeleton { width: 36px; height: 36px; radius: 18px; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            padding-left: Theme.space-2;
+                            Skeleton { width: 20px; height: 20px; radius: 10px; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // The list: compact rows, the current voice selected (radio mark), a preview button when there is a sample.
+        if root.data.state == LoadState.ready: HorizontalLayout {
+            padding-left: StepMetrics.gutter - StepMetrics.row-bleed;
+            padding-right: StepMetrics.gutter - StepMetrics.row-bleed;
+            list := ScrollArea {
+                min-height: min(StepMetrics.list-height, rows.preferred-height);
+                max-height: rows.preferred-height;
+                vertical-stretch: 1;
+                edge-fade: true;
+                // Rows are list items (ListRow) that report the current voice as selected.
+                accessible-role: AccessibleRole.list;
+                accessible-label: "Voices";
+
+                rows := VerticalLayout {
+                    alignment: start;
+                    padding-left: StepMetrics.row-bleed;
+                    padding-right: StepMetrics.row-bleed;
+                    for v in root.data.items: ListRow {
+                        size: ListRowSize.compact;
+                        art: v.art;
+                        title: v.name;
+                        subtitle: v.subtitle;
+                        selected: v.in-use;
+                        accessible-text: v.name + (v.subtitle != "" ? ", " + v.subtitle : "");
+                        clicked => { root.choose(v.id); }
+
+                        if v.preview != PreviewState.none: PreviewButton {
+                            phase: v.preview;
+                            name: v.name;
+                            clicked => { root.preview(v.id); }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            padding-left: Theme.space-2;
+                            RadioMark { checked: v.in-use; }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.data.state == LoadState.error || root.data.state == LoadState.empty: HorizontalLayout {
+            padding-left: StepMetrics.gutter;
+            padding-right: StepMetrics.gutter;
+            vertical-stretch: 0;
+            ListState {
+                icon: root.data.state == LoadState.error ? Icons.circle-alert : Icons.audio-lines;
+                glyph-color: root.data.state == LoadState.error ? Theme.danger : Theme.text;
+                title: root.data.title;
+                body: root.data.body;
+                action-text: root.data.state == LoadState.error ? "Try again" : "";
+                action => { root.retry(); }
+            }
+        }
+    }
+}
+
+// ───────────────────────────── Step 4: Try it ─────────────────────────────
+
+// The decorative "read from anywhere" picture: a paragraph with a highlighted sentence, the context menu that
+// opened on it, the "Read with" chip beside the menu and a pointer under the chip. Scaled down, theme-aware. Framed
+// like the outline Card under it (radius 16, divider hairline); it is positioned freely, so it is not a Card itself.
+component TryIllustration inherits Rectangle {
+    property <length> pad: 16px;
+
+    width: 268px;
+    height: menu.y + menu.height + 16px;
+    border-radius: Theme.radius-card;
+    background: transparent;
+    border-width: Theme.hairline;
+    border-color: Theme.divider;
+    clip: true;
+    accessible-role: none;
+
+    lead := Text {
+        x: root.pad;
+        y: 13px;
+        width: root.width - 2 * root.pad;
+        text: "The quiet revolution in personal computing was never about faster chips.";
+        font-family: Theme.font-text;
+        font-size: 11.5px;
+        font-weight: Theme.weight-regular;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+    // The selection.
+    sel := Rectangle {
+        x: root.pad - 3px;
+        y: lead.y + lead.preferred-height + 2px;
+        width: sel-text.preferred-width + 6px;
+        height: sel-text.preferred-height + 2px;
+        border-radius: 3px;
+        background: Theme.selection;
+        sel-text := Text {
+            x: 3px;
+            y: 1px;
+            text: "It was about software fitting around people.";
+            font-family: Theme.font-text;
+            font-size: 11.5px;
+            font-weight: Theme.weight-medium;
+            color: Theme.text;
+            accessible-role: none;
+        }
+    }
+    // The context menu, opened under the selection.
+    menu := Rectangle {
+        x: root.pad + 4px;
+        y: sel.y + sel.height + 8px;
+        width: 112px;
+        height: menu-rows.preferred-height;
+        border-radius: 10px;
+        background: Theme.popup;
+        border-width: Theme.hairline;
+        border-color: Theme.popup-border;
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.popup-shadow;
+
+        menu-rows := VerticalLayout {
+            padding: 4px;
+            spacing: 0px;
+            for label in ["Copy", "Search the web", "Print…"]: Rectangle {
+                height: 22px;
+                Text {
+                    x: 8px;
+                    width: parent.width - 16px;
+                    height: 100%;
+                    text: label;
+                    font-family: Theme.font-text;
+                    font-size: 11px;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-secondary;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+    // The chip beside the menu.
+    chip := Rectangle {
+        x: menu.x + menu.width + 6px;
+        y: menu.y;
+        width: chip-row.preferred-width;
+        height: 28px;
+        border-radius: 14px;
+        background: Theme.panel;
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.popup-shadow;
+
+        chip-row := HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 11px;
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                ArtThumb {
+                    width: 14px;
+                    height: 14px;
+                    round: true;
+                    border: false;
+                }
+            }
+            Text {
+                text: Brand.read-with-label;
+                font-family: Theme.font-text;
+                font-size: 11px;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+    // The pointer, just under the chip's end: it never covers the label.
+    Icon {
+        x: chip.x + chip.width - 12px;
+        y: chip.y + chip.height - 4px;
+        source: Icons.mouse-pointer-click;
+        size: 18px;
+        color: Theme.text;
+    }
+}
+
+// One numbered how-to line: a round number cap and the text (`styled` = the middle part in bold).
+component HowLine inherits HorizontalLayout {
+    in property <string> number;
+    in property <string> before;
+    in property <string> strong;
+    in property <string> after;
+
+    spacing: Theme.space-3;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.number + ". " + root.before + root.strong + root.after;
+
+    VerticalLayout {
+        alignment: start;
+        Rectangle {
+            width: 22px;
+            height: 22px;
+            border-radius: 11px;
+            background: Theme.chip;
+            border-width: Theme.hairline;
+            border-color: Theme.field-border;
+            Text {
+                text: root.number;
+                font-family: Theme.font-text;
+                font-size: Theme.size-keycap;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        padding-top: 2px;
+        StyledText {
+            text: @markdown("\{root.before}**\{root.strong}**\{root.after}");
+            default-font-family: Theme.font-text;
+            default-font-size: Theme.size-label;
+            default-color: Theme.text;
+            accessible-role: none;
+        }
+    }
+}
+
+// Step 4: how to read from anywhere + "Read this".
+export component TryStep inherits Rectangle {
+    in property <TryStepData> data;
+
+    callback read-sample();
+    // "Add a key" → the key step.
+    callback add-key();
+
+    // The how-to column's width in the 560-px panel (body 496 − illustration 268 − gap 20) and its text indent; the
+    // shortcut is measured off-layout so the inline / stacked choice never feeds back into the layout.
+    property <length> how-width: 208px;
+    property <length> how-indent: 22px + Theme.space-3;
+    property <bool> keys-stacked: root.how-indent + or-measure.preferred-width + Theme.space-3
+        + keys-measure.preferred-width > root.how-width;
+
+    background: transparent;
+    vertical-stretch: 0;
+    accessible-role: groupbox;
+    accessible-label: "Read from anywhere";
+
+    or-measure := Text {
+        visible: false;
+        text: "or press";
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        accessible-role: none;
+    }
+    keys-measure := KeyCombo {
+        visible: false;
+        keys: root.data.keys;
+        accessible-role: none;
+    }
+
+    VerticalLayout {
+        padding-left: StepMetrics.gutter;
+        padding-right: StepMetrics.gutter;
+        alignment: start;
+        spacing: Theme.space-5;
+
+        StepHead {
+            eyebrow: "Try it";
+            title: "Read from anywhere";
+        }
+
+        HorizontalLayout {
+            spacing: Theme.space-5;
+
+            VerticalLayout {
+                alignment: start;
+                TryIllustration { }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 14px;
+                HowLine { number: "1"; before: "Select text in any app"; }
+                HowLine { number: "2"; before: "Right-click the selection"; }
+                HowLine { number: "3"; before: "Click "; strong: Brand.read-with-label; after: " beside the menu"; }
+                if root.data.keys.length > 0 && !root.keys-stacked: HorizontalLayout {
+                    spacing: Theme.space-3;
+                    padding-left: root.how-indent;
+                    alignment: start;
+                    Text {
+                        text: "or press";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                    }
+                    KeyCombo { keys: root.data.keys; }
+                }
+                // A long shortcut goes under "or press" instead of past the column.
+                if root.data.keys.length > 0 && root.keys-stacked: VerticalLayout {
+                    padding-left: root.how-indent;
+                    spacing: 6px;
+                    Text {
+                        text: "or press";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        KeyCombo {
+                            keys: root.data.keys;
+                            small: keys-measure.preferred-width > root.how-width - root.how-indent;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The sample (always quoted) and, under it, how to hear it: "Read this", or the add-key line without a key.
+        Card {
+            kind: CardKind.outline;
+            content-padding: Theme.space-5;
+            content-spacing: Theme.space-4;
+            accessible-label: "Sample";
+
+            if root.data.sample != "": Text {
+                text: "“" + root.data.sample + "”";
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+                accessible-role: AccessibleRole.text;
+                accessible-label: root.data.sample;
+            }
+            HorizontalLayout {
+                spacing: Theme.space-3;
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.data.can-read ? root.data.caption : "Connect your ElevenLabs key to hear it.";
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-label;
+                    font-weight: Theme.weight-medium;
+                    color: root.data.can-read ? Theme.text-label : Theme.text-secondary;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: self.text;
+                    accessible-live-region: polite;
+                }
+                if root.data.can-read: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Read this";
+                        kind: ButtonKind.primary;
+                        size: ButtonSize.sm;
+                        icon: Icons.play;
+                        loading: root.data.busy;
+                        accessible-text: "Read this sample";
+                        clicked => { root.read-sample(); }
+                    }
+                }
+                if !root.data.can-read: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Add a key";
+                        kind: ButtonKind.secondary;
+                        size: ButtonSize.sm;
+                        icon: Icons.key-round;
+                        clicked => { root.add-key(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────── Step 5: Done ─────────────────────────────
+
+// One tip in the tips card: a 16-px glyph (tray / keyboard), the label, and its keycaps on the right. A hairline
+// separates it from the tip above.
+component TipRow inherits Rectangle {
+    in property <KeyGroup> tip;
+    in property <bool> first: false;
+
+    height: 48px;
+    accessible-role: none;
+
+    if !root.first: Divider {
+        y: 0px;
+        height: Theme.hairline;
+        inset: Theme.space-4;
+    }
+    HorizontalLayout {
+        padding-left: Theme.space-4;
+        padding-right: Theme.space-4;
+        spacing: Theme.space-3;
+
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.tip.keys.length == 0 ? Icons.panel-bottom : Icons.keyboard;
+                size: 16px;
+                color: Theme.text-secondary;
+            }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.tip.label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-medium;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.tip.label;
+        }
+        if root.tip.keys.length > 0: VerticalLayout {
+            alignment: center;
+            KeyCombo { keys: root.tip.keys; }
+        }
+    }
+}
+
+// Step 5: done + tips. Centred like the welcome step: the frame draws the step art with the check badge as a hero
+// above it (DoneStep has no art input), then the heading and body centred, then the tips in a hairline card.
+export component DoneStep inherits Rectangle {
+    in property <[KeyGroup]> tips;
+
+    background: transparent;
+    vertical-stretch: 0;
+    accessible-role: groupbox;
+    accessible-label: "You’re all set";
+
+    VerticalLayout {
+        padding-left: StepMetrics.gutter;
+        padding-right: StepMetrics.gutter;
+        alignment: start;
+        spacing: 0px;
+
+        Text {
+            text: "You’re all set";
+            font-family: Theme.font-display;
+            font-size: Theme.size-hero;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: self.text;
+        }
+        Rectangle { height: 8px; }
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                max-width: 420px;
+                text: Brand.app-name
+                    + " lives in the system tray. Close this window whenever you like: it keeps watching for your selections.";
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                accessible-role: AccessibleRole.text;
+                accessible-label: self.text;
+            }
+        }
+        if root.tips.length > 0: Rectangle { height: Theme.space-6; }
+        if root.tips.length > 0: Card {
+            kind: CardKind.outline;
+            content-padding: 0px;
+            content-spacing: 0px;
+            accessible-label: "Tips";
+
+            for tip[i] in root.tips: TipRow {
+                tip: tip;
+                first: i == 0;
+            }
+        }
+    }
+}

@@ -1,0 +1,81 @@
+{
+  "data": {
+    "step": 2,
+    "furthest": 2,
+    "step-labels": [
+      "Welcome",
+      "API key",
+      "Voice",
+      "Try it",
+      "Done"
+    ],
+    "crumb": "Setup 3/5",
+    "next-label": "Continue",
+    "next-secondary": false,
+    "show-back": true,
+    "show-skip": true,
+    "finishing": false,
+    "art": {
+      "$image": "art/thumb-george.png"
+    },
+    "key": {
+      "has-key": false,
+      "form-visible": true,
+      "replacing": false,
+      "busy": false,
+      "error": "",
+      "hint": "Find it under Settings → API keys on elevenlabs.io.",
+      "connected-caption": "",
+      "warning": "",
+      "notice": ""
+    },
+    "voices": {
+      "state": {
+        "$enum": "LoadState.loading"
+      },
+      "title": "",
+      "body": "",
+      "items": []
+    },
+    "try-it": {
+      "can-read": true,
+      "caption": "Or hear it right here:",
+      "busy": false,
+      "sample": "Hi, I’m George. Select any text on your screen, right-click it, and choose Read with Vox. I’ll read emails, articles and documents aloud while you keep working.",
+      "keys": [
+        "Ctrl",
+        "Alt",
+        "R"
+      ]
+    },
+    "tips": [
+      {
+        "label": "Click the tray icon to open Vox",
+        "keys": []
+      },
+      {
+        "label": "Read selection",
+        "keys": [
+          "Ctrl",
+          "Alt",
+          "R"
+        ]
+      },
+      {
+        "label": "Play / pause",
+        "keys": [
+          "Ctrl",
+          "Alt",
+          "P"
+        ]
+      }
+    ]
+  },
+  "backdrop-dark": {
+    "$image": "art/backdrop-dark.png"
+  },
+  "backdrop-light": {
+    "$image": "art/backdrop-light.png"
+  },
+  "key-draft": ""
+}

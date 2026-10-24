@@ -1,0 +1,19 @@
+[package]
+name = "vox-audio"
+description = "Vox playback: MP3/WAV decoding, WSOLA time-stretch, resampling, WASAPI output with a keep-alive warmer, and the session Player"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+symphonia.workspace = true
+cpal.workspace = true
+rtrb.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]

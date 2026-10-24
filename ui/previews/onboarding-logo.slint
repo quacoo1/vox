@@ -1,0 +1,31 @@
+// The onboarding brand mark (LogoMark, ui/pages/onboarding/steps.slint) at the welcome hero, mid and breadcrumb sizes.
+//   vox-shot ui/previews/onboarding-logo.slint --component LogoPreview --size 360x140 --scale 2
+//            --out shots/ui/onboarding/logo-dark.png   (... --set Theme.dark=false for -light)
+import { Theme } from "../design/theme.slint";
+import { LogoMark } from "../pages/onboarding/steps.slint";
+
+export { Theme }
+
+export component LogoPreview inherits Window {
+    preferred-width: 360px;
+    preferred-height: 140px;
+    background: Theme.panel;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 30px;
+        padding: 20px;
+        VerticalLayout {
+            alignment: center;
+            LogoMark { size: 96px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            LogoMark { size: 48px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            LogoMark { size: 24px; }
+        }
+    }
+}

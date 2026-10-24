@@ -1,0 +1,31 @@
+// Divider: a 1 px hairline rule in `divider`.
+//
+//   in    vertical: bool            false (default) = horizontal rule 1 px high that stretches in width;
+//                                   true = vertical rule 1 px wide that stretches in height
+//   in    inset: length             empty space before and after the line along its length (default 0)
+//   in    line-color: brush         default Theme.divider
+// In a layout it stretches along its length; placed freely it fills its parent unless given a geometry.
+// Decorative (accessible-role none).
+
+import { Theme } from "theme.slint";
+
+export component Divider inherits Rectangle {
+    in property <bool> vertical: false;
+    in property <length> inset: 0px;
+    in property <brush> line-color: Theme.divider;
+
+    min-width: root.vertical ? Theme.hairline : 0px;
+    max-width: root.vertical ? Theme.hairline : 100000px;
+    min-height: root.vertical ? 0px : Theme.hairline;
+    max-height: root.vertical ? 100000px : Theme.hairline;
+    horizontal-stretch: root.vertical ? 0 : 1;
+    vertical-stretch: root.vertical ? 1 : 0;
+
+    Rectangle {
+        x: root.vertical ? 0px : root.inset;
+        y: root.vertical ? root.inset : 0px;
+        width: root.vertical ? root.width : root.width - 2 * root.inset;
+        height: root.vertical ? root.height - 2 * root.inset : root.height;
+        background: root.line-color;
+    }
+}

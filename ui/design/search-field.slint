@@ -1,0 +1,143 @@
+// SearchField: the fully round search pill (sidebar "Search history", page filters).
+//
+//   in-out text: string             the query
+//   in    placeholder: string       e.g. "Search history" (text-secondary: brighter than field placeholders)
+//   in    keys: [string]            shortcut hint shown at the right while empty and unfocused (["Ctrl", "K"])
+//   in    small: bool               32 h variant for in-page filter rows, level with FilterChips and sm pills (default 44 h)
+//   in    enabled: bool
+//   in    show-focus: bool          draw the focused look without focus (previews)
+//   out   has-focus: bool
+//   callback edited(text: string)   every keystroke
+//   callback accepted(text: string) Enter
+//   callback cleared()              the clear button or Esc emptied the field
+//   function focus-input()          focus the text input (e.g. from the Ctrl K shortcut)
+// Behaviour: Esc clears a non-empty value (and stops there); the clear button "Clear search" appears when
+// non-empty and refocuses the field.
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+import { KeyCombo } from "keycap.slint";
+import { IconButton, IconButtonSize } from "icon-button.slint";
+
+export component SearchField inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder: "Search";
+    in property <[string]> keys;
+    in property <bool> small: false;
+    in property <bool> enabled: true;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: input.has-focus;
+
+    callback edited(text: string);
+    callback accepted(text: string);
+    callback cleared();
+
+    public function focus-input() {
+        input.focus();
+    }
+
+    property <bool> focused-look: input.has-focus || root.show-focus;
+
+    height: root.small ? 32px : 44px;
+    min-width: 160px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: self.height / 2;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: root.focused-look ? Theme.field-border-focus : touch.has-hover ? Theme.field-border-focus : Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: input;
+
+    accessible-role: text-input;
+    accessible-label: root.placeholder;
+    accessible-placeholder-text: root.placeholder;
+    accessible-value: root.text;
+    accessible-enabled: root.enabled;
+
+    animate border-color { duration: Theme.fast; easing: ease-out; }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+
+    HorizontalLayout {
+        padding-left: root.small ? 14px : 16px;
+        padding-right: root.text != "" ? 6px : (root.small ? 8px : 10px);
+        spacing: 10px;
+
+        Icon {
+            source: @image-url("../icons/search.svg");
+            size: root.small ? 16px : 18px;
+            color: root.focused-look ? Theme.text : Theme.text-secondary;
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            placeholder-text := Text {
+                width: 100%;
+                height: 100%;
+                text: root.text == "" ? root.placeholder : "";
+                font-family: Theme.font-text;
+                font-size: root.small ? Theme.size-label : Theme.size-body;
+                font-weight: Theme.weight-medium;
+                // Brighter than other placeholders: the search pill doubles as a navigation entry (the
+                // reference's "Search all libraries" reads almost like a label).
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+
+            input := TextInput {
+                width: 100%;
+                height: 100%;
+                enabled: root.enabled;
+                single-line: true;
+                font-family: Theme.font-text;
+                font-size: root.small ? Theme.size-label : Theme.size-body;
+                font-weight: Theme.weight-medium;
+                color: Theme.text;
+                selection-background-color: Theme.selection;
+                selection-foreground-color: Theme.text;
+                vertical-alignment: center;
+                accessible-role: none;
+
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+                key-pressed(event) => {
+                    if (event.text == Key.Escape && self.text != "") {
+                        self.text = "";
+                        root.edited("");
+                        root.cleared();
+                        return accept;
+                    }
+                    reject
+                }
+            }
+        }
+
+        if root.text == "" && !input.has-focus && root.keys.length > 0: KeyCombo {
+            keys: root.keys;
+        }
+
+        if root.text != "": VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: @image-url("../icons/x.svg");
+                label: "Clear search";
+                size: IconButtonSize.sm;
+                clicked => {
+                    input.text = "";
+                    root.edited("");
+                    root.cleared();
+                    input.focus();
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,551 @@
+// Settings → Triggers (ui-settings-widget.md §2.5, §3). Intro, the hook-unavailable notice (only after a failed hook
+// install), the chip / popup toggles, the Keyboard group (global shortcuts, four hotkey recorders, media keys) and the
+// Capture group (restore clipboard, excluded apps).
+// The hotkey recorder captures keys in Rust (winit key events) while `HotkeyRowData.recording` is true.
+//
+// Recorder (spec §3.5, D-USW-13/17/18): focus (Tab or click), a press while idle, or Enter / Space while idle ask Rust
+// to record (`hotkey-start(action)`); blur stops it (`hotkey-stop()`, also sent when a request is still unanswered),
+// and Tab / Shift+Tab without Ctrl/Alt/Win are let through so focus can leave. The recording look and the key
+// swallowing follow `hotkey.recording` alone: Rust may decline a request (e.g. while the window is not in front), and
+// the control then simply stays idle. While recording every other key is swallowed here (Rust reads it from winit).
+// Idle bare Backspace / Delete with a shortcut set clears it (`hotkey-clear(action)`); auto-repeated keydowns are
+// ignored while idle. Display: idle = the keycaps or "Not set"; recording = a pulsing dot, the held modifiers
+// (`preview`) followed by "+ …", or "Press keys…"; the flash hint shows under the row (also while modifiers are held).
+// Width: the four recorders share one width, at least 248 px (four held modifiers + "+ …" + Esc) and wider when a
+// stored chord needs it (Ctrl Alt Shift Win + "Prev track"), so the keycaps never squeeze.
+//
+// Known shell conflict (reported to the shell owner): MainWindow's capture-key-pressed handles Ctrl+1..5 and Ctrl+K
+// before the recorder sees them, so those chords cannot be recorded until the shell lets keys through while a
+// recorder records.
+import { Theme, Icons, Icon, Button, ButtonSize, IconButton, IconButtonSize, Keycap, KeyCombo, FocusRing, Tip }
+    from "../../design/index.slint";
+import { TriggersData, HotkeyRowData, Brand, Motion } from "../../models.slint";
+import { SectionHead, SubHead, Row, ToggleRow, StackedRow, Notice, AlertLine } from "parts.slint";
+
+component Recorder inherits Rectangle {
+    in property <HotkeyRowData> hotkey;
+    in property <bool> enabled: true;
+    // The width this recorder needs to show its stored chord without squeezing the keycaps (min 248 px).
+    out property <length> needed-width: max(248px, idle-row.preferred-width);
+
+    callback start(action: string);
+    callback stop();
+    callback clear-shortcut(action: string);
+
+    // A start request is out (Rust may not have answered yet): a blur must still send `stop`.
+    property <bool> asked: false;
+    property <bool> recording: root.hotkey.recording;
+    property <bool> keyboard-focus: false;
+    property <float> pulse: root.recording && !Motion.reduce
+        ? 0.7 + 0.3 * cos(mod(animation-tick() / 1ms, 1400) / 1400 * 360deg) : 1;
+
+    function begin() {
+        if (root.enabled && !root.recording) {
+            root.asked = true;
+            root.start(root.hotkey.action);
+        }
+    }
+
+    changed recording => {
+        if (!root.recording) {
+            root.asked = false;
+        }
+    }
+
+    height: 36px;
+    border-radius: self.height / 2;
+    background: root.recording ? Theme.field : touch.has-hover && root.enabled ? Theme.hover : Theme.pill-fill;
+    border-width: Theme.hairline;
+    border-color: root.recording ? Theme.text-secondary
+        : touch.has-hover && root.enabled ? Theme.field-border-focus : Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: keys;
+
+    accessible-role: button;
+    accessible-label: root.hotkey.label + " shortcut: " + (root.hotkey.spoken != "" ? root.hotkey.spoken : "Not set");
+    accessible-description: root.hotkey.hint != "" ? root.hotkey.hint
+        : root.recording ? "Recording. Press a key combination, Escape to cancel, Backspace to clear."
+        : "Press Enter to change, Backspace to clear.";
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        keys.focus();
+        root.begin();
+    }
+
+    animate background, border-color { duration: Theme.fast; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: keys.has-focus && root.keyboard-focus;
+    }
+
+    // Idle: the shortcut's keycaps, or "Not set". Always laid out (hidden while recording) so its width is known.
+    Rectangle {
+        visible: !root.recording;
+        idle-row := HorizontalLayout {
+            padding-left: 7px;
+            padding-right: 12px;
+            spacing: Theme.space-2;
+            KeyCombo {
+                keys: root.hotkey.keys;
+                empty-text: "Not set";
+            }
+            Rectangle { horizontal-stretch: 1; }
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: Icons.pencil;
+                    size: 14px;
+                    color: touch.has-hover && root.enabled ? Theme.text-secondary : Theme.text-muted;
+                }
+            }
+        }
+    }
+
+    // Recording: pulsing dot, held modifiers + "+ …" (or "Press keys…"), Esc to cancel.
+    if root.recording: HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 7px;
+        spacing: Theme.space-2;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Theme.text;
+                opacity: root.pulse;
+            }
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+            if root.hotkey.preview.length > 0: KeyCombo { keys: root.hotkey.preview; }
+            Text {
+                horizontal-stretch: 1;
+                text: root.hotkey.preview.length > 0 ? "+ …" : "Press keys…";
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-muted;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Keycap { text: "Esc"; }
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                if (!keys.has-focus) {
+                    root.keyboard-focus = false;
+                    keys.focus();
+                } else {
+                    root.begin();
+                }
+            }
+        }
+    }
+
+    keys := FocusScope {
+        enabled: root.enabled;
+        focus-gained(reason) => {
+            root.keyboard-focus = reason != FocusReason.pointer-click;
+            root.begin();
+        }
+        focus-lost(reason) => {
+            root.keyboard-focus = false;
+            if (root.recording || root.asked) {
+                root.asked = false;
+                root.stop();
+            }
+        }
+        key-pressed(event) => {
+            let plain = !event.modifiers.control && !event.modifiers.alt && !event.modifiers.meta;
+            if (root.recording) {
+                // Tab / Shift+Tab move focus on (blur stops recording); everything else belongs to the recorder.
+                if ((event.text == Key.Tab || event.text == Key.Backtab) && plain) {
+                    return reject;
+                }
+                return accept;
+            }
+            let start-key = event.text == Key.Return || event.text == Key.Space;
+            let clear-key = (event.text == Key.Backspace || event.text == Key.Delete) && plain && !event.modifiers.shift;
+            if (event.repeat && (start-key || clear-key)) {
+                return accept;
+            }
+            if (start-key) {
+                root.begin();
+                return accept;
+            }
+            if (clear-key && root.hotkey.keys.length > 0) {
+                root.clear-shortcut(root.hotkey.action);
+                return accept;
+            }
+            reject
+        }
+    }
+}
+
+// One shortcut row: label, description, the recorder, and the hint / warning under the text.
+component HotkeyRow inherits VerticalLayout {
+    in property <HotkeyRowData> hotkey;
+    in property <bool> enabled: true;
+    // The shared recorder width (the section passes the widest `needed-width`).
+    in property <length> recorder-width: 248px;
+    out property <length> needed-width: recorder.needed-width;
+
+    callback start(action: string);
+    callback stop();
+    callback clear-shortcut(action: string);
+
+    vertical-stretch: 0;
+
+    Row {
+        title: root.hotkey.label;
+        description: root.hotkey.description;
+        warning: root.hotkey.warning;
+        note: root.hotkey.recording ? root.hotkey.hint : "";
+        dim: !root.enabled;
+
+        recorder := Recorder {
+            width: root.recorder-width;
+            hotkey: root.hotkey;
+            enabled: root.enabled;
+            start(a) => { root.start(a); }
+            stop => { root.stop(); }
+            clear-shortcut(a) => { root.clear-shortcut(a); }
+        }
+    }
+}
+
+// A single-line input with a fixed trailing suffix (".exe"), styled like ui/design TextField.
+component SuffixField inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <string> suffix;
+    in property <bool> has-error: false;
+    in property <string> label;
+
+    callback edited(text: string);
+    callback accepted(text: string);
+
+    height: 40px;
+    min-width: 120px;
+    horizontal-stretch: 1;
+    border-radius: Theme.radius-field;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: root.has-error ? Theme.danger
+        : input.has-focus || touch.has-hover ? Theme.field-border-focus : Theme.field-border;
+    forward-focus: input;
+
+    accessible-role: text-input;
+    accessible-label: root.label;
+    accessible-placeholder-text: root.placeholder;
+    accessible-value: root.text;
+
+    animate border-color { duration: Theme.fast; easing: ease-out; }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 2px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            Text {
+                width: 100%;
+                height: 100%;
+                text: root.text == "" ? root.placeholder : "";
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-muted;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+
+            input := TextInput {
+                property <length> scroll-x;
+                x: min(0px, max(parent.width - self.width, self.scroll-x));
+                width: max(parent.width, self.preferred-width + self.text-cursor-width);
+                height: 100%;
+                single-line: true;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text;
+                selection-background-color: Theme.selection;
+                selection-foreground-color: Theme.text;
+                vertical-alignment: center;
+                accessible-role: none;
+
+                cursor-position-changed(pos) => {
+                    if (pos.x + self.scroll-x < 0px) {
+                        self.scroll-x = -pos.x;
+                    } else if (pos.x + self.scroll-x > parent.width - self.text-cursor-width) {
+                        self.scroll-x = parent.width - self.text-cursor-width - pos.x;
+                    }
+                }
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+        }
+        Text {
+            text: root.suffix;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+}
+
+export component TriggersSection inherits Rectangle {
+    in property <TriggersData> data;
+    // The excluded-app input's text (in-out; Rust clears it after a successful add).
+    in-out property <string> exclude-draft;
+
+    // key = "triggers.rightClickChip" | "triggers.selectionPopup" | "triggers.hotkeysEnabled" | "triggers.mediaKeys"
+    //     | "triggers.restoreClipboard".
+    callback set-bool(string, bool);
+    // Recorder: focus/click/Enter starts recording the action ("readSelection"…); blur/Tab/Escape stops.
+    callback hotkey-start(string);
+    callback hotkey-stop();
+    // Idle Backspace/Delete clears the action's shortcut.
+    callback hotkey-clear(string);
+    // Excluded apps: add (input text) / remove (exe name); typing clears the error.
+    callback add-excluded(string);
+    callback remove-excluded(string);
+    callback excluded-edited();
+
+    public function reassert() {
+        chip.checked = root.data.right-click-chip;
+        popup.checked = root.data.selection-popup;
+        hotkeys.checked = root.data.hotkeys-enabled;
+        media.checked = root.data.media-keys;
+        clipboard.checked = root.data.restore-clipboard;
+    }
+    changed data => { root.reassert(); }
+
+    // One width for the four recorders (see the header).
+    property <length> recorder-width: max(248px, h0.needed-width, h1.needed-width, h2.needed-width, h3.needed-width);
+
+    // Pinned horizontal size info: repeated rows below take the section's width explicitly (see parts.slint).
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    horizontal-stretch: 1;
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Triggers";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Triggers";
+            intro: "Windows can’t add items to other apps’ menus, so " + Brand.app-name
+                + " offers a few ways to start reading. Mix and match.";
+        }
+        Rectangle { height: Theme.space-2; }
+
+        // Only after a failed hook install (R-Hook); the two chip toggles are paused meanwhile.
+        if !root.data.hook-available: VerticalLayout {
+            padding-top: Theme.space-3;
+            padding-bottom: Theme.space-3;
+            Notice {
+                width: root.width;
+                warning: true;
+                title: root.data.hook-notice-title;
+                body: root.data.hook-notice-body;
+            }
+        }
+
+        chip := ToggleRow {
+            divider: false;
+            title: "“" + Brand.read-with-label + "” chip";
+            description: "Select text, then right-click it in any app. The chip appears right beside the menu — click it to listen.";
+            enabled: root.data.hook-available;
+            checked: root.data.right-click-chip;
+            toggled(c) => { root.set-bool("triggers.rightClickChip", c); }
+        }
+        popup := ToggleRow {
+            title: "Selection popup";
+            description: "A small Read button pops up right after you select text, without right-clicking.";
+            enabled: root.data.hook-available;
+            checked: root.data.selection-popup;
+            toggled(c) => { root.set-bool("triggers.selectionPopup", c); }
+        }
+
+        // ── Keyboard ──
+        SubHead { text: "Keyboard"; }
+        hotkeys := ToggleRow {
+            divider: false;
+            title: "Global shortcuts";
+            description: "Work in every app, even when this window is closed.";
+            checked: root.data.hotkeys-enabled;
+            toggled(c) => { root.set-bool("triggers.hotkeysEnabled", c); }
+        }
+        // The spec fixes four actions (readSelection, readClipboard, playPause, stop), in this order. They are unrolled:
+        // a recorder inside a `for` row throws off the section's measured height in Slint 1.18.
+        h0 := HotkeyRow {
+            hotkey: root.data.hotkeys[0];
+            recorder-width: root.recorder-width;
+            enabled: root.data.hotkeys-enabled;
+            start(a) => { root.hotkey-start(a); }
+            stop => { root.hotkey-stop(); }
+            clear-shortcut(a) => { root.hotkey-clear(a); }
+        }
+        h1 := HotkeyRow {
+            hotkey: root.data.hotkeys[1];
+            recorder-width: root.recorder-width;
+            enabled: root.data.hotkeys-enabled;
+            start(a) => { root.hotkey-start(a); }
+            stop => { root.hotkey-stop(); }
+            clear-shortcut(a) => { root.hotkey-clear(a); }
+        }
+        h2 := HotkeyRow {
+            hotkey: root.data.hotkeys[2];
+            recorder-width: root.recorder-width;
+            enabled: root.data.hotkeys-enabled;
+            start(a) => { root.hotkey-start(a); }
+            stop => { root.hotkey-stop(); }
+            clear-shortcut(a) => { root.hotkey-clear(a); }
+        }
+        h3 := HotkeyRow {
+            hotkey: root.data.hotkeys[3];
+            recorder-width: root.recorder-width;
+            enabled: root.data.hotkeys-enabled;
+            start(a) => { root.hotkey-start(a); }
+            stop => { root.hotkey-stop(); }
+            clear-shortcut(a) => { root.hotkey-clear(a); }
+        }
+        media := ToggleRow {
+            title: "Media keys";
+            description: "Play / pause and skip with your keyboard’s media keys and the Windows media flyout.";
+            checked: root.data.media-keys;
+            toggled(c) => { root.set-bool("triggers.mediaKeys", c); }
+        }
+
+        // ── Capture ──
+        SubHead { text: "Capture"; }
+        clipboard := ToggleRow {
+            divider: false;
+            title: "Restore clipboard";
+            description: Brand.app-name + " copies the selection to read it. This puts your previous clipboard back afterwards.";
+            checked: root.data.restore-clipboard;
+            toggled(c) => { root.set-bool("triggers.restoreClipboard", c); }
+        }
+        StackedRow {
+            title: "Excluded apps";
+            description: "Chips never appear in these programs — handy for games, design tools or remote desktops.";
+
+            if root.data.excluded-apps.length > 0: Rectangle {
+                border-radius: Theme.radius-field;
+                border-width: Theme.hairline;
+                border-color: Theme.divider;
+                accessible-role: list;
+                accessible-label: "Excluded apps";
+
+                VerticalLayout {
+                    padding-left: Theme.space-4;
+                    padding-right: 6px;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
+
+                    for app[i] in root.data.excluded-apps: VerticalLayout {
+                        if i > 0: Rectangle {
+                            height: Theme.hairline;
+                            background: Theme.divider;
+                        }
+                        HorizontalLayout {
+                            height: 44px;
+                            spacing: Theme.space-3;
+                            accessible-role: list-item;
+                            accessible-label: app;
+
+                            Icon {
+                                source: Icons.app-window;
+                                size: 16px;
+                                color: Theme.text-secondary;
+                            }
+                            Text {
+                                horizontal-stretch: 1;
+                                text: app;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-body;
+                                font-weight: Theme.weight-medium;
+                                color: Theme.text;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                accessible-role: none;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                IconButton {
+                                    icon: Icons.x;
+                                    size: IconButtonSize.sm;
+                                    label: "Remove " + app;
+                                    tooltip: "Remove " + app;
+                                    clicked => { root.remove-excluded(app); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if root.data.excluded-apps.length > 0: Rectangle { height: Theme.space-1; }
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                SuffixField {
+                    text <=> root.exclude-draft;
+                    placeholder: "photoshop";
+                    suffix: ".exe";
+                    label: "Program to exclude";
+                    has-error: root.data.exclude-error != "";
+                    edited => { root.excluded-edited(); }
+                    accepted(t) => { root.add-excluded(t); }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Add";
+                        icon: Icons.plus;
+                        size: ButtonSize.sm;
+                        // Slint has no trim: Rust ignores a blank (whitespace-only) entry.
+                        enabled: root.exclude-draft != "";
+                        accessible-text: "Add excluded app";
+                        clicked => { root.add-excluded(root.exclude-draft); }
+                    }
+                }
+            }
+            if root.data.exclude-error != "": VerticalLayout {
+                padding-top: Theme.space-1;
+                AlertLine {
+                    width: root.width;
+                    text: root.data.exclude-error;
+                }
+            }
+        }
+    }
+}

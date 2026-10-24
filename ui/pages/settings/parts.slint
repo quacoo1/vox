@@ -1,0 +1,966 @@
+// Settings building blocks, private to the Settings page and its sections (not part of ui/design).
+// DESIGN.md "Screens → Settings": a column of setting rows (title 14 / 600, help 13 text-secondary, control on the
+// right, hairlines between rows), grouped under a section head and muted sub-headings.
+//
+// SectionHead   title (Display 17 / 600) + optional intro paragraph; @children = trailing accessory (badge, button)
+// SubHead       muted sentence-case group label ("Keyboard"); @children = trailing accessory
+// Row           title, help text, an optional emphasised line, warning / caution / note / badges under the text;
+//               @children = the control (right)
+// ToggleRow     a Row with a Toggle; clicking the label area flips it; `checked` is in-out (re-assert it from data)
+// StackedRow    title + help text with the control (@children) below, full width
+// Notice        inline callout: info (info glyph) or warning (alert glyph in danger); @children = optional action
+// Meter         a thin line meter (credits left, cache use)
+// AlertLine     an alert glyph + danger caption (field / row errors), announced assertively; `quiet` = a block-level
+//               warning (danger glyph, text-secondary copy)
+// HintLine      an info glyph + secondary caption (recorder hints), announced politely
+// SettingSlider ui/design Slider with its value label right-aligned on the column edge (see below)
+// ChoiceSelect, ChoiceSegmented   ui/design Select / Segmented over [ChoiceItem] (see their comment below)
+//
+// WrapText      word-wrapped text that reports its real height wherever it sits (see below)
+//
+// Never put `opacity` on a wrapped Text (or its container in a layout): Slint wraps it in a layer whose size info
+// no longer follows the wrap. Dim text through its colour (`with-alpha`) instead.
+//
+// Wrapped text and Slint 1.18 box layouts: a word-wrapped Text reports its height for its *current* width. When the
+// text sits beside other items in a HorizontalLayout, its width depends on the row's own width, and the row's
+// horizontal size info would in turn depend on the text: Slint breaks that cycle silently and the text is measured as
+// one line (it then overflows the row). The fix used throughout: the container of wrapped text pins its horizontal
+// size info (`min-width: 0; preferred-width: 0; horizontal-stretch: 1`) so the layout gives it the remaining width,
+// and the text inside gets that width explicitly. `WrapText` packages the pattern for single blocks of text.
+
+import { Theme, Icons, Icon, Toggle, Divider, Badge, BadgeKind, BadgeDot, Pressable, FocusRing, Slider }
+    from "../../design/index.slint";
+import { BadgeData, BadgeTone, ChoiceItem, Motion } from "../../models.slint";
+
+// WrapText: a word-wrapped paragraph whose height always matches its wrapped lines (in any layout).
+//   in text, text-color (default text-secondary), size (default 13), weight (default 500), align (default left)
+export component WrapText inherits Rectangle {
+    in property <string> text;
+    in property <brush> text-color: Theme.text-secondary;
+    in property <length> size: Theme.size-label;
+    in property <int> weight: Theme.weight-medium;
+    in property <TextHorizontalAlignment> align: TextHorizontalAlignment.left;
+
+    min-width: 0px;
+    preferred-width: 0px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    height: label.preferred-height;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    label := Text {
+        x: 0;
+        y: 0;
+        width: root.width;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.text-color;
+        horizontal-alignment: root.align;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+}
+
+export component SectionHead inherits VerticalLayout {
+    in property <string> title;
+    in property <string> intro;
+
+    spacing: Theme.space-2;
+    vertical-stretch: 0;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+        min-height: 32px;
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.title;
+            font-family: Theme.font-display;
+            font-size: Theme.size-sentence;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.title;
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                @children
+            }
+        }
+    }
+    if root.intro != "": WrapText { text: root.intro; }
+}
+
+export component SubHead inherits HorizontalLayout {
+    in property <string> text;
+
+    padding-top: 28px;
+    padding-bottom: Theme.space-1;
+    spacing: Theme.space-3;
+    vertical-stretch: 0;
+    min-height: 22px;
+
+    Text {
+        horizontal-stretch: 1;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-label;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+    }
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 0;
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            @children
+        }
+    }
+}
+
+// An alert glyph + danger caption (wraps; see the header). `quiet`: a block-level failure message or a warning that
+// is not an input error (13 / 500 text-secondary beside the danger glyph) instead of a field error. `assertive`:
+// false for a warning that should not interrupt (announced politely).
+export component AlertLine inherits Rectangle {
+    in property <string> text;
+    in property <bool> quiet: false;
+    in property <bool> assertive: true;
+
+    min-width: 0px;
+    preferred-width: 0px;
+    horizontal-stretch: 1;
+    height: label.preferred-height;
+    vertical-stretch: 0;
+
+    Icon {
+        x: 0;
+        y: root.quiet ? 2px : 1px;
+        source: Icons.circle-alert;
+        size: 14px;
+        color: Theme.danger;
+    }
+    label := Text {
+        x: 20px;
+        y: 0;
+        width: max(0px, root.width - 20px);
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: root.quiet ? Theme.size-label : Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: root.quiet ? Theme.text-secondary : Theme.danger;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+        accessible-live-region: root.assertive ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+    }
+}
+
+// An info glyph + secondary caption (wraps; see the header).
+export component HintLine inherits Rectangle {
+    in property <string> text;
+
+    min-width: 0px;
+    preferred-width: 0px;
+    horizontal-stretch: 1;
+    height: label.preferred-height;
+    vertical-stretch: 0;
+
+    Icon {
+        x: 0;
+        y: 1px;
+        source: Icons.info;
+        size: 14px;
+        color: Theme.text-secondary;
+    }
+    label := Text {
+        x: 20px;
+        y: 0;
+        width: max(0px, root.width - 20px);
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-secondary;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+        accessible-live-region: polite;
+    }
+}
+
+// Row: label + help on the left, the control (@children) on the right, vertically centred.
+export component Row inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    // A line under the description with one emphasised run (13 / 600 text), e.g. the UI words to look for:
+    // "On Windows 11 it’s under" + "Show more options" + ".". Empty `strong` = no line.
+    in property <string> strong-before;
+    in property <string> strong;
+    in property <string> strong-after;
+    // Error / rejection under the text (danger, assertive).
+    in property <string> warning;
+    // A warning that is not an input error (danger glyph, secondary copy, polite): "Port 47823 may be in use…".
+    in property <string> caution;
+    // Hint under the text (secondary, polite).
+    in property <string> note;
+    // Small facts under the help text (model cost, limits).
+    in property <[BadgeData]> badges;
+    // Top hairline (off for the first row of a group).
+    in property <bool> divider: true;
+    // The row is disabled: the text dims (the control disables itself).
+    in property <bool> dim: false;
+    // Clicking the label area fires `label-clicked` (toggle rows).
+    in property <bool> label-clickable: false;
+    // The description is a file path: it may break anywhere (paths have no spaces to wrap at).
+    in property <bool> path: false;
+
+    callback label-clicked();
+
+    // The text column's width: known up front so wrapped help text gets its real height.
+    property <length> text-width: max(0px, root.width - control.preferred-width - Theme.space-6);
+
+    vertical-stretch: 0;
+
+    if root.divider: Divider { }
+
+    HorizontalLayout {
+        padding-top: Theme.space-4;
+        padding-bottom: Theme.space-4;
+        spacing: Theme.space-6;
+
+        // Pinned horizontal size info: the layout hands this box the width left of the control (see the header).
+        Rectangle {
+            min-width: 0px;
+            preferred-width: 0px;
+            max-width: 100000px;
+            horizontal-stretch: 1;
+
+            TouchArea {
+                enabled: root.label-clickable;
+                mouse-cursor: root.label-clickable ? MouseCursor.pointer : MouseCursor.default;
+                clicked => { root.label-clicked(); }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: Theme.space-1;
+
+                Text {
+                    width: root.text-width;
+                    text: root.title;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    // Dimmed through the colour: `opacity` on a wrapped Text breaks its measured height.
+                    color: root.dim ? Theme.text.with-alpha(0.45) : Theme.text;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                // Help text, then the optional emphasised line, read as one paragraph (no gap between them).
+                if root.description != "" || root.strong != "": VerticalLayout {
+                    spacing: 0px;
+                    if root.description != "": Text {
+                        width: root.text-width;
+                        text: root.description;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: root.dim ? Theme.text-secondary.with-alpha(0.45) : Theme.text-secondary;
+                        wrap: root.path ? TextWrap.char-wrap : TextWrap.word-wrap;
+                        accessible-role: none;
+                    }
+                    if root.strong != "": HorizontalLayout {
+                        width: root.text-width;
+                        spacing: 4px;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: root.strong-before + " " + root.strong + root.strong-after;
+                        if root.strong-before != "": Text {
+                            horizontal-stretch: 0;
+                            text: root.strong-before;
+                            font-family: Theme.font-text;
+                            font-size: Theme.size-label;
+                            font-weight: Theme.weight-medium;
+                            color: root.dim ? Theme.text-secondary.with-alpha(0.45) : Theme.text-secondary;
+                            overflow: elide;
+                            accessible-role: none;
+                        }
+                        HorizontalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 0px;
+                            Text {
+                                horizontal-stretch: 0;
+                                text: root.strong;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-label;
+                                font-weight: Theme.weight-semibold;
+                                color: root.dim ? Theme.text.with-alpha(0.45) : Theme.text;
+                                overflow: elide;
+                                accessible-role: none;
+                            }
+                            Text {
+                                horizontal-stretch: 1;
+                                text: root.strong-after;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-label;
+                                font-weight: Theme.weight-medium;
+                                color: root.dim ? Theme.text-secondary.with-alpha(0.45) : Theme.text-secondary;
+                                accessible-role: none;
+                            }
+                        }
+                    }
+                }
+                if root.badges.length > 0: VerticalLayout {
+                    width: root.text-width;
+                    padding-top: 6px;
+                    FlexboxLayout {
+                        spacing: 6px;
+                        for b in root.badges: Badge {
+                            text: b.text;
+                            kind: b.tone == BadgeTone.attention ? BadgeKind.outline : BadgeKind.filled;
+                            dot: b.tone == BadgeTone.attention ? BadgeDot.danger
+                                : b.tone == BadgeTone.success ? BadgeDot.success : BadgeDot.none;
+                        }
+                    }
+                }
+                if root.warning != "": VerticalLayout {
+                    padding-top: 4px;
+                    AlertLine {
+                        width: root.text-width;
+                        text: root.warning;
+                    }
+                }
+                if root.caution != "": VerticalLayout {
+                    padding-top: 4px;
+                    AlertLine {
+                        width: root.text-width;
+                        text: root.caution;
+                        quiet: true;
+                        assertive: false;
+                    }
+                }
+                if root.note != "": VerticalLayout {
+                    padding-top: 4px;
+                    HintLine {
+                        width: root.text-width;
+                        text: root.note;
+                    }
+                }
+            }
+        }
+
+        control := VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                alignment: end;
+                @children
+            }
+        }
+    }
+}
+
+export component ToggleRow inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    in property <string> strong-before;
+    in property <string> strong;
+    in property <string> strong-after;
+    in property <string> warning;
+    in property <bool> divider: true;
+    in property <bool> enabled: true;
+    in-out property <bool> checked <=> toggle.checked;
+    out property <bool> has-focus: toggle.has-focus;
+
+    callback toggled(checked: bool);
+
+    vertical-stretch: 0;
+
+    Row {
+        title: root.title;
+        description: root.description;
+        strong-before: root.strong-before;
+        strong: root.strong;
+        strong-after: root.strong-after;
+        warning: root.warning;
+        divider: root.divider;
+        dim: !root.enabled;
+        label-clickable: root.enabled;
+        label-clicked => { toggle.flip(); }
+
+        toggle := Toggle {
+            enabled: root.enabled;
+            label: root.title;
+            toggled(c) => { root.toggled(c); }
+        }
+    }
+}
+
+// StackedRow: the control goes below the text, full width.
+export component StackedRow inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> divider: true;
+    in property <bool> dim: false;
+
+    vertical-stretch: 0;
+
+    if root.divider: Divider { }
+
+    VerticalLayout {
+        padding-top: Theme.space-4;
+        padding-bottom: Theme.space-4;
+        spacing: Theme.space-1;
+
+        Text {
+            text: root.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: root.dim ? Theme.text.with-alpha(0.45) : Theme.text;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.title;
+        }
+        if root.description != "": WrapText {
+            text: root.description;
+            text-color: root.dim ? Theme.text-secondary.with-alpha(0.45) : Theme.text-secondary;
+        }
+        Rectangle { height: Theme.space-2; }
+        @children
+    }
+}
+
+export component Notice inherits Rectangle {
+    in property <bool> warning: false;
+    in property <string> title;
+    in property <string> body;
+
+    property <length> text-width: max(0px, root.width - 2 * Theme.space-4 - 18px - Theme.space-3
+        - (action.preferred-width > 0 ? action.preferred-width + Theme.space-3 : 0px));
+
+    border-radius: Theme.radius-row;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.title != "" ? root.title + ". " + root.body : root.body;
+    accessible-live-region: polite;
+
+    HorizontalLayout {
+        padding-left: Theme.space-4;
+        padding-right: Theme.space-4;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: Theme.space-3;
+
+        VerticalLayout {
+            alignment: start;
+            padding-top: 1px;
+            Icon {
+                source: root.warning ? Icons.triangle-alert : Icons.info;
+                size: 18px;
+                color: root.warning ? Theme.danger : Theme.text;
+            }
+        }
+        VerticalLayout {
+            min-width: 0px;
+            preferred-width: 0px;
+            max-width: 100000px;
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            if root.title != "": Text {
+                width: root.text-width;
+                text: root.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+            // A title-less notice carries its message in the body: `text` (as on the onboarding key step), so a
+            // warning never reads quieter than the paragraph under it. Under a title the body is secondary.
+            if root.body != "": Text {
+                width: root.text-width;
+                text: root.body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: root.title != "" ? Theme.text-secondary : Theme.text;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+        }
+        action := VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                @children
+            }
+        }
+    }
+}
+
+export component Meter inherits Rectangle {
+    in property <float> value;
+    // Danger fill (credits low, cache nearly full).
+    in property <bool> alert: false;
+    in property <string> label;
+    in property <string> value-text;
+
+    height: 4px;
+    min-width: 40px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: 2px;
+    background: Theme.track;
+    accessible-role: progress-indicator;
+    accessible-label: root.label;
+    accessible-value: root.value-text;
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 1;
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width * max(0, min(1, root.value));
+        height: parent.height;
+        border-radius: 2px;
+        background: root.alert ? Theme.danger : Theme.primary;
+    }
+}
+
+// SettingSlider: ui/design Slider (track, knob, keys, accessible value) with the value label drawn here, right-aligned
+// in a fixed box, so the label ends on the column edge like the toggles, selects and pills above and below it (the
+// design Slider left-aligns its label). The box never changes width, so the track never jitters.
+//   in-out value: float; in minimum, maximum, step: float; in enabled: bool; in label (accessible), value-text
+//   in    value-width: length (default 48 px)
+//   out   dragging, has-focus: bool
+//   callback committed(value: float)   release / key press (the design Slider's `committed`)
+export component SettingSlider inherits HorizontalLayout {
+    in-out property <float> value <=> slider.value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 1;
+    in property <float> step: 0.01;
+    in property <bool> enabled: true;
+    in property <string> label;
+    in property <string> value-text;
+    in property <length> value-width: 48px;
+    out property <bool> dragging: slider.dragging;
+    out property <bool> has-focus: slider.has-focus;
+
+    callback committed(value: float);
+
+    spacing: Theme.space-3;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    slider := Slider {
+        horizontal-stretch: 1;
+        minimum: root.minimum;
+        maximum: root.maximum;
+        step: root.step;
+        enabled: root.enabled;
+        label: root.label;
+        // Still set: it is the slider's accessible value.
+        value-text: root.value-text;
+        show-value: false;
+        committed(v) => { root.committed(v); }
+    }
+    Text {
+        width: root.value-width;
+        text: root.value-text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-secondary;
+        opacity: root.enabled ? 1 : 0.4;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+}
+
+// ───────────────────── ChoiceItem controls ─────────────────────
+// The settings data carries `[ChoiceItem]` (value, label, accessible-label), while ui/design's Select and Segmented
+// take `[string]` and Slint cannot map one array into the other. These are the design components with the same look
+// and keys, reading `label` for display and `accessible-label` for screen readers (D-USW-22 asked for that).
+//
+// MIRRORED CODE: ChoiceSelect copies ui/design/select.slint (`Select` + its popup) and ChoiceSegmented copies
+// ui/design/segmented.slint (`Segmented`). When either design file changes (pill height, popup width / row height /
+// radius / shadow, keys, placeholder, focus ring, thumb animation), port the change here. voices.slint and
+// history.slint carry their own ChoiceItem dropdowns; one shared ChoiceItem-aware Select / Segmented (in ui/design or
+// a shared ui/pages/common file) has been raised with the architect so the three copies can be merged.
+
+// ChoiceSelect: ui/design Select over [ChoiceItem].
+//   in    model: [ChoiceItem]; in-out current-index: int; in enabled, small: bool; in label: string (accessible)
+//   callback selected(index: int, value: string)   value = the option's `value`
+export component ChoiceSelect {
+    in property <[ChoiceItem]> model;
+    in-out property <int> current-index: -1;
+    in property <string> placeholder: "Choose";
+    in property <bool> enabled: true;
+    in property <bool> small: false;
+    in property <string> label;
+    out property <bool> has-focus: press.has-focus;
+    out property <bool> is-open: popup.is-open;
+
+    callback selected(index: int, value: string);
+
+    property <int> highlight: -1;
+    property <string> current-label: root.current-index >= 0 && root.current-index < root.model.length
+        ? root.model[root.current-index].label : "";
+
+    function open() {
+        if (root.enabled && root.model.length > 0) {
+            root.highlight = max(0, root.current-index);
+            popup.show();
+        }
+    }
+    function choose(i: int) {
+        if (i >= 0 && i < root.model.length && i != root.current-index) {
+            root.current-index = i;
+            root.selected(i, root.model[i].value);
+        }
+    }
+
+    height: root.small ? 32px : 40px;
+    min-width: 120px;
+    preferred-width: max(160px, row.preferred-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.current-index >= 0 && root.current-index < root.model.length
+        ? (root.model[root.current-index].accessible-label != "" ? root.model[root.current-index].accessible-label
+            : root.model[root.current-index].label) : "";
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-expand => { root.open(); }
+    accessible-action-default => { root.open(); }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+        border-width: Theme.hairline;
+        border-color: (press.has-hover || popup.is-open) ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible;
+    }
+
+    row := HorizontalLayout {
+        padding-left: root.small ? 14px : 18px;
+        padding-right: root.small ? 10px : 14px;
+        spacing: 8px;
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.current-label != "" ? root.current-label : root.placeholder;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label : Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: root.current-label != "" ? Theme.text : Theme.text-muted;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Icon {
+            source: Icons.chevron-down;
+            size: 16px;
+            color: Theme.text-secondary;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.open(); }
+        key(event) => {
+            if (event.text == Key.DownArrow && event.modifiers.alt) {
+                root.open();
+                return accept;
+            }
+            if (event.text == Key.DownArrow) {
+                root.choose(min(root.model.length - 1, root.current-index + 1));
+                return accept;
+            }
+            if (event.text == Key.UpArrow) {
+                root.choose(max(0, root.current-index - 1));
+                return accept;
+            }
+            reject
+        }
+    }
+
+    popup := PopupWindow {
+        x: 0;
+        y: root.height + 6px;
+        width: max(root.width, 180px);
+        height: menu.height;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-keys;
+
+        popup-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    popup.close();
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.highlight = min(root.model.length - 1, root.highlight + 1);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.highlight = max(0, root.highlight - 1);
+                    return accept;
+                }
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.choose(root.highlight);
+                    popup.close();
+                    return accept;
+                }
+                reject
+            }
+
+            menu := Rectangle {
+                property <length> row-h: 36px;
+                property <length> pad: 6px;
+                property <int> rows: min(8, root.model.length);
+
+                width: parent.width;
+                height: self.rows * self.row-h + 2 * self.pad;
+                border-radius: Theme.radius-popup;
+                background: Theme.popup;
+                border-width: Theme.hairline;
+                border-color: Theme.popup-border;
+                drop-shadow-blur: 24px;
+                drop-shadow-offset-y: 8px;
+                drop-shadow-color: Theme.popup-shadow;
+                accessible-role: list;
+
+                flick := Flickable {
+                    x: menu.pad;
+                    y: menu.pad;
+                    width: menu.width - 2 * menu.pad;
+                    height: menu.height - 2 * menu.pad;
+                    content-height: root.model.length * menu.row-h;
+                    interactive: root.model.length > 8;
+                    content-y: root.highlight < 0 ? 0px
+                        : -max(0px, min((root.model.length - menu.rows) * menu.row-h,
+                            (root.highlight - menu.rows + 1) * menu.row-h));
+
+                    for item[i] in root.model: Rectangle {
+                        y: i * menu.row-h;
+                        width: flick.width;
+                        height: menu.row-h;
+                        border-radius: 10px;
+                        background: row-touch.pressed ? Theme.pressed
+                            : (row-touch.has-hover || i == root.highlight) ? Theme.hover : transparent;
+                        accessible-role: list-item;
+                        accessible-label: item.accessible-label != "" ? item.accessible-label : item.label;
+                        accessible-item-selectable: true;
+                        accessible-item-selected: i == root.current-index;
+                        accessible-item-index: i;
+                        accessible-item-count: root.model.length;
+                        accessible-action-default => {
+                            root.choose(i);
+                            popup.close();
+                        }
+                        animate background { duration: Theme.fast; easing: ease-out; }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 10px;
+                            spacing: 8px;
+                            Text {
+                                horizontal-stretch: 1;
+                                text: item.label;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-body;
+                                font-weight: i == root.current-index ? Theme.weight-semibold : Theme.weight-medium;
+                                color: Theme.text;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                accessible-role: none;
+                            }
+                            if i == root.current-index: Icon {
+                                source: Icons.check;
+                                size: 16px;
+                                color: Theme.text;
+                            }
+                        }
+
+                        row-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.choose(i);
+                                popup.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ChoiceSegmented: ui/design Segmented over [ChoiceItem]. Arrow keys wrap around at the ends, and clicking the
+// selected option fires `selected` again (spec §1.8: Playback speed re-sends the live rate).
+//   in    model: [ChoiceItem]; in-out current-index: int; in enabled, small: bool; in label: string (group name)
+//   in    segment-width: length (0 = equal shares of the width)
+//   callback selected(index: int, value: string)   value = the option's `value`
+export component ChoiceSegmented {
+    in property <[ChoiceItem]> model;
+    in-out property <int> current-index: 0;
+    in property <bool> enabled: true;
+    in property <bool> small: false;
+    in property <length> segment-width: 0px;
+    in property <string> label;
+    out property <bool> has-focus: focus.has-focus;
+
+    callback selected(index: int, value: string);
+
+    property <length> pad: 3px;
+    property <int> count: max(1, root.model.length);
+    property <length> seg: root.segment-width > 0 ? root.segment-width : (root.width - 2 * root.pad) / root.count;
+
+    function select(i: int) {
+        if (i >= 0 && i < root.model.length && i != root.current-index) {
+            root.current-index = i;
+            root.selected(i, root.model[i].value);
+        }
+    }
+
+    height: root.small ? 32px : 36px;
+    preferred-width: root.segment-width > 0 ? root.count * root.segment-width + 2 * root.pad
+        : root.count * 64px + 2 * root.pad;
+    min-width: root.count * 40px + 2 * root.pad;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: focus;
+
+    accessible-role: tab-list;
+    accessible-label: root.label;
+    accessible-value: root.current-index >= 0 && root.current-index < root.model.length
+        ? root.model[root.current-index].label : "";
+    accessible-enabled: root.enabled;
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: Theme.field;
+        border-width: Theme.hairline;
+        border-color: Theme.field-border;
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: focus.focus-visible;
+    }
+
+    focus := Pressable {
+        enabled: root.enabled;
+        cursor: MouseCursor.default;
+        activate-on-enter: false;
+        key(event) => {
+            if (event.text == Key.RightArrow || event.text == Key.DownArrow) {
+                root.select(mod(root.current-index + 1, root.count));
+                return accept;
+            }
+            if (event.text == Key.LeftArrow || event.text == Key.UpArrow) {
+                root.select(mod(root.current-index - 1 + root.count, root.count));
+                return accept;
+            }
+            if (event.text == Key.Home) {
+                root.select(0);
+                return accept;
+            }
+            if (event.text == Key.End) {
+                root.select(root.model.length - 1);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    thumb := Rectangle {
+        visible: root.current-index >= 0 && root.current-index < root.model.length;
+        x: root.pad + root.current-index * root.seg;
+        y: root.pad;
+        width: root.seg;
+        height: root.height - 2 * root.pad;
+        border-radius: self.height / 2;
+        background: Theme.primary-fill;
+        animate x { duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+    }
+
+    for item[i] in root.model: Rectangle {
+        x: root.pad + i * root.seg;
+        y: root.pad;
+        width: root.seg;
+        height: root.height - 2 * root.pad;
+        border-radius: self.height / 2;
+        background: i == root.current-index ? transparent
+            : seg-touch.pressed ? Theme.pressed : seg-touch.has-hover ? Theme.hover : transparent;
+        accessible-role: tab;
+        accessible-label: item.accessible-label != "" ? item.accessible-label : item.label;
+        accessible-item-selectable: true;
+        accessible-item-selected: i == root.current-index;
+        accessible-item-index: i;
+        accessible-item-count: root.model.length;
+        accessible-action-default => { root.select(i); }
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        Text {
+            x: 6px;
+            width: parent.width - 12px;
+            text: item.label;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label - 1px : Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: i == root.current-index ? Theme.on-primary : seg-touch.has-hover ? Theme.text : Theme.text-secondary;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+            animate color { duration: Theme.medium; easing: ease-out; }
+        }
+
+        seg-touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                if (i == root.current-index) {
+                    root.selected(i, item.value);
+                } else {
+                    root.select(i);
+                }
+                focus.focus-quietly();
+            }
+        }
+    }
+}

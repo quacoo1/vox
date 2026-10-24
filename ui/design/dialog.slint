@@ -1,0 +1,234 @@
+// Dialog and DialogFrame: the reference's shape (64-px header with title and close glyph, divider, body, footer
+// with right-aligned pills), over a scrim.
+//
+// DialogFrame: the panel alone (use it directly for onboarding or inline previews).
+//   in    title: string                 15 / 600
+//   in    icon: image                   optional 18 px glyph before the title (danger tone when `danger`)
+//   in    size: DialogSize              sm (400) | md (520, default) | lg (680) wide
+//   in    show-close: bool              header close glyph "Close" (default true)
+//   in    primary-text: string          right-most pill; empty = none
+//   in    secondary-text: string        pill left of it ("Cancel"); empty = none
+//   in    danger: bool                  the primary pill is a danger pill (red text on a dark pill)
+//   in    primary-enabled: bool         default true
+//   in    busy: bool                    primary shows a spinner and ignores clicks
+//   in    body-padding: length          default 24
+//   @children                           the body (stacked vertically, 12 px apart)
+//   callback primary-clicked(), secondary-clicked(), close-requested()
+//   function focus-initial()            focuses the secondary pill (else the primary): the initial focus rule
+//
+// Dialog: fills its parent with the scrim and centres a DialogFrame. Same properties and callbacks, plus
+//   in    open: bool                    shows / hides with a 180 ms fade
+//   in    close-on-scrim: bool          a press that starts and ends on the scrim requests close (default true)
+// Esc requests close. Owners decide what close means (they may ignore it while busy).
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+import { Divider } from "divider.slint";
+import { Button, ButtonKind } from "button.slint";
+import { IconButton } from "icon-button.slint";
+
+export enum DialogSize { sm, md, lg }
+
+export component DialogFrame {
+    in property <string> title;
+    in property <image> icon;
+    in property <DialogSize> size: DialogSize.md;
+    in property <bool> show-close: true;
+    in property <string> primary-text;
+    in property <string> secondary-text;
+    in property <bool> danger: false;
+    in property <bool> primary-enabled: true;
+    in property <bool> busy: false;
+    in property <length> body-padding: Theme.space-6;
+
+    callback primary-clicked();
+    callback secondary-clicked();
+    callback close-requested();
+
+    property <bool> has-footer: root.primary-text != "" || root.secondary-text != "";
+
+    public function focus-initial() {
+        if (root.secondary-text != "") {
+            secondary.focus();
+        } else if (root.primary-text != "") {
+            primary.focus();
+        }
+    }
+
+    width: root.size == DialogSize.sm ? 400px : root.size == DialogSize.lg ? 680px : 520px;
+    preferred-height: frame-layout.preferred-height;
+    min-height: frame-layout.min-height;
+    accessible-role: groupbox;
+    accessible-label: root.title;
+
+    Rectangle {
+        border-radius: Theme.radius-panel;
+        background: Theme.panel;
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+        drop-shadow-blur: 40px;
+        drop-shadow-offset-y: 16px;
+        drop-shadow-color: Theme.shadow;
+    }
+
+    frame-layout := VerticalLayout {
+        // Header
+        HorizontalLayout {
+            height: Theme.header-height;
+            padding-left: Theme.space-6;
+            padding-right: Theme.space-4;
+            spacing: Theme.space-3;
+
+            if root.icon.width > 0: Icon {
+                source: root.icon;
+                size: 18px;
+                color: root.danger ? Theme.danger : Theme.text;
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: root.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-title;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: root.title;
+            }
+            if root.show-close: VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: @image-url("../icons/x.svg");
+                    label: "Close";
+                    icon-color: Theme.text-secondary;
+                    clicked => { root.close-requested(); }
+                }
+            }
+        }
+        Divider { }
+
+        // Body
+        VerticalLayout {
+            padding: root.body-padding;
+            spacing: Theme.space-3;
+            @children
+        }
+
+        // Footer (always present so the buttons keep stable ids; collapses when both texts are empty)
+        HorizontalLayout {
+            padding-left: Theme.space-6;
+            padding-right: Theme.space-6;
+            padding-bottom: root.has-footer ? Theme.space-6 : 0px;
+            padding-top: 0px;
+            spacing: Theme.space-3;
+            alignment: end;
+
+            secondary := Button {
+                visible: root.secondary-text != "";
+                width: root.secondary-text != "" ? self.min-width : 0px;
+                height: root.has-footer ? 40px : 0px;
+                text: root.secondary-text;
+                kind: ButtonKind.secondary;
+                clicked => { root.secondary-clicked(); }
+            }
+            primary := Button {
+                visible: root.primary-text != "";
+                width: root.primary-text != "" ? self.min-width : 0px;
+                height: root.has-footer ? 40px : 0px;
+                text: root.primary-text;
+                kind: root.danger ? ButtonKind.danger : ButtonKind.primary;
+                enabled: root.primary-enabled;
+                loading: root.busy;
+                clicked => { root.primary-clicked(); }
+            }
+        }
+    }
+}
+
+export component Dialog inherits Rectangle {
+    in property <bool> open: true;
+    in property <bool> close-on-scrim: true;
+    in property <string> title;
+    in property <image> icon;
+    in property <DialogSize> size: DialogSize.md;
+    in property <bool> show-close: true;
+    in property <string> primary-text;
+    in property <string> secondary-text;
+    in property <bool> danger: false;
+    in property <bool> primary-enabled: true;
+    in property <bool> busy: false;
+    in property <length> body-padding: Theme.space-6;
+
+    callback primary-clicked();
+    callback secondary-clicked();
+    callback close-requested();
+
+    public function focus-initial() {
+        frame.focus-initial();
+    }
+
+    property <float> shown: root.open ? 1 : 0;
+    animate shown { duration: Theme.medium; easing: ease-out; }
+
+    visible: root.shown > 0.01;
+    background: Theme.scrim;
+    opacity: root.shown;
+
+    scrim-touch := TouchArea {
+        enabled: root.open;
+        property <bool> started-here;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                self.started-here = true;
+            } else if (event.kind == PointerEventKind.up) {
+                if (self.started-here && self.has-hover && root.close-on-scrim) {
+                    root.close-requested();
+                }
+                self.started-here = false;
+            }
+        }
+    }
+
+    keys := FocusScope {
+        enabled: root.open;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.close-requested();
+                return accept;
+            }
+            reject
+        }
+
+        // Swallow clicks on the panel so they never reach the scrim.
+        TouchArea {
+            x: frame.x;
+            y: frame.y;
+            width: frame.width;
+            height: frame.height;
+        }
+
+        frame := DialogFrame {
+            x: (root.width - self.width) / 2;
+            height: self.preferred-height;
+            y: (root.height - self.height) / 2 + (1 - root.shown) * 8px;
+            title: root.title;
+            icon: root.icon;
+            size: root.size;
+            show-close: root.show-close;
+            primary-text: root.primary-text;
+            secondary-text: root.secondary-text;
+            danger: root.danger;
+            primary-enabled: root.primary-enabled;
+            busy: root.busy;
+            body-padding: root.body-padding;
+            primary-clicked => { root.primary-clicked(); }
+            secondary-clicked => { root.secondary-clicked(); }
+            close-requested => { root.close-requested(); }
+
+            @children
+        }
+    }
+}

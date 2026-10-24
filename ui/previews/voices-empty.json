@@ -1,0 +1,22 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.empty"
+    },
+    "in-use": "In use: George",
+    "count": "",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [],
+    "category-options": [],
+    "refreshing": false,
+    "state-title": "No voices yet",
+    "state-body": "Add or clone a voice in ElevenLabs, then refresh this page.",
+    "state-button": "",
+    "voices": [],
+    "revision": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.error"
+    },
+    "in-use": "In use: George",
+    "count": "",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [],
+    "category-options": [],
+    "refreshing": false,
+    "state-title": "Couldn’t load your voices",
+    "state-body": "ElevenLabs didn’t answer in time. Check your connection and try again.",
+    "state-button": "Try again",
+    "voices": [],
+    "revision": 1
+  }
+}

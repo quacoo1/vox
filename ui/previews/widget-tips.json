@@ -1,0 +1,6 @@
+{
+  "card-tip": "You exceeded your character quota. You have 52 credits remaining, while 1,240 credits are required for this request.\nOpen settings",
+  "plain-tip": "Failed to fetch: the network connection was lost while streaming chunk 3 of 7.",
+  "note-tip": "Your ElevenLabs quota is used up.\nOpen settings",
+  "dot-tip": "Stops early: Failed to fetch: the network connection was lost while streaming chunk 3 of 7."
+}

@@ -1,0 +1,10 @@
+{
+  "data": {
+    "kind": {
+      "$enum": "ChipKind.context"
+    },
+    "label": "Read with Vox",
+    "hiding": false,
+    "show-key": 0
+  }
+}

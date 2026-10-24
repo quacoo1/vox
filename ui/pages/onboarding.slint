@@ -1,0 +1,441 @@
+// Onboarding (ui-settings-widget.md §5; DESIGN.md "Screens → Onboarding"): full backdrop, a centred 560-px dialog-shaped
+// panel with step dots, art per step and a primary "Continue" pill. Keep the interface.
+//
+// Layout (the page fills the window; the main window's toasts sit bottom-centre above it):
+//   backdrop   `backdrop` (cover; a soft placeholder while missing)
+//   panel      560 × 624 (shrinks to the window minus 16 px margins), 16 px above centre, radius 22, panel-border
+//              hairline, one soft shadow, a groupbox "Vox setup". The height is fixed on purpose: the footer (and the
+//              next pill under the pointer) never moves while the user steps through.
+//   one edge   the header's logo, the body's content column, the Back arrow, "Skip setup" and the next pill all sit
+//              on the same 32-px gutter (`StepMetrics.gutter`).
+//     header   64 h: breadcrumb (logo + `crumb`, "Setup 2/5"; hidden when `crumb` is empty, i.e. on welcome, where
+//              the rule under the header is hidden too) and "Skip setup" (ghost, `show-skip`, disabled while
+//              `finishing`) → skip()
+//     body     scrolls when the window is short (edge fades). The current step, full panel width (steps apply their
+//              own 32-px gutter); on steps 1–3 the step art (`art`, 110×82, with a step glyph) sits top-right; on
+//              step 4 the art is a centred hero (148×110, check badge) above DoneStep, the pair centred like the
+//              welcome step. A new step fades in over 220 ms (instant under Motion.reduce) and opens scrolled to
+//              the top. On every step change (not on first paint) focus moves to an invisible anchor named
+//              "Step 2 of 5: API key" so screen readers announce the step; Tab from it reaches the step's first
+//              control.
+//     footer   72 h: Back (ghost, left arrow, `show-back`) → back(); the progress dots centred (`step-labels`; a dot
+//              is clickable when it is not the current step and ≤ `furthest` → go-to(i)); the next pill
+//              (`next-label`; secondary when `next-secondary`; right arrow except on the last step; spinner on the
+//              last step while `finishing`, in a width reserved for it) → next(). Rust decides what next() means on
+//              the last step (finish).
+// Keyboard order: Skip setup → the step's controls → Back → dots → next pill.
+import {
+    Theme, Icons, Icon, Pressable, FocusRing, Button, ButtonKind, ButtonSize, Divider, ScrollArea, ArtThumb,
+} from "../design/index.slint";
+import { OnboardingData, Brand, Motion } from "../models.slint";
+import { WelcomeStep, ApiKeyStep, VoiceStep, TryStep, DoneStep, LogoMark, StepMetrics } from "onboarding/steps.slint";
+
+// One progress dot: a 6-px dot that stretches into a 20-px pill when current. Visited (reachable): text-secondary;
+// ahead: text-muted (3.3:1 or more on the panel in both themes, where the old track grey was about 1.3:1); hover: text.
+component StepDot {
+    in property <int> index;
+    in property <string> label;
+    in property <bool> current;
+    in property <bool> reachable;
+
+    callback activated();
+
+    // The cell follows the pip, so every gap between pips is the same 12 px (the pill does not crowd its neighbours).
+    width: pip.width + 12px;
+    height: 28px;
+    forward-focus: press;
+    accessible-role: button;
+    accessible-label: "Step " + (root.index + 1) + ": " + root.label + (root.current ? ", current step" : "");
+    accessible-enabled: root.reachable && !root.current;
+    accessible-item-selected: root.current;
+    accessible-action-default => { press.activated(); }
+
+    pip := Rectangle {
+        width: root.current ? 20px : 6px;
+        height: 6px;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-radius: 3px;
+        background: root.current ? Theme.primary
+            : press.has-hover ? Theme.text
+            : root.reachable ? Theme.text-secondary : Theme.text-muted;
+        animate width { duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+        animate background { duration: Theme.fast; easing: ease-out; }
+    }
+    FocusRing {
+        x: pip.x - 3px;
+        y: pip.y - 3px;
+        width: pip.width + 6px;
+        height: pip.height + 6px;
+        radius: 6px;
+        shown: press.focus-visible;
+    }
+    press := Pressable {
+        enabled: root.reachable && !root.current;
+        activated => { root.activated(); }
+    }
+}
+
+// The step glyph cut into the bottom-right corner of the step art: a `panel` ring around a chip disc with the glyph.
+// Placed as a child of the ArtThumb, about a quarter of it past the corner (x / y set by the user).
+component StepBadge {
+    in property <length> side: 38px;
+    in property <image> icon;
+
+    property <length> ring: 4px;
+
+    width: root.side;
+    height: root.side;
+    accessible-role: none;
+
+    Rectangle {
+        border-radius: root.side / 2;
+        background: Theme.panel;
+    }
+    Rectangle {
+        x: root.ring;
+        y: root.ring;
+        width: root.side - 2 * root.ring;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: Theme.chip;
+        border-width: Theme.hairline;
+        border-color: Theme.field-border;
+        Icon {
+            width: 100%;
+            height: 100%;
+            source: root.icon;
+            size: round(root.side * 0.4 / 1px) * 1px;
+            color: Theme.text;
+        }
+    }
+}
+
+export component OnboardingPage inherits Rectangle {
+    in property <OnboardingData> data;
+    in property <image> backdrop;
+    // The API-key draft survives step changes.
+    in-out property <string> key-draft;
+
+    // Frame navigation.
+    callback go-to(int);
+    callback next();
+    callback back();
+    callback skip();
+    // Key step
+    callback connect-key(string);
+    callback key-edited();
+    callback get-key();
+    callback replace-key();
+    callback cancel-replace();
+    // Voice step
+    callback choose-voice(string);
+    callback preview-voice(string);
+    callback retry-voices();
+    // Try step
+    callback read-sample();
+
+    property <int> step: root.data.step;
+    property <int> count: max(1, root.data.step-labels.length);
+    property <bool> last: root.step >= root.count - 1;
+    property <length> margin: Theme.space-4;
+    property <length> lift: Theme.space-4;
+    // Width of each footer side slot (Back / next pill).
+    property <length> slot: 168px;
+    // Side padding of an md pill: the footer starts this much inside the gutter so Back's arrow sits on the edge.
+    property <length> pill-pad: 22px;
+    // Side padding of an sm pill ("Skip setup"): its text ends on the gutter.
+    property <length> sm-pill-pad: 14px;
+    property <image> no-icon;
+    property <image> step-icon: root.step == 1 ? Icons.key-round
+        : root.step == 2 ? Icons.audio-lines
+        : root.step == 3 ? Icons.mouse-pointer-click : Icons.check;
+
+    // Every step opens at its top, and the step anchor takes focus (not on first paint): screen readers announce
+    // the new step.
+    changed step => {
+        body.scroll-to-top();
+        anchor.focus();
+    }
+
+    background: Theme.backdrop;
+
+    // Measures the next pill's label: the pill keeps the width it has with its spinner (16 px + 8 px gap, the same
+    // room as the trailing arrow on the other steps), so it never jumps while finishing.
+    next-measure := Text {
+        visible: false;
+        text: root.data.next-label;
+        font-family: Theme.font-text;
+        font-size: Theme.size-body;
+        font-weight: Theme.weight-semibold;
+        accessible-role: none;
+    }
+
+    // ── backdrop ──
+    if root.backdrop.width == 0: Rectangle {
+        // Placeholder "silk" until the art arrives: one soft out-of-focus highlight. Square, so its circle fades out
+        // before the square's edges (a gradient circle spans half the box diagonal) and is never cut.
+        clip: true;
+        Rectangle {
+            width: max(parent.width, parent.height) * 1.1;
+            height: self.width;
+            x: parent.width * 0.86 - self.width / 2;
+            y: parent.height * 0.02 - self.height / 2;
+            background: @radial-gradient(circle, Theme.art-sheen 0%, Theme.art-sheen.with-alpha(0) 66%);
+        }
+    }
+    if root.backdrop.width > 0: Image {
+        width: 100%;
+        height: 100%;
+        source: root.backdrop;
+        image-fit: cover;
+        accessible-role: none;
+    }
+
+    // ── the panel ──
+    panel := Rectangle {
+        width: min(560px, root.width - 2 * root.margin);
+        height: min(624px, root.height - 2 * root.margin);
+        x: (root.width - self.width) / 2;
+        // A little above centre (the optical centre), which also keeps the bottom-centre toasts off the footer.
+        y: max(root.margin, (root.height - self.height) / 2 - root.lift);
+        border-radius: Theme.radius-panel;
+        background: Theme.panel;
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+        drop-shadow-blur: 40px;
+        drop-shadow-offset-y: 16px;
+        drop-shadow-color: Theme.shadow;
+        accessible-role: groupbox;
+        accessible-label: Brand.app-name + " setup";
+
+        VerticalLayout {
+            // ── header ──
+            HorizontalLayout {
+                height: Theme.header-height;
+                padding-left: StepMetrics.gutter;
+                padding-right: StepMetrics.gutter - root.sm-pill-pad;
+                spacing: Theme.space-3;
+
+                if root.data.crumb != "": VerticalLayout {
+                    alignment: center;
+                    LogoMark { size: 24px; }
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.data.crumb;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-title;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: self.text;
+                }
+                if root.data.show-skip: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Skip setup";
+                        kind: ButtonKind.ghost;
+                        size: ButtonSize.sm;
+                        enabled: !root.data.finishing;
+                        clicked => { root.skip(); }
+                    }
+                }
+            }
+            // No rule under an empty header (welcome): the hero opens the panel. The rule keeps its pixel, so the
+            // body does not move when the breadcrumb appears.
+            Divider {
+                line-color: root.data.crumb != "" ? Theme.divider : transparent;
+            }
+
+            // ── body ──
+            body := ScrollArea {
+                vertical-stretch: 1;
+                edge-fade: true;
+                fade-color: Theme.panel;
+
+                Rectangle {
+                    min-height: col.min-height;
+                    preferred-height: col.preferred-height;
+
+                    // Focus anchor announced on step changes (no visuals, not in the Tab order). Declared before the
+                    // step so Tab from it reaches the step's first control.
+                    anchor := FocusScope {
+                        x: StepMetrics.gutter;
+                        y: StepMetrics.body-pad;
+                        width: 1px;
+                        height: 1px;
+                        focus-on-click: false;
+                        focus-on-tab-navigation: false;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: root.step < root.data.step-labels.length
+                            ? "Step " + (root.step + 1) + " of " + root.count + ": " + root.data.step-labels[root.step]
+                            : "";
+                    }
+
+                    col := VerticalLayout {
+                        padding-top: StepMetrics.body-pad;
+                        // Welcome has no rule under its header, so its hero centres on the panel above the footer
+                        // (not on the body under the empty header): half the header higher.
+                        padding-bottom: StepMetrics.body-pad + (root.step == 0 ? Theme.header-height : 0px);
+
+                        if root.step == 0: WelcomeStep {
+                            property <float> shown: 0;
+                            init => { self.shown = 1; }
+                            animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+                            opacity: self.shown;
+                            art: root.data.art;
+                        }
+                        if root.step == 1: ApiKeyStep {
+                            property <float> shown: 0;
+                            init => { self.shown = 1; }
+                            animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+                            opacity: self.shown;
+                            data: root.data.key;
+                            draft <=> root.key-draft;
+                            connect(k) => { root.connect-key(k); }
+                            edited => { root.key-edited(); }
+                            get-key => { root.get-key(); }
+                            replace-key => { root.replace-key(); }
+                            cancel-replace => { root.cancel-replace(); }
+                        }
+                        if root.step == 2: VoiceStep {
+                            property <float> shown: 0;
+                            init => { self.shown = 1; }
+                            animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+                            opacity: self.shown;
+                            data: root.data.voices;
+                            choose(id) => { root.choose-voice(id); }
+                            preview(id) => { root.preview-voice(id); }
+                            retry => { root.retry-voices(); }
+                        }
+                        if root.step == 3: TryStep {
+                            property <float> shown: 0;
+                            init => { self.shown = 1; }
+                            animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+                            opacity: self.shown;
+                            data: root.data.try-it;
+                            read-sample => { root.read-sample(); }
+                            add-key => { root.go-to(1); }
+                        }
+                        // The last step mirrors the welcome step: the art as a centred hero with the check badge,
+                        // then DoneStep's centred text and tips, the pair centred in the body.
+                        if root.step == 4: Rectangle {
+                            property <float> shown: 0;
+                            init => { self.shown = 1; }
+                            animate shown { duration: Motion.reduce ? 0ms : Theme.slow; easing: ease-out; }
+                            opacity: self.shown;
+                            vertical-stretch: 1;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: Theme.space-6;
+
+                                HorizontalLayout {
+                                    alignment: center;
+                                    ArtThumb {
+                                        width: StepMetrics.hero-art-width;
+                                        height: StepMetrics.hero-art-height;
+                                        source: root.data.art;
+                                        StepBadge {
+                                            x: parent.width - self.width * 0.74;
+                                            y: parent.height - self.height * 0.74;
+                                            side: 46px;
+                                            icon: Icons.check;
+                                        }
+                                    }
+                                }
+                                DoneStep {
+                                    tips: root.data.tips;
+                                }
+                            }
+                        }
+                        // Steps 1–3 keep to the top (the filler takes the free height); the welcome and done steps
+                        // centre themselves and the voice step's list outbids the filler for the free height.
+                        if root.step != 0 && root.step != 4: Rectangle { vertical-stretch: 0.001; }
+                    }
+
+                    // The step art (steps 1–3), with the step's glyph cut into its corner.
+                    if root.step > 0 && root.step < 4: ArtThumb {
+                        x: parent.width - StepMetrics.gutter - self.width;
+                        y: StepMetrics.body-pad;
+                        width: StepMetrics.art-width;
+                        height: StepMetrics.art-height;
+                        source: root.data.art;
+
+                        StepBadge {
+                            x: parent.width - self.width * 0.74;
+                            y: parent.height - self.height * 0.74;
+                            side: 38px;
+                            icon: root.step-icon;
+                        }
+                    }
+                }
+            }
+
+            Divider { }
+
+            // ── footer ── (equal side slots keep the dots centred: the left slot makes up for the left padding being
+            // a pill's padding short of the gutter; Tab order: Back → dots → next)
+            HorizontalLayout {
+                height: 72px;
+                padding-left: StepMetrics.gutter - root.pill-pad;
+                padding-right: StepMetrics.gutter;
+
+                HorizontalLayout {
+                    min-width: root.slot + root.pill-pad;
+                    horizontal-stretch: 0;
+                    alignment: start;
+                    if root.data.show-back: VerticalLayout {
+                        alignment: center;
+                        Button {
+                            text: "Back";
+                            kind: ButtonKind.ghost;
+                            icon: Icons.arrow-left;
+                            enabled: !root.data.finishing;
+                            clicked => { root.back(); }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 0px;
+                    accessible-role: AccessibleRole.list;
+                    accessible-label: "Setup progress";
+
+                    for label[i] in root.data.step-labels: VerticalLayout {
+                        alignment: center;
+                        StepDot {
+                            index: i;
+                            label: label;
+                            current: i == root.step;
+                            reachable: i <= root.data.furthest && !root.data.finishing;
+                            activated => { root.go-to(i); }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    min-width: root.slot;
+                    horizontal-stretch: 0;
+                    alignment: end;
+                    if root.data.next-label != "": VerticalLayout {
+                        alignment: center;
+                        Button {
+                            min-width: max(64px, next-measure.preferred-width + 2 * root.pill-pad + 24px);
+                            text: root.data.next-label;
+                            kind: root.data.next-secondary ? ButtonKind.secondary : ButtonKind.primary;
+                            trailing-icon: root.last ? root.no-icon : Icons.arrow-right;
+                            loading: root.last && root.data.finishing;
+                            clicked => { root.next(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

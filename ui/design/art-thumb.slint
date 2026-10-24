@@ -1,0 +1,69 @@
+// ArtThumb: a "silk" art image with the thumbnail radius and a hairline drawn inside the edge.
+//
+//   in    source: image             the art (vox-art PNG). Empty (width 0) = a quiet steel gradient placeholder.
+//   in    radius: length            corner radius; default: 12 px when >= 100 px wide, 10 px from 40 px, else
+//                                   a quarter of the size (dots and 16-px chips become circles via `round`)
+//   in    round: bool               a circle (voice dots, now-playing chip)
+//   in    label: string             accessible label (the voice or source name); leave empty when decorative
+//   in    border: bool              draw the inner hairline (default true)
+// Size: set width/height (110x82 large rows, 56x56 or 44x44 compact rows). Preferred size is 110x82.
+// The image fills and crops (image-fit cover).
+// @children: overlays drawn above the art (a centred Icon, a play IconButton); they fill the thumbnail.
+
+import { Theme } from "theme.slint";
+
+export component ArtThumb {
+    in property <image> source;
+    in property <length> radius: root.width >= 100px ? Theme.radius-thumb-large
+        : root.width >= 40px ? Theme.radius-thumb : root.width / 4;
+    in property <bool> round: false;
+    in property <string> label;
+    in property <bool> border: true;
+
+    property <bool> empty: root.source.width == 0;
+    property <length> r: root.round ? min(root.width, root.height) / 2 : root.radius;
+
+    preferred-width: 110px;
+    preferred-height: 82px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: image;
+    accessible-label: root.label;
+
+    Rectangle {
+        border-radius: root.r;
+        clip: true;
+        background: root.empty
+            ? @linear-gradient(135deg, Theme.art-placeholder-a 0%, Theme.art-placeholder-b 55%, Theme.art-placeholder-c 100%)
+            : Theme.chip;
+
+        if root.empty: Rectangle {
+            // A soft diagonal sheen so the placeholder reads as "art loading", not as a flat box.
+            background: @radial-gradient(circle, Theme.art-sheen 0%, Theme.art-sheen.with-alpha(0) 70%);
+            x: -root.width * 0.15;
+            y: -root.height * 0.35;
+            width: root.width * 0.9;
+            height: root.height * 1.0;
+        }
+
+        if !root.empty: Image {
+            width: 100%;
+            height: 100%;
+            source: root.source;
+            image-fit: cover;
+            accessible-role: none;
+        }
+    }
+
+    if root.border: Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: root.r;
+        border-width: Theme.hairline;
+        border-color: Theme.art-border;
+        background: transparent;
+    }
+
+    // Overlays (a glyph, a play button) drawn above the art.
+    @children
+}

@@ -1,0 +1,287 @@
+// Settings → Integrations (ui-settings-widget.md §2.9; integrations.md §1.9, §3-§4).
+// Static copy (D-INT-3; the product name from Brand.app-name):
+//   "Launch at login" — "Start " + Brand.app-name + " when you sign in to Windows. Turn on Start minimized to keep it in
+//   the tray."
+//   "Start minimized" — "Open straight to the tray instead of showing this window." (governs every launch)
+// Groups: Browser extension (status badge from data, bridge toggle, port field, install steps with copy chips) and
+// Windows ("Installed" badge, Explorer verb, launch at login, start minimized, close to tray).
+// Port field: every edit → `port-edited`; Enter or leaving the field → `commit-port`; Escape → `revert-port`. No
+// placeholder (Rust always writes the draft, so a hard-coded default could contradict the stored port). The error
+// (`port-error`, danger) replaces the note (`port-note`, a warning: danger glyph, secondary copy). Explorer's
+// "Show more options" is emphasised (spec §2.9). Copy chips announce "Copied" politely. Stateful toggles are
+// re-asserted from `data` in `changed data` and by the page on `revision` (`reassert()`).
+import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, IconButton, IconButtonSize, TextField, Badge, BadgeKind,
+    BadgeDot, Keycap } from "../../design/index.slint";
+import { IntegrationsData, BadgeTone, Brand } from "../../models.slint";
+import { SectionHead, SubHead, Row, ToggleRow, StackedRow } from "parts.slint";
+
+// A copy chip: the text as a keycap-like chip with a copy button ("Copy chrome://extensions" → "Copied" for 1.4 s).
+component CopyChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> copied;
+
+    callback copy(text: string);
+
+    height: 28px;
+    preferred-width: row.preferred-width;
+    min-width: row.min-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    border-radius: 8px;
+    background: Theme.chip;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+
+    // "Copied" is announced (the icon swap and the tooltip alone are silent).
+    Rectangle {
+        width: 0px;
+        height: 0px;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.copied ? "Copied" : "";
+        accessible-live-region: polite;
+    }
+
+    row := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 2px;
+        spacing: 4px;
+        Text {
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: root.copied ? Icons.check : Icons.copy;
+                size: IconButtonSize.sm;
+                label: root.copied ? "Copied" : "Copy " + root.text;
+                tooltip: root.copied ? "Copied" : "Copy " + root.text;
+                icon-color: root.copied ? Theme.text : transparent;
+                clicked => { root.copy(root.text); }
+            }
+        }
+    }
+}
+
+// A numbered step: a round number cap and the step's line.
+component Step inherits HorizontalLayout {
+    in property <string> number;
+
+    spacing: Theme.space-3;
+    min-height: 28px;
+
+    VerticalLayout {
+        alignment: center;
+        Keycap { text: root.number; }
+    }
+    HorizontalLayout {
+        horizontal-stretch: 1;
+        spacing: 4px;
+        alignment: start;
+        @children
+    }
+}
+
+// A run of step text (13 / 500 secondary; `strong` = the UI word to look for, 13 / 600 text).
+component StepText inherits Text {
+    in property <bool> strong: false;
+
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: root.strong ? Theme.weight-semibold : Theme.weight-medium;
+    color: root.strong ? Theme.text : Theme.text-secondary;
+    vertical-alignment: center;
+}
+
+export component IntegrationsSection inherits Rectangle {
+    in property <IntegrationsData> data;
+    // The port field's text (in-out): Rust writes the stripped draft after every edit, resets it on Escape and when the
+    // stored port changes.
+    in-out property <string> port-draft;
+
+    // key = "triggers.browserExtension" | "triggers.explorerMenu" | "app.launchAtLogin" | "app.startMinimized"
+    //     | "app.closeToTray".
+    callback set-bool(string, bool);
+    // Port field: every edit (Rust strips non-digits, ≤ 5), commit on blur/Enter, revert on Escape.
+    callback port-edited(string);
+    callback commit-port(string);
+    callback revert-port();
+    // Copy chips ("chrome://extensions", "edge://extensions").
+    callback copy-text(string);
+    callback show-extension-folder();
+
+    public function reassert() {
+        bridge.checked = root.data.bridge-enabled;
+        explorer.checked = root.data.explorer-enabled;
+        login.checked = root.data.launch-at-login;
+        minimized.checked = root.data.start-minimized;
+        tray.checked = root.data.close-to-tray;
+    }
+    changed data => { root.reassert(); }
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Integrations";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Integrations";
+            intro: "Real “" + Brand.read-with-label + "” menu entries where Windows allows them, and how "
+                + Brand.app-name + " starts with your PC.";
+        }
+
+        // ── Browser extension ──
+        SubHead {
+            text: "Browser extension";
+            if root.data.bridge-badge.text != "": Badge {
+                text: root.data.bridge-badge.text;
+                kind: root.data.bridge-badge.tone == BadgeTone.attention ? BadgeKind.outline : BadgeKind.filled;
+                dot: root.data.bridge-badge.tone == BadgeTone.success ? BadgeDot.success
+                    : root.data.bridge-badge.tone == BadgeTone.attention ? BadgeDot.danger : BadgeDot.muted;
+            }
+        }
+        bridge := ToggleRow {
+            divider: false;
+            title: "Chrome & Edge bridge";
+            description: "Lets the bundled extension add “" + Brand.read-with-label
+                + "” to the browser’s own right-click menu. Only reachable from this PC.";
+            checked: root.data.bridge-enabled;
+            toggled(c) => { root.set-bool("triggers.browserExtension", c); }
+        }
+        Row {
+            title: "Port";
+            description: "Change it only if another app already uses it, then enter the same port in the extension’s popup.";
+            warning: root.data.port-error;
+            caution: root.data.port-error == "" ? root.data.port-note : "";
+            dim: !root.data.bridge-enabled;
+
+            // Escape reverts (the key bubbles up from the field).
+            FocusScope {
+                focus-on-click: false;
+                focus-on-tab-navigation: false;
+                width: 112px;
+                height: 40px;
+                key-pressed(event) => {
+                    if (event.text == Key.Escape) {
+                        root.revert-port();
+                        return accept;
+                    }
+                    reject
+                }
+
+                port := TextField {
+                    width: parent.width;
+                    text <=> root.port-draft;
+                    label: "Port";
+                    enabled: root.data.bridge-enabled;
+                    has-error: root.data.port-error != "";
+                    edited(t) => { root.port-edited(t); }
+                    accepted(t) => { root.commit-port(t); }
+                    changed has-focus => {
+                        if (!self.has-focus) {
+                            root.commit-port(root.port-draft);
+                        }
+                    }
+                }
+            }
+        }
+        StackedRow {
+            title: "Install the extension";
+            description: "One-time setup in Chrome, Edge, Brave or any Chromium browser.";
+
+            VerticalLayout {
+                spacing: Theme.space-3;
+                padding-top: 2px;
+
+                Step {
+                    number: "1";
+                    StepText { text: "Open"; }
+                    CopyChip {
+                        text: "chrome://extensions";
+                        copied: root.data.copied == self.text;
+                        copy(t) => { root.copy-text(t); }
+                    }
+                    StepText { text: "or"; }
+                    CopyChip {
+                        text: "edge://extensions";
+                        copied: root.data.copied == self.text;
+                        copy(t) => { root.copy-text(t); }
+                    }
+                }
+                Step {
+                    number: "2";
+                    StepText { text: "Turn on"; }
+                    StepText {
+                        text: "Developer mode";
+                        strong: true;
+                    }
+                    StepText { text: "in the corner of the page"; }
+                }
+                Step {
+                    number: "3";
+                    StepText { text: "Click"; }
+                    StepText {
+                        text: "Load unpacked";
+                        strong: true;
+                    }
+                    StepText { text: "and choose the extension folder"; }
+                }
+                HorizontalLayout {
+                    padding-left: 34px;
+                    alignment: start;
+                    Button {
+                        text: "Show extension folder";
+                        size: ButtonSize.sm;
+                        icon: Icons.folder-open;
+                        clicked => { root.show-extension-folder(); }
+                    }
+                }
+            }
+        }
+
+        // ── Windows ──
+        SubHead {
+            text: "Windows";
+            if root.data.explorer-installed: Badge {
+                text: "Installed";
+                dot: BadgeDot.success;
+            }
+        }
+        explorer := ToggleRow {
+            divider: false;
+            title: "Explorer right-click";
+            description: "Adds “" + Brand.read-with-label + "” to text files (.txt .md .log .csv .json .rtf .html).";
+            strong-before: "On Windows 11 it’s under";
+            strong: "Show more options";
+            strong-after: ".";
+            checked: root.data.explorer-enabled;
+            toggled(c) => { root.set-bool("triggers.explorerMenu", c); }
+        }
+        login := ToggleRow {
+            title: "Launch at login";
+            description: "Start " + Brand.app-name
+                + " when you sign in to Windows. Turn on Start minimized to keep it in the tray.";
+            checked: root.data.launch-at-login;
+            toggled(c) => { root.set-bool("app.launchAtLogin", c); }
+        }
+        minimized := ToggleRow {
+            title: "Start minimized";
+            description: "Open straight to the tray instead of showing this window.";
+            checked: root.data.start-minimized;
+            toggled(c) => { root.set-bool("app.startMinimized", c); }
+        }
+        tray := ToggleRow {
+            title: "Close to tray";
+            description: "Closing the window keeps " + Brand.app-name + " running so shortcuts and chips keep working.";
+            checked: root.data.close-to-tray;
+            toggled(c) => { root.set-bool("app.closeToTray", c); }
+        }
+    }
+}

@@ -1,0 +1,105 @@
+{
+  "search-text": "whisper",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.no-match"
+    },
+    "in-use": "In use: George",
+    "count": "0 of 24",
+    "gender": "female",
+    "accent": "irish",
+    "category": "",
+    "gender-options": [
+      {
+        "value": "",
+        "label": "All",
+        "accessible-label": "All genders"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "accessible-label": "Female"
+      },
+      {
+        "value": "male",
+        "label": "Male",
+        "accessible-label": "Male"
+      },
+      {
+        "value": "neutral",
+        "label": "Neutral",
+        "accessible-label": "Neutral"
+      }
+    ],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "australian",
+        "label": "Australian",
+        "accessible-label": "Australian"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      },
+      {
+        "value": "irish",
+        "label": "Irish",
+        "accessible-label": "Irish"
+      },
+      {
+        "value": "swedish",
+        "label": "Swedish",
+        "accessible-label": "Swedish"
+      },
+      {
+        "value": "transatlantic",
+        "label": "Transatlantic",
+        "accessible-label": "Transatlantic"
+      }
+    ],
+    "category-options": [
+      {
+        "value": "",
+        "label": "All types",
+        "accessible-label": "All types"
+      },
+      {
+        "value": "cloned",
+        "label": "Cloned",
+        "accessible-label": "Cloned"
+      },
+      {
+        "value": "generated",
+        "label": "Designed",
+        "accessible-label": "Designed"
+      },
+      {
+        "value": "premade",
+        "label": "Premade",
+        "accessible-label": "Premade"
+      },
+      {
+        "value": "professional",
+        "label": "Professional",
+        "accessible-label": "Professional"
+      }
+    ],
+    "refreshing": false,
+    "state-title": "No voices match",
+    "state-body": "Try a different search or clear the filters.",
+    "state-button": "Clear filters",
+    "voices": [],
+    "revision": 1
+  }
+}

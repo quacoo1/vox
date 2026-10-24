@@ -1,0 +1,120 @@
+// Pressable and FocusRing: the interaction plumbing shared by every clickable component.
+//
+// Pressable (inherits FocusScope, fills its parent)
+//   in    enabled: bool                (FocusScope builtin) false = no hover, press, focus or activation
+//   in    cursor: MouseCursor          pointer by default
+//   in    activate-on-enter: bool      true: Enter activates (buttons). Space always activates (on release).
+//   out   has-hover: bool              pointer is over the area
+//   out   pressed: bool                pointer button or Space held down
+//   out   focus-visible: bool          focused by keyboard / programmatically (not by a click): draw a ring
+//   out   mouse-x, mouse-y: length     pointer position inside the area
+//   callback activated()               click, Enter or Space
+//   callback pointer-event(PointerEvent)  raw pointer events, for components that need drag handling
+//   callback moved()                   pointer moved while pressed
+//   callback key(KeyEvent) -> EventResult  keys other than Enter/Space (arrows etc.); reject to bubble
+//   function focus-quietly()           take focus without showing the ring (after a click on a child area)
+// Put it *before* the visuals that should stay clickable on top of it (trailing buttons in a row), or after
+// purely decorative visuals. Give the owning component `forward-focus: <pressable id>`.
+//
+// FocusRing (inherits Rectangle): a 2 px ring drawn just outside its parent.
+//   in    radius: length               the parent's corner radius (ring radius = radius + gap + width)
+//   in    gap: length                  space between the parent edge and the ring (default 1 px)
+//   in    shown: bool                  usually `pressable.focus-visible`
+
+import { Theme } from "theme.slint";
+
+export component FocusRing inherits Rectangle {
+    in property <length> radius;
+    in property <length> gap: 1px;
+    in property <bool> shown;
+
+    background: transparent;
+
+    Rectangle {
+        x: -(root.gap + Theme.focus-ring-width);
+        y: -(root.gap + Theme.focus-ring-width);
+        width: root.width + 2 * (root.gap + Theme.focus-ring-width);
+        height: root.height + 2 * (root.gap + Theme.focus-ring-width);
+        border-radius: root.radius + root.gap + Theme.focus-ring-width;
+        border-width: Theme.focus-ring-width;
+        border-color: Theme.focus-ring;
+        background: transparent;
+        opacity: root.shown ? 1 : 0;
+        animate opacity { duration: Theme.fast; easing: ease-out; }
+    }
+}
+
+export component Pressable inherits FocusScope {
+    in property <MouseCursor> cursor: MouseCursor.pointer;
+    in property <bool> activate-on-enter: true;
+    out property <bool> has-hover: touch.has-hover && root.enabled;
+    out property <bool> pressed: (touch.pressed || root.key-down) && root.enabled;
+    out property <bool> focus-visible: root.has-focus && root.keyboard-focus && root.enabled;
+    out property <length> mouse-x: touch.mouse-x;
+    out property <length> mouse-y: touch.mouse-y;
+
+    callback activated();
+    callback pointer-event(event: PointerEvent);
+    callback moved();
+    callback key(event: KeyEvent) -> EventResult;
+
+    property <bool> key-down;
+    property <bool> keyboard-focus;
+    property <bool> quiet;
+
+    // Focus as if by a click: no focus ring (use after a pointer interaction on a child area).
+    public function focus-quietly() {
+        self.quiet = true;
+        self.focus();
+        self.quiet = false;
+    }
+
+    focus-gained(reason) => {
+        self.keyboard-focus = reason != FocusReason.pointer-click && !self.quiet;
+    }
+    focus-lost(reason) => {
+        self.keyboard-focus = false;
+        self.key-down = false;
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled) {
+            return reject;
+        }
+        if (event.text == Key.Space) {
+            if (!event.repeat) {
+                root.key-down = true;
+            }
+            return accept;
+        }
+        if (event.text == Key.Return && root.activate-on-enter) {
+            if (!event.repeat) {
+                root.activated();
+            }
+            return accept;
+        }
+        root.key(event)
+    }
+    key-released(event) => {
+        if (event.text == Key.Space && root.key-down) {
+            root.key-down = false;
+            root.activated();
+            return accept;
+        }
+        reject
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? root.cursor : MouseCursor.default;
+        clicked => {
+            root.activated();
+        }
+        pointer-event(event) => {
+            root.pointer-event(event);
+        }
+        moved => {
+            root.moved();
+        }
+    }
+}

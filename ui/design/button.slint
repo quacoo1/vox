@@ -1,0 +1,125 @@
+// Button: the pill.
+//
+//   in    text: string             label (also the accessible label unless `accessible-text` is set)
+//   in    kind: ButtonKind         primary (near-white pill, dark text) | secondary (dark pill + hairline, default)
+//                                  | ghost (no fill, hover fill) | danger (secondary with danger text)
+//   in    size: ButtonSize         sm (32 h, 14 px sides, 13/600) | md (40 h, 22 px sides, 14/600, default)
+//   in    icon: image              optional leading 16 px glyph (Icons.*)
+//   in    trailing-icon: image     optional trailing 16 px glyph (e.g. chevron-down, arrow-right)
+//   in    enabled: bool            false = 40 % opacity, no interaction
+//   in    loading: bool            shows a small spinner in place of the icon and ignores activation
+//   in    accessible-text: string  overrides the accessible label
+//   in    show-focus: bool         draw the focus ring without focus (previews)
+//   out   has-focus: bool
+//   callback clicked()             click, Enter or Space
+//   function focus()               (builtin; focus is forwarded to the key handler)
+// Width: hugs its content (min 64 px for md, 52 px for sm); stretch it with `horizontal-stretch` or a width.
+// @children: optional extras that fill the button, e.g. `Tip { text: "Read the clipboard aloud"; }`.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+import { Spinner } from "spinner.slint";
+
+export enum ButtonKind { primary, secondary, ghost, danger }
+export enum ButtonSize { sm, md }
+
+export component Button {
+    in property <string> text;
+    in property <ButtonKind> kind: ButtonKind.secondary;
+    in property <ButtonSize> size: ButtonSize.md;
+    in property <image> icon;
+    in property <image> trailing-icon;
+    in property <bool> enabled: true;
+    in property <bool> loading: false;
+    in property <string> accessible-text;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: press.has-focus;
+
+    callback clicked();
+
+    property <bool> small: root.size == ButtonSize.sm;
+    property <bool> is-primary: root.kind == ButtonKind.primary;
+    property <bool> has-icon: root.icon.width > 0 || root.loading;
+    property <bool> has-trailing: root.trailing-icon.width > 0;
+    property <color> fg: root.is-primary ? Theme.on-primary
+        : root.kind == ButtonKind.danger ? Theme.danger : Theme.text;
+    property <brush> rest-fill: root.is-primary ? Theme.primary-fill
+        : root.kind == ButtonKind.ghost ? transparent : Theme.pill-fill;
+    property <brush> hover-fill: root.is-primary ? Theme.primary-fill-hover
+        : root.kind == ButtonKind.danger ? Theme.danger-soft : Theme.hover;
+    property <brush> pressed-fill: root.is-primary ? Theme.primary-pressed : Theme.pressed;
+
+    height: root.small ? 32px : 40px;
+    min-width: max(root.small ? 52px : 64px, row.preferred-width);
+    preferred-width: self.min-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: button;
+    accessible-label: root.accessible-text != "" ? root.accessible-text : root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { press.activated(); }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? root.pressed-fill : press.has-hover ? root.hover-fill : root.rest-fill;
+        border-width: (root.kind == ButtonKind.secondary || root.kind == ButtonKind.danger) ? Theme.hairline : 0px;
+        border-color: press.has-hover ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    row := HorizontalLayout {
+        padding-left: root.small ? 14px : 22px;
+        padding-right: root.small ? 14px : 22px;
+        spacing: root.small ? 6px : 8px;
+        alignment: center;
+
+        if root.has-icon && !root.loading: Icon {
+            source: root.icon;
+            size: 16px;
+            color: root.fg;
+        }
+        if root.loading: Spinner {
+            size: 16px;
+            color: root.fg;
+            track-color: transparent;
+            arc: 270deg;
+        }
+        label := Text {
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label : Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: root.fg;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        if root.has-trailing: Icon {
+            source: root.trailing-icon;
+            size: 16px;
+            color: root.fg;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => {
+            if (!root.loading) {
+                root.clicked();
+            }
+        }
+    }
+
+    // Extras such as `Tip { text: "..." }` (they fill the button and must not take input).
+    @children
+}

@@ -1,0 +1,139 @@
+// Design tokens from docs/DESIGN.md. Components and pages read colours, type and metrics only from here.
+// `Theme.dark` is set by the app from Settings → Appearance (System / Paper / Night).
+
+export global Theme {
+    in-out property <bool> dark: true;
+
+    // Surfaces
+    out property <color> backdrop: dark ? #05070b : #e9ecf1;
+    out property <color> panel: dark ? #1a1a1a : #ffffff;
+    out property <color> panel-border: dark ? #262a2d : #dfe2e6;
+    out property <color> divider: dark ? #2d2d2d : #ececee;
+    out property <color> field: dark ? #1d1d1d : #f6f6f7;
+    out property <color> field-border: dark ? #2e2e2e : #e2e2e5;
+    out property <color> field-border-focus: dark ? #5a5a5a : #9a9aa0;
+    out property <color> hover: dark ? #232323 : #f2f2f3;
+    out property <color> pressed: dark ? #2a2a2a : #e8e8ea;
+    out property <color> chip: dark ? #262626 : #efeff1;
+    // Paper: a lighter, cool scrim (a neutral 30 % black turns the pale silk backdrop a muddy grey).
+    out property <color> scrim: dark ? #000000a6 : #0f172a3d;
+
+    // Text and icons
+    out property <color> text: dark ? #f2f2f2 : #111113;
+    out property <color> text-secondary: dark ? #9a9a9a : #5f6067;
+    out property <color> text-muted: dark ? #6f6f6f : #8d8e94;
+
+    // Actions and status
+    out property <color> primary: dark ? #f9f9f9 : #111113;
+    out property <color> primary-hover: dark ? #ffffff : #2a2a2e;
+    out property <color> on-primary: dark ? #0a0a0a : #ffffff;
+    out property <color> danger: dark ? #ff6b5e : #d93a2b;
+    out property <color> success: dark ? #7ad69a : #1f9d55;
+    out property <color> focus-ring: dark ? #ffffff40 : #11111340;
+
+    // Type
+    out property <string> font-text: "Segoe UI Variable Text";
+    out property <string> font-display: "Segoe UI Variable Display";
+    out property <length> size-caption: 12px;
+    out property <length> size-label: 13px;
+    out property <length> size-body: 14px;
+    out property <length> size-title: 15px;
+    out property <length> size-sentence: 17px;
+    out property <length> size-hero: 26px;
+    out property <length> size-number: 34px;
+
+    // Shape
+    out property <length> radius-panel: 22px;
+    out property <length> radius-card: 16px;
+    out property <length> radius-field: 12px;
+    out property <length> radius-thumb: 10px;
+    out property <length> radius-keycap: 7px;
+    out property <length> radius-widget: 20px;
+
+    // Spacing scale
+    out property <length> space-1: 4px;
+    out property <length> space-2: 8px;
+    out property <length> space-3: 12px;
+    out property <length> space-4: 16px;
+    out property <length> space-5: 20px;
+    out property <length> space-6: 24px;
+    out property <length> space-8: 32px;
+    out property <length> space-10: 40px;
+
+    // Layout metrics
+    out property <length> header-height: 64px;
+    out property <length> sidebar-width: 260px;
+    out property <length> panel-inset: 14px;
+
+    // Motion
+    out property <duration> fast: 120ms;
+    out property <duration> medium: 180ms;
+    out property <duration> slow: 220ms;
+
+    // ---- Added for the component library (ui/design/*.slint) ----
+
+    // Surfaces that float above the panel (popups, toasts, tooltips) and their shadows.
+    out property <color> popup: dark ? #1d1d1d : #ffffff;
+    out property <color> popup-border: dark ? #2f3236 : #e1e3e7;
+    out property <color> shadow: dark ? #00000099 : #0f172a2e;
+    out property <color> popup-shadow: dark ? #0000008c : #0f172a24;
+    out property <color> tooltip: dark ? #f2f2f2 : #1b1b1e;
+    out property <color> on-tooltip: dark ? #0a0a0a : #f7f7f8;
+
+    // Art thumbnails: hairline drawn inside the image, and the placeholder gradient used while art is missing.
+    out property <color> art-border: dark ? #ffffff17 : #00000012;
+    out property <color> art-placeholder-a: dark ? #3a4350 : #c3ccd8;
+    out property <color> art-placeholder-b: dark ? #20252c : #dde2e9;
+    out property <color> art-placeholder-c: dark ? #121417 : #eef1f4;
+    out property <color> art-sheen: dark ? #ffffff1f : #ffffffa0;
+
+    // Controls
+    out property <color> track: dark ? #2c2c2c : #e4e4e7;          // slider / progress / toggle-off track
+    out property <color> buffered: dark ? #6f6f6f80 : #8d8e9466;   // text-muted at 50 %
+    out property <color> knob-off: dark ? #8a8a8a : #ffffff;       // toggle knob when off
+    out property <color> knob-off-border: dark ? #00000000 : #d4d4d8;
+    out property <color> selection: dark ? #ffffff38 : #11111326;  // text selection highlight
+    out property <color> danger-soft: dark ? #ff6b5e24 : #d93a2b14;
+    out property <color> primary-pressed: dark ? #e0e0e0 : #3a3a3f;  // pressed primary pill / circle
+    // Section labels: the reference measures about #8a8a8a; a step brighter than text-muted for 13-px legibility.
+    out property <color> text-label: dark ? #858585 : #7b7c83;
+
+    // Pill surfaces. The reference's pills are not flat: "Publish" runs #fcfcfc -> #e8e8e8 top to bottom and
+    // "Remove" #1f1f1f -> #1b1b1b. Primary / secondary pills, chips and the segmented thumb use these brushes;
+    // `primary` / `field` stay the flat equivalents (toggle track, progress fill, inputs).
+    out property <brush> primary-fill: dark
+        ? @linear-gradient(180deg, #fdfdfd 0%, #f6f6f6 45%, #e6e6e6 100%)
+        : @linear-gradient(180deg, #313136 0%, #1a1a1d 50%, #0f0f11 100%);
+    out property <brush> primary-fill-hover: dark
+        ? @linear-gradient(180deg, #ffffff 0%, #fbfbfb 45%, #efefef 100%)
+        : @linear-gradient(180deg, #414147 0%, #29292d 50%, #1d1d20 100%);
+    out property <brush> pill-fill: dark
+        ? @linear-gradient(180deg, #212121 0%, #1c1c1c 100%)
+        : @linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%);
+    // Skeleton bars: a step above `hover` so loading rows read on the panel in both themes.
+    out property <color> skeleton: dark ? #282828 : #ebebed;
+
+    // Type
+    out property <length> size-keycap: 11px;
+    out property <length> size-keycap-small: 10px;   // small keycaps, keys inside tooltips
+    out property <int> weight-regular: 400;
+    out property <int> weight-medium: 500;
+    // Dark text on a light panel renders about one weight step thinner than light-on-dark (and Paper titles then
+    // read as Regular), so Paper uses a slightly heavier semibold. Segoe UI Variable is a variable font: 640 is
+    // a real instance, not a synthetic bold.
+    out property <int> weight-semibold: dark ? 600 : 640;
+
+    // Shape
+    out property <length> radius-row: 14px;          // ListRow hover / NavItem-like rows that are not pills
+    out property <length> radius-popup: 14px;        // Select popup, menus
+    out property <length> radius-thumb-large: 12px;  // 110-px art
+    out property <length> radius-toast: 14px;
+    out property <length> hairline: 1px;
+    out property <length> focus-ring-width: 2px;
+
+    // Motion
+    out property <duration> pulse: 1400ms;           // Skeleton
+    out property <duration> spin: 900ms;             // Spinner revolution
+    out property <duration> tooltip-delay: 450ms;
+    out property <duration> scrollbar-hide-delay: 900ms;
+}

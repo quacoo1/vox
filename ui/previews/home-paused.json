@@ -1,0 +1,304 @@
+{
+ "data": {
+  "state": {
+   "$enum": "LoadState.ready"
+  },
+  "error-title": "",
+  "error-body": "",
+  "retrying": false,
+  "greeting": "Good evening",
+  "date-line": "Friday, October 17",
+  "now": {
+   "idle": false,
+   "art": {
+    "$image": "art/thumb-george.png"
+   },
+   "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+   "meta": "George · Outlook",
+   "meta-is-error": false,
+   "badges": [
+    "Outlook",
+    "Paused"
+   ],
+   "phase": {
+    "$enum": "PlayerPhase.paused"
+   },
+   "time": "-0:58",
+   "time-estimate": false,
+   "time-accessible": "0:58 left",
+   "progress": 0.52,
+   "buffered": 0.8,
+   "seekable": true,
+   "can-stop": true,
+   "can-previous": true,
+   "can-next": true,
+   "main-action": {
+    "$enum": "MainAction.play"
+   },
+   "main-enabled": true,
+   "title-tooltip": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+   "idle-title": "Select text, then right-click",
+   "idle-sub": "Choose “Read with Vox” or press",
+   "idle-keys": [
+    "Ctrl",
+    "Alt",
+    "R"
+   ],
+   "idle-keys-spoken": "Ctrl plus Alt plus R",
+   "replay-last-visible": false,
+   "replay-last-tooltip": "",
+   "replay-last-busy": false
+  },
+  "today": {
+   "loading": false,
+   "label": "Today",
+   "badge": "Goal 15m",
+   "value": "12m",
+   "value-accessible": "12 minutes listened today",
+   "caption": "4 reads · 1.6K words",
+   "sub": "3m to your daily goal",
+   "fraction": 0.8,
+   "accessible-value": "80% of the daily goal",
+   "done": false
+  },
+  "credits": {
+   "state": {
+    "$enum": "CreditsState.ready"
+   },
+   "title": "",
+   "tier": "Creator",
+   "percent": "39%",
+   "percent-accessible": "39 percent of credits left",
+   "fraction": 0.388,
+   "low": false,
+   "facts": "38.8K of 100K left",
+   "reset": "Resets in 12 days",
+   "detail": "38,766 of 100,000 characters left. Resets in 12 days",
+   "message": "",
+   "action-label": "",
+   "refreshing": false
+  },
+  "week": {
+   "loading": false,
+   "title": "Last 7 days",
+   "total": "1h 21m",
+   "bars": [
+    {
+     "level": 0.34615384615384615,
+     "label": "S",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Saturday",
+     "tooltip-value": "9m",
+     "tooltip-sub": "",
+     "accessible": "Saturday: 9 minutes"
+    },
+    {
+     "level": 0.0,
+     "label": "S",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Sunday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Sunday: 0 seconds"
+    },
+    {
+     "level": 0.6153846153846154,
+     "label": "M",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Monday",
+     "tooltip-value": "16m",
+     "tooltip-sub": "",
+     "accessible": "Monday: 16 minutes"
+    },
+    {
+     "level": 1.0,
+     "label": "T",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Tuesday",
+     "tooltip-value": "26m",
+     "tooltip-sub": "",
+     "accessible": "Tuesday: 26 minutes"
+    },
+    {
+     "level": 0.23076923076923078,
+     "label": "W",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Wednesday",
+     "tooltip-value": "6m",
+     "tooltip-sub": "",
+     "accessible": "Wednesday: 6 minutes"
+    },
+    {
+     "level": 0.46153846153846156,
+     "label": "T",
+     "today": false,
+     "zero": false,
+     "tooltip-title": "Thursday",
+     "tooltip-value": "12m",
+     "tooltip-sub": "",
+     "accessible": "Thursday: 12 minutes"
+    },
+    {
+     "level": 0.46153846153846156,
+     "label": "F",
+     "today": true,
+     "zero": false,
+     "tooltip-title": "Friday",
+     "tooltip-value": "12m",
+     "tooltip-sub": "",
+     "accessible": "Friday: 12 minutes"
+    }
+   ],
+   "streak": "3 day streak",
+   "best": "best 6",
+   "streak-active": true,
+   "accessible-description": "Listening per day. Saturday: 9 minutes, Sunday: 0 seconds, Monday: 16 minutes, Tuesday: 26 minutes, Wednesday: 6 minutes, Thursday: 12 minutes, Friday: 12 minutes"
+  },
+  "quick-read-words": "",
+  "quick-read-can-read": false,
+  "read-busy": false,
+  "clipboard-busy": false,
+  "recent-loading": false,
+  "recent": [
+   {
+    "id": "r1",
+    "art": {
+     "$image": "art/small-george.png"
+    },
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen, and to answer ba…",
+    "meta": "Outlook · George · 10 minutes ago",
+    "duration": "0:42",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": true,
+    "favorite": true,
+    "live": false,
+    "resumable": true,
+    "busy": false,
+    "accessible-label": "Resume: The quiet revolution in personal computing was never about…"
+   },
+   {
+    "id": "r2",
+    "art": {
+     "$image": "art/small-charlotte.png"
+    },
+    "title": "Quarterly planning notes: we move the launch review to Thursday and keep the beta open for two more weeks.",
+    "meta": "Chrome · Charlotte · 2 hours ago",
+    "duration": "1:18",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": true,
+    "favorite": false,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Quarterly planning notes: we move the launch review to Thur…"
+   },
+   {
+    "id": "r3",
+    "art": {
+     "$image": "art/small-brian.png"
+    },
+    "title": "Tenancy agreement for 14 Harrowgate Gardens, clause 14.2 (b): the tenant shall give not less than one calendar month’s written notice, endi…",
+    "meta": "File Explorer · Charlotte (multilingual, warm narration) · 2 days ago",
+    "duration": "3:05",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": false,
+    "favorite": false,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Tenancy agreement for 14 Harrowgate Gardens, clause 14.2 (b…"
+   },
+   {
+    "id": "r4",
+    "art": {
+     "$image": "art/small-lily.png"
+    },
+    "title": "Council meeting minutes: residents raised concerns about the new parking scheme on Elm Street.",
+    "meta": "Edge · Lily · yesterday",
+    "duration": "2:11",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": false,
+    "favorite": true,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Council meeting minutes: residents raised concerns about th…"
+   },
+   {
+    "id": "r5",
+    "art": {
+     "$image": "art/small-daniel.png"
+    },
+    "title": "Release notes for 2.4: faster startup, gapless playback between chunks and a quieter tray menu.",
+    "meta": "Typed in app · Daniel · 4 days ago",
+    "duration": "0:58",
+    "failed": false,
+    "failed-tooltip": "",
+    "cached": false,
+    "favorite": false,
+    "live": false,
+    "resumable": false,
+    "busy": false,
+    "accessible-label": "Replay: Release notes for 2.4: faster startup, gapless playback bet…"
+   }
+  ],
+  "ways": [
+   {
+    "title": "Right-click chip",
+    "body": "Select text, right-click, then pick “Read with Vox” beside the menu.",
+    "key-groups": [],
+    "icon": "mouse-pointer-click",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Hotkeys",
+    "body": "",
+    "key-groups": [
+     {
+      "label": "Selection",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "R"
+      ]
+     },
+     {
+      "label": "Clipboard",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "V"
+      ]
+     }
+    ],
+    "icon": "keyboard",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Browser extension",
+    "body": "Adds “Read with Vox” to the Chrome and Edge right-click menu.",
+    "key-groups": [],
+    "icon": "globe",
+    "section": "integrations",
+    "off": false
+   }
+  ],
+  "voice-name": "George",
+  "voice-meta": "Flash v2.5 · 1×",
+  "voice-art": {
+   "$image": "art/small-george.png"
+  },
+  "voice-accessible": "Voice: George. Flash v2.5, speed 1 times. Change voice"
+ }
+}

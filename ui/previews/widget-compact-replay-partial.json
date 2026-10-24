@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.compact"
+    },
+    "body": {
+      "$enum": "WidgetBody.title"
+    },
+    "art": {
+      "$image": "art/small-aria.png"
+    },
+    "source": "Replay",
+    "voice": "Aria",
+    "phase": {
+      "$enum": "PlayerPhase.playing"
+    },
+    "status": "Reading",
+    "status-loading": false,
+    "rate": "1×",
+    "show-rate": true,
+    "title": "Notes from Monday: invoices are due on the 28th and the new office opens…",
+    "spoken": "The quiet revolution in personal",
+    "current": "computing",
+    "upcoming": "was never about faster chips.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "−0:52",
+    "time-estimate": false,
+    "time-accessible": "0:52 left",
+    "progress": 0.18,
+    "buffered": 1.0,
+    "progress-accessible": "0:11 of 1:03",
+    "seekable": true,
+    "previous-enabled": true,
+    "next-enabled": true,
+    "previous-label": "Back 10 seconds",
+    "next-label": "Forward 10 seconds",
+    "main-action": {
+      "$enum": "MainAction.pause"
+    },
+    "compact-loading": false,
+    "warning-visible": false,
+    "warning-lead": "",
+    "warning-reason": "",
+    "warning-link": false,
+    "warning-tooltip": "",
+    "warning-dot-tooltip": "",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "",
+      "tone": {
+        "$enum": "ToastTone.info"
+      },
+      "title": "",
+      "message": "",
+      "action-label": "",
+      "leaving": false,
+      "key": 0
+    },
+    "toast-visible": false
+  }
+}

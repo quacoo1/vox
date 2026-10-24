@@ -1,0 +1,153 @@
+// ScrollArea: a Flickable with a thin overlay scrollbar that appears while scrolling or when the pointer is near
+// the right edge, then fades out. No arrows, no track box: a 4 px rounded thumb that grows to 8 px under the pointer.
+//
+//   in-out content-x, content-y: length       scroll position (content-y is <= 0)
+//   in-out content-width, content-height: length  computed from the children unless set
+//   out   visible-width, visible-height: length   the viewport size
+//   in    always-show-bar: bool               keep the thumb visible whenever the content overflows
+//   in    bar-inset: length                   gap between the thumb and the right edge (default 4 px)
+//   in    wheel-only: bool                    true (default): no mouse-drag panning (desktop behaviour); touch
+//                                             panning still works
+//   in    edge-fade: bool                     fade the content into `fade-color` at the top / bottom edges while
+//                                             more content is hidden there (default false)
+//   in    fade-color: color                   the colour behind the area (default Theme.panel)
+//   out   can-scroll: bool                    the content is taller than the viewport
+//   out   at-top: bool                        content-y is 0 (pages may hide a header rule while at the top)
+//   callback scrolled()                       the user scrolled (wheel, drag, thumb)
+//   function scroll-to-top()
+//   @children                                 the content: usually a VerticalLayout with `alignment: start` (without
+//                                             it, short content is stretched to the viewport height)
+// Wheel / touchpad scrolling is native. Drag the thumb to scroll; click the gutter to page.
+
+import { Theme } from "theme.slint";
+
+export component ScrollArea inherits Rectangle {
+    in-out property <length> content-x <=> flick.content-x;
+    in-out property <length> content-y <=> flick.content-y;
+    in-out property <length> content-width <=> flick.content-width;
+    in-out property <length> content-height <=> flick.content-height;
+    out property <length> visible-width: flick.width;
+    out property <length> visible-height: flick.height;
+    in property <bool> always-show-bar: false;
+    in property <length> bar-inset: 4px;
+    in property <bool> wheel-only: true;
+    in property <bool> edge-fade: false;
+    in property <color> fade-color: Theme.panel;
+    out property <bool> can-scroll: root.max-y > 0.5px;
+    out property <bool> at-top: flick.content-y >= -0.5px;
+
+    callback scrolled();
+
+    public function scroll-to-top() {
+        flick.content-y = 0px;
+    }
+
+    property <length> max-y: max(0px, flick.content-height - flick.height);
+    property <bool> recently: false;
+    property <bool> hot: gutter.has-hover || gutter.pressed;
+    property <bool> show-bar: root.can-scroll && (root.always-show-bar || root.recently || root.hot);
+
+    function poke() {
+        root.recently = true;
+        hide-timer.restart();
+    }
+
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    min-height: 40px;
+    clip: true;
+
+    flick := Flickable {
+        width: root.width;
+        height: root.height;
+        mouse-drag-pan-enabled: !root.wheel-only;
+        flicked => {
+            root.poke();
+            root.scrolled();
+        }
+        @children
+    }
+
+    // Edge fades: content dissolves into the background instead of being cut at the clip edge.
+    if root.edge-fade: Rectangle {
+        y: 0;
+        width: root.width;
+        height: 24px;
+        background: @linear-gradient(180deg, root.fade-color 0%, root.fade-color.with-alpha(0) 100%);
+        opacity: root.at-top ? 0 : 1;
+        animate opacity { duration: Theme.fast; }
+    }
+    if root.edge-fade: Rectangle {
+        y: root.height - self.height;
+        width: root.width;
+        height: 32px;
+        background: @linear-gradient(0deg, root.fade-color 0%, root.fade-color.with-alpha(0) 100%);
+        opacity: root.can-scroll && flick.content-y > -root.max-y + 0.5px ? 1 : 0;
+        animate opacity { duration: Theme.fast; }
+    }
+
+    hide-timer := Timer {
+        interval: Theme.scrollbar-hide-delay;
+        running: false;
+        triggered => {
+            root.recently = false;
+            self.running = false;
+        }
+    }
+
+    thumb := Rectangle {
+        property <length> track: root.height - 2 * root.bar-inset;
+        width: root.hot ? 8px : 4px;
+        height: root.max-y <= 0 ? 0px : max(32px, self.track * flick.height / flick.content-height);
+        x: root.width - self.width - root.bar-inset;
+        y: root.bar-inset + (root.max-y <= 0 ? 0px : (self.track - self.height) * (-flick.content-y / root.max-y));
+        border-radius: self.width / 2;
+        background: root.hot ? Theme.text-secondary : Theme.text-muted;
+        opacity: root.show-bar ? (root.hot ? 0.9 : 0.6) : 0;
+        animate width { duration: Theme.fast; easing: ease-out; }
+        animate opacity { duration: Theme.medium; easing: ease-out; }
+        animate background { duration: Theme.fast; easing: ease-out; }
+    }
+
+    gutter := TouchArea {
+        property <length> start-y;
+        property <length> start-content;
+        x: root.width - 14px;
+        width: 14px;
+        height: root.height;
+        enabled: root.can-scroll;
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                if (self.mouse-y >= thumb.y && self.mouse-y <= thumb.y + thumb.height) {
+                    self.start-y = self.mouse-y;
+                    self.start-content = flick.content-y;
+                } else {
+                    // Page towards the click.
+                    self.start-y = -1px;
+                    if (self.mouse-y < thumb.y) {
+                        flick.content-y = min(0px, flick.content-y + flick.height * 0.9);
+                    } else {
+                        flick.content-y = max(-root.max-y, flick.content-y - flick.height * 0.9);
+                    }
+                    root.poke();
+                    root.scrolled();
+                }
+            }
+        }
+        moved => {
+            if (self.pressed && self.start-y >= 0px && thumb.track > thumb.height) {
+                let ratio = root.max-y / (thumb.track - thumb.height);
+                flick.content-y = max(-root.max-y, min(0px, self.start-content - (self.mouse-y - self.start-y) * ratio));
+                root.poke();
+                root.scrolled();
+            }
+        }
+        scroll-event(event) => {
+            reject
+        }
+    }
+
+    changed content-y => {
+        root.poke();
+    }
+}

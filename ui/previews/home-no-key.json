@@ -1,0 +1,215 @@
+{
+ "data": {
+  "state": {
+   "$enum": "LoadState.ready"
+  },
+  "error-title": "",
+  "error-body": "",
+  "retrying": false,
+  "greeting": "Good evening",
+  "date-line": "Friday, October 17",
+  "now": {
+   "idle": true,
+   "art": {
+    "$image": "art/thumb-george.png"
+   },
+   "title": "",
+   "meta": "",
+   "meta-is-error": false,
+   "badges": [],
+   "phase": {
+    "$enum": "PlayerPhase.idle"
+   },
+   "time": "",
+   "time-estimate": false,
+   "time-accessible": "",
+   "progress": 0,
+   "buffered": 0,
+   "seekable": false,
+   "can-stop": false,
+   "can-previous": false,
+   "can-next": false,
+   "main-action": {
+    "$enum": "MainAction.play"
+   },
+   "main-enabled": false,
+   "title-tooltip": "",
+   "idle-title": "Select text, then right-click",
+   "idle-sub": "Choose “Read with Vox” or press",
+   "idle-keys": [
+    "Ctrl",
+    "Alt",
+    "R"
+   ],
+   "idle-keys-spoken": "Ctrl plus Alt plus R",
+   "replay-last-visible": false,
+   "replay-last-tooltip": "",
+   "replay-last-busy": false
+  },
+  "today": {
+   "loading": false,
+   "label": "Today",
+   "badge": "Goal 15m",
+   "value": "0m",
+   "value-accessible": "0 seconds listened today",
+   "caption": "0 reads · 0 words",
+   "sub": "15m to your daily goal",
+   "fraction": 0.0,
+   "accessible-value": "0% of the daily goal",
+   "done": false
+  },
+  "credits": {
+   "state": {
+    "$enum": "CreditsState.no-key"
+   },
+   "title": "No API key",
+   "tier": "",
+   "percent": "",
+   "percent-accessible": "",
+   "fraction": 0,
+   "low": false,
+   "facts": "",
+   "reset": "",
+   "detail": "",
+   "message": "Add your ElevenLabs key to start reading.",
+   "action-label": "Add key",
+   "refreshing": false
+  },
+  "week": {
+   "loading": false,
+   "title": "Last 7 days",
+   "total": "0m",
+   "bars": [
+    {
+     "level": 0,
+     "label": "S",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Saturday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Saturday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "S",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Sunday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Sunday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "M",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Monday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Monday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "T",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Tuesday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Tuesday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "W",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Wednesday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Wednesday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "T",
+     "today": false,
+     "zero": true,
+     "tooltip-title": "Thursday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Thursday: 0 seconds"
+    },
+    {
+     "level": 0,
+     "label": "F",
+     "today": true,
+     "zero": true,
+     "tooltip-title": "Friday",
+     "tooltip-value": "0s",
+     "tooltip-sub": "",
+     "accessible": "Friday: 0 seconds"
+    }
+   ],
+   "streak": "0 day streak",
+   "best": "best 0",
+   "streak-active": false,
+   "accessible-description": "Listening per day. Saturday: 0 seconds, Sunday: 0 seconds, Monday: 0 seconds, Tuesday: 0 seconds, Wednesday: 0 seconds, Thursday: 0 seconds, Friday: 0 seconds"
+  },
+  "quick-read-words": "",
+  "quick-read-can-read": false,
+  "read-busy": false,
+  "clipboard-busy": false,
+  "recent-loading": false,
+  "recent": [],
+  "ways": [
+   {
+    "title": "Right-click chip",
+    "body": "Select text, right-click, then pick “Read with Vox” beside the menu.",
+    "key-groups": [],
+    "icon": "mouse-pointer-click",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Hotkeys",
+    "body": "",
+    "key-groups": [
+     {
+      "label": "Selection",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "R"
+      ]
+     },
+     {
+      "label": "Clipboard",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "V"
+      ]
+     }
+    ],
+    "icon": "keyboard",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Browser extension",
+    "body": "Adds “Read with Vox” to the Chrome and Edge right-click menu.",
+    "key-groups": [],
+    "icon": "globe",
+    "section": "integrations",
+    "off": false
+   }
+  ],
+  "voice-name": "George",
+  "voice-meta": "Flash v2.5 · 1×",
+  "voice-art": {
+   "$image": "art/small-george.png"
+  },
+  "voice-accessible": "Voice: George. Flash v2.5, speed 1 times. Change voice"
+ }
+}

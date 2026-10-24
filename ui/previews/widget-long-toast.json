@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.toast"
+    },
+    "body": {
+      "$enum": "WidgetBody.sentence"
+    },
+    "art": {
+      "$image": "art/small-george.png"
+    },
+    "source": "Chrome",
+    "voice": "George",
+    "phase": {
+      "$enum": "PlayerPhase.playing"
+    },
+    "status": "Reading",
+    "status-loading": false,
+    "rate": "1×",
+    "show-rate": true,
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+    "spoken": "The quiet revolution in personal",
+    "current": "computing",
+    "upcoming": "was never about faster chips.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "−0:27",
+    "time-estimate": false,
+    "time-accessible": "0:27 left",
+    "progress": 0.34,
+    "buffered": 0.72,
+    "progress-accessible": "0:14 of 0:41",
+    "seekable": true,
+    "previous-enabled": true,
+    "next-enabled": true,
+    "previous-label": "Previous sentence",
+    "next-label": "Next sentence",
+    "main-action": {
+      "$enum": "MainAction.pause"
+    },
+    "compact-loading": false,
+    "warning-visible": false,
+    "warning-lead": "",
+    "warning-reason": "",
+    "warning-link": false,
+    "warning-tooltip": "",
+    "warning-dot-tooltip": "",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "t",
+      "tone": {
+        "$enum": "ToastTone.error"
+      },
+      "title": "Couldn’t start reading",
+      "message": "ElevenLabs is busy right now. Your read will start as soon as a slot frees up, or you can try again in a minute from the tray menu or the main window.",
+      "action-label": "Open settings",
+      "leaving": false,
+      "key": 1
+    },
+    "toast-visible": true
+  }
+}

@@ -1,0 +1,142 @@
+// Toast: a floating notification card (bottom-right in the shell, bottom-centre on onboarding).
+//
+//   in    kind: ToastKind           info (info glyph) | success (check glyph) | error (alert glyph in `danger`;
+//                                   never a red fill)
+//   in    title: string             optional bold first line ("History exported")
+//   in    message: string           the text (wraps to 3 lines max, then elides)
+//   in    action-text: string       optional action, a ghost sm pill ("Undo", "Open")
+//   in    dismissible: bool         show the close button "Dismiss notification" (default true)
+//   in    show-focus: bool          ring around the card (previews)
+//   out   has-hover: bool           owners pause the countdown while hovered...
+//   out   has-focus: bool           ...or while a control inside has focus
+//   callback action()               the action pill was activated (owner runs it, then dismisses)
+//   callback dismissed()            the close button was activated
+// Size: hugs content between 280 and 440 px wide. One line: a 52-h pill; taller (title, wrapped text): radius 14.
+// Live region: errors are assertive, others polite.
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+import { Button, ButtonKind, ButtonSize } from "button.slint";
+import { IconButton, IconButtonSize } from "icon-button.slint";
+import { FocusRing } from "pressable.slint";
+
+export enum ToastKind { info, success, error }
+
+export component Toast {
+    in property <ToastKind> kind: ToastKind.info;
+    in property <string> title;
+    in property <string> message;
+    in property <string> action-text;
+    in property <bool> dismissible: true;
+    in property <bool> show-focus: false;
+    out property <bool> has-hover: hover.has-hover;
+    out property <bool> has-focus: (root.action-text != "" && action-focus) || close-focus;
+
+    callback action();
+    callback dismissed();
+
+    property <bool> action-focus;
+    property <bool> close-focus;
+
+    min-width: 280px;
+    max-width: 440px;
+    preferred-width: min(440px, max(280px, row.preferred-width));
+    min-height: max(52px, row.min-height);
+    preferred-height: max(52px, row.preferred-height);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.title != "" ? root.title + ". " + root.message : root.message;
+    accessible-live-region: root.kind == ToastKind.error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+
+    bg := Rectangle {
+        border-radius: root.height <= 56px ? root.height / 2 : Theme.radius-toast;
+        background: Theme.popup;
+        border-width: Theme.hairline;
+        border-color: Theme.popup-border;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    hover := TouchArea {
+        // Only tracks hover; clicks fall through to nothing.
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: root.show-focus;
+    }
+
+    row := HorizontalLayout {
+        padding-left: 18px;
+        padding-right: root.dismissible ? 8px : 16px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 12px;
+
+        VerticalLayout {
+            alignment: root.title != "" ? LayoutAlignment.start : LayoutAlignment.center;
+            padding-top: root.title != "" ? 9px : 0px;
+            Icon {
+                source: root.kind == ToastKind.error ? @image-url("../icons/circle-alert.svg")
+                    : root.kind == ToastKind.success ? @image-url("../icons/circle-check.svg")
+                    : @image-url("../icons/info.svg");
+                size: 18px;
+                color: root.kind == ToastKind.error ? Theme.danger : Theme.text;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            padding-top: root.title != "" ? 6px : 0px;
+            padding-bottom: root.title != "" ? 6px : 0px;
+
+            if root.title != "": Text {
+                text: root.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            Text {
+                text: root.message;
+                font-family: Theme.font-text;
+                font-size: root.title != "" ? Theme.size-label : Theme.size-body;
+                font-weight: Theme.weight-medium;
+                color: root.title != "" ? Theme.text-secondary : Theme.text;
+                wrap: word-wrap;
+                max-lines: 3;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+
+        if root.action-text != "": VerticalLayout {
+            alignment: center;
+            act := Button {
+                text: root.action-text;
+                kind: ButtonKind.ghost;
+                size: ButtonSize.sm;
+                clicked => { root.action(); }
+                changed has-focus => { root.action-focus = self.has-focus; }
+            }
+        }
+
+        if root.dismissible: VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: @image-url("../icons/x.svg");
+                label: "Dismiss notification";
+                size: IconButtonSize.sm;
+                clicked => { root.dismissed(); }
+                changed has-focus => { root.close-focus = self.has-focus; }
+            }
+        }
+    }
+}

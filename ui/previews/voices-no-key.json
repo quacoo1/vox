@@ -1,0 +1,22 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.no-key"
+    },
+    "in-use": "In use: George",
+    "count": "",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [],
+    "category-options": [],
+    "refreshing": false,
+    "state-title": "Add your ElevenLabs key to browse voices",
+    "state-body": "Voices come straight from your ElevenLabs account — the premade library plus any voices you’ve cloned or designed.",
+    "state-button": "Add API key",
+    "voices": [],
+    "revision": 1
+  }
+}

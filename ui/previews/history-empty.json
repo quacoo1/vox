@@ -1,0 +1,84 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.nothing-yet"
+  },
+  "dimmed": false,
+  "count-label": "0 reads",
+  "actions-visible": false,
+  "exporting": false,
+  "clearing": false,
+  "can-export": false,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "history",
+  "state-title": "Nothing read yet",
+  "state-body": "Select text in any app, right-click and choose “Read with Vox” — or press",
+  "state-keys": [
+   "Ctrl",
+   "Alt",
+   "R"
+  ],
+  "state-body-after": ". Every read lands here.",
+  "state-button": "Paste & read",
+  "rows": [],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

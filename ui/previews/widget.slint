@@ -1,0 +1,53 @@
+// Floating widget + "Read with Vox" chip previews: WidgetWindow / ChipWindow rendered directly with fixture data.
+//   Widget: ui/previews/widget-<state>.json       → shots/ui/widget/<state>-dark.png / -light.png
+//   Chip:   ui/previews/widget-chip-<state>.json  → shots/ui/widget/chip-<state>-dark.png / -light.png
+//   Tips:   ui/previews/widget-tips.slint + .json → shots/ui/widget/tips-dark.png / -light.png (the warning tooltips)
+// Both windows lay their card out at the top-left and never bind their own size, so each render is made at exactly the
+// card's size (listed below; measured from a first, larger render's opaque bounds). The rounded corners must come out
+// fully transparent (alpha 0). Renders use --scale 2. Light renders add --set Theme.dark=false: the app keeps both
+// windows dark (D-USW-20); the light renders only check that nothing bypasses the Theme tokens.
+// Fixtures keep `card-key` / `sentence-key` / `show-key` at 0 so no card / sentence enter animation runs at snapshot
+// time. A toast banner or compact toast fades in when it appears, and vox-shot's off-screen window advances that fade
+// late, so renders use --wait 1800.
+//   target/release/vox-shot ui/previews/widget.slint --component WidgetWindow \
+//       --data ui/previews/widget-reading.json --size 380x198 --scale 2 --wait 1800 --out shots/ui/widget/reading-dark.png
+//   target/release/vox-shot ui/previews/widget.slint --component ChipWindow \
+//       --data ui/previews/widget-chip-context.json --size 131x34 --scale 2 --out shots/ui/widget/chip-context-dark.png
+//
+// Full card 380×198 (spec §6.8 matrix):
+//   idle               no session: product name, "Nothing playing" + hint, empty inert line, "Ready"
+//   synthesizing       loading, no audio: every word upcoming, loader, prev/next disabled, Pause, ≈ time, no knob
+//   starting           loading with audio: loader + "Starting", transport enabled, buffered segment
+//   reading            playing: word highlight (spoken / underlined current / muted upcoming), level bars, −time
+//   reading-estimate   1.25× speed pill, first word current, one-line sentence, ≈ time (synthesis still running)
+//   paused             still bars, "Paused", Play
+//   finished           title body, check, total time, next disabled, Play again
+//   stopped-early      ended + warning link "Stopped early · out of credits ›", alert glyph, Play again
+//   stops-early        warning (plain, tooltip only) "Stops early · connection lost" while reading
+//   stops-early-link   warning link while paused ("no API key")
+//   replay-partial     cached replay of a preview-only record: title body, Back / Forward 10 seconds
+//   banner             info toast banner replacing the sentence
+//   banner-action      error toast banner with an action pill, on a read that will stop early
+//   banner-title       titled success banner: "History exported" over the saved path (two lines, in full) + Open
+//   long               long source / voice (elided), 1.75×, long sentence scrolled to the current word's line, −1:02:03
+//   long-start         the same sentence at its start (no scroll), 0.75×
+//   long-end           last word: the scroll stops at the last two full lines
+//   long-title         finished with a long title (two lines, elided) and an hour-long total
+//   sentence-url       the current word is a long URL that wraps: the view keeps the line where it starts on top
+//   sentence-punct     scrolled past a line of ( ) [ ] / _ | (their descenders never bleed into the top line)
+// Error card 380 w: error 188 (Open settings), error-retry 188 (Try again), error-plain 171 (no action), long-error 205
+//   (long source, one-line title, three-line detail elided), error-two-line 211 (two-line title, no action),
+//   banner-error 188 (toast banner over the error body).
+// Standalone toast card 380 w: toast 52 (info, one line), toast-title 88 (success + title + path), toast-long-title 90
+//   (error, two-line title), toast-action 114 (error + primary action), long-toast 149 (title + three lines elided +
+//   action).
+// Compact pill 340×48: compact-reading, compact-synthesizing (loader), compact-starting (loading with audio: the bar),
+//   compact-paused, compact-finished (Play again, full bar), compact-replay-partial, compact-stopped-early (link note
+//   replaces bar and time; grip), compact-stopped-early-plain, compact-stops-early (red dot 6 px before the time),
+//   compact-toast (link with chevron), compact-toast-plain, compact-long (hour time), compact-long-toast (two lines,
+//   elided).
+// Chip 131×34 / 77×34: chip-context ("Read with Vox"), chip-selection ("Read"), chip-no-art (placeholder dot).
+export { Theme } from "../design/theme.slint";
+export { Brand, Motion } from "../models.slint";
+export { WidgetWindow } from "../windows/widget-window.slint";
+export { ChipWindow } from "../windows/chip-window.slint";

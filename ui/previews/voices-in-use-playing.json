@@ -1,0 +1,136 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: George",
+    "count": "2 of 24",
+    "gender": "male",
+    "accent": "british",
+    "category": "",
+    "gender-options": [
+      {
+        "value": "",
+        "label": "All",
+        "accessible-label": "All genders"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "accessible-label": "Female"
+      },
+      {
+        "value": "male",
+        "label": "Male",
+        "accessible-label": "Male"
+      },
+      {
+        "value": "neutral",
+        "label": "Neutral",
+        "accessible-label": "Neutral"
+      }
+    ],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "australian",
+        "label": "Australian",
+        "accessible-label": "Australian"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      },
+      {
+        "value": "irish",
+        "label": "Irish",
+        "accessible-label": "Irish"
+      },
+      {
+        "value": "swedish",
+        "label": "Swedish",
+        "accessible-label": "Swedish"
+      },
+      {
+        "value": "transatlantic",
+        "label": "Transatlantic",
+        "accessible-label": "Transatlantic"
+      }
+    ],
+    "category-options": [
+      {
+        "value": "",
+        "label": "All types",
+        "accessible-label": "All types"
+      },
+      {
+        "value": "cloned",
+        "label": "Cloned",
+        "accessible-label": "Cloned"
+      },
+      {
+        "value": "generated",
+        "label": "Designed",
+        "accessible-label": "Designed"
+      },
+      {
+        "value": "premade",
+        "label": "Premade",
+        "accessible-label": "Premade"
+      },
+      {
+        "value": "professional",
+        "label": "Professional",
+        "accessible-label": "Professional"
+      }
+    ],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "onwK4e9ZLuTAKqWW03F9",
+        "name": "Daniel",
+        "art": {
+          "$image": "art/thumb-daniel.png"
+        },
+        "subtitle": "Male · British · News",
+        "description": "Authoritative, measured newsreader.",
+        "tags": [],
+        "caption": "News",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "JBFqnCBsd6RMkjVDRZzb",
+        "name": "George",
+        "art": {
+          "$image": "art/thumb-george.png"
+        },
+        "subtitle": "Male · British · Narration",
+        "description": "Warm, mature storyteller with a gentle rasp.",
+        "tags": [],
+        "caption": "Narration",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.playing"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

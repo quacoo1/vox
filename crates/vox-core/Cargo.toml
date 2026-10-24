@@ -1,0 +1,17 @@
+[package]
+name = "vox-core"
+description = "Vox shared contracts: settings schema, history records, player/read/TTS types, ledger, formatting, hotkeys, geometry. Pure: no I/O, no Windows APIs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+regex.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]

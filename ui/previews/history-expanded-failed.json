@@ -1,0 +1,294 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.list"
+  },
+  "dimmed": false,
+  "count-label": "3 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "",
+  "state-title": "",
+  "state-body": "",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "",
+  "rows": [
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Today",
+    "header-label": "Today",
+    "header-meta": "3 reads · 6m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "f1",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-lily.png"
+    },
+    "source-icon": "text-select",
+    "source-label": "Selection popup",
+    "title": "Chapter 3. The garden had gone quiet by the time she returned, and the gate stood open.",
+    "meta": "Word · Lily · ~0:48 · 5 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 3:20 PM",
+    "favorite": false,
+    "badges": [
+     "Failed"
+    ],
+    "progress": 0.0,
+    "percent": "0%",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "Replay",
+    "replay-tooltip": "Audio no longer cached and full text wasn’t saved",
+    "expanded": true,
+    "full-text": "Chapter 3. The garden had gone quiet by the time she returned, and the gate stood open. Somewhere beyond the hedge a radio was playing the same three bars of a song she almost remembered.",
+    "notes": [
+     "Only a short preview was saved for this read (full text storage is off).",
+     "ElevenLabs couldn’t generate the audio: the voice “Lily” isn’t available on your plan."
+    ],
+    "facts": [
+     {
+      "label": "Chars",
+      "value": "160",
+      "tooltip": "160 characters"
+     },
+     {
+      "label": "Words",
+      "value": "33",
+      "tooltip": "33 words"
+     },
+     {
+      "label": "Credits",
+      "value": "0",
+      "tooltip": "0 characters billed"
+     },
+     {
+      "label": "Heard",
+      "value": "0%",
+      "tooltip": "0% listened"
+     }
+    ],
+    "details": [
+     {
+      "label": "Source",
+      "value": "Selection popup · Word",
+      "tooltip": ""
+     },
+     {
+      "label": "Voice",
+      "value": "Lily · Eleven Multilingual v2",
+      "tooltip": ""
+     },
+     {
+      "label": "Audio",
+      "value": "about 0:48",
+      "tooltip": ""
+     },
+     {
+      "label": "Read",
+      "value": "Friday, October 17, 2026 at 3:20 PM",
+      "tooltip": ""
+     }
+    ],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "n1",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-matilda.png"
+    },
+    "source-icon": "keyboard",
+    "source-label": "Hotkey",
+    "title": "Shopping list: oat milk, sourdough, lemons, basil, two tins of tomatoes and a bag of espresso beans.",
+    "meta": "Notepad · Matilda · 1:05 · 6 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 2:41 PM",
+    "favorite": true,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 0.56,
+    "percent": "56%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": true,
+    "full-text": "Shopping list: oat milk, sourdough, lemons, basil, two tins of tomatoes and a bag of espresso beans.",
+    "notes": [],
+    "facts": [
+     {
+      "label": "Chars",
+      "value": "102",
+      "tooltip": "102 characters"
+     },
+     {
+      "label": "Words",
+      "value": "18",
+      "tooltip": "18 words"
+     },
+     {
+      "label": "Credits",
+      "value": "102",
+      "tooltip": "102 characters billed"
+     },
+     {
+      "label": "Heard",
+      "value": "56%",
+      "tooltip": "56% listened"
+     }
+    ],
+    "details": [
+     {
+      "label": "Source",
+      "value": "Hotkey · Notepad",
+      "tooltip": ""
+     },
+     {
+      "label": "Window",
+      "value": "shopping-list.txt - Notepad",
+      "tooltip": "shopping-list.txt - Notepad"
+     },
+     {
+      "label": "Voice",
+      "value": "Matilda · Eleven Flash v2.5",
+      "tooltip": ""
+     },
+     {
+      "label": "Audio",
+      "value": "1:05 · saved for free replay",
+      "tooltip": ""
+     },
+     {
+      "label": "Read",
+      "value": "Friday, October 17, 2026 at 2:41 PM",
+      "tooltip": ""
+     }
+    ],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r3",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-brian.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "Why the best interfaces disappear: a short history of calm technology, from Mark Weiser’s ubiquitous computing to today’s ambient assistants.",
+    "meta": "Firefox · Brian · ~6:05 · 3 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 5:12 PM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.62,
+    "percent": "62%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   }
+  ],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

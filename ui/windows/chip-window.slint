@@ -1,0 +1,139 @@
+// The "Read with Vox" chip and the selection popup (DESIGN.md "Read with Vox chip"; ui-settings-widget.md §7;
+// shell.md §6.5). A 34-px pill window; a press anywhere is a chip press: left → activate, other → dismiss, on press
+// (not click); presses are ignored while `data.hiding`. Enter/exit animations only scale (exit 120 ms; 1 ms under
+// Motion.reduce). The Window does **not** bind its own width/height: the pill lays out at the top-left and reports its
+// size (`pill-width`/`pill-height` + `size-changed`); Rust applies position and size in one SetWindowPos. Always dark
+// (Theme.dark = true, D-USW-20).
+//
+// Look: `panel` pill with the `panel-border` hairline, a 16-px round voice-art dot, then the label (13 / 600, `text`):
+// "Read with Vox" in context mode, "Read" in selection mode (the label comes from `data.label`). Hover = `hover` fill;
+// a press scales the pill to 0.96 — the only interactive feedback. Enter (every `show-key` bump): 200 ms, the pill fades
+// in from scale 0.82 and the dot grows from 0.6. Exit (`hiding`): 120 ms ease-in, fade out to scale 0.9.
+// Not focusable; accessible name = the label.
+import { Theme } from "../design/theme.slint";
+import { ArtThumb } from "../design/index.slint";
+import { Motion, ChipData, ChipKind } from "../models.slint";
+
+export component ChipWindow inherits Window {
+    in property <ChipData> data;
+    // An opaque panel pill under the animated pill (see WidgetWindow.opaque-backing: without per-pixel alpha the
+    // enter / exit scale and fade would show black inside the window region). Rust sets it; previews leave it off.
+    in property <bool> opaque-backing;
+    out property <length> pill-width: ceil(lay.preferred-width / 1px) * 1px;
+    out property <length> pill-height: 34px;
+
+    // Pointer-down anywhere in the window: `true` = left button.
+    callback pressed(bool);
+    // The pill's size changed (per label/mode).
+    callback size-changed(length, length);
+
+    property <int> show-key: root.data.show-key;
+    property <bool> entering;
+    property <bool> hiding: root.data.hiding;
+    property <duration> enter-time: Motion.reduce ? 1ms : 200ms;
+    property <duration> exit-time: Motion.reduce ? 1ms : 120ms;
+
+    title: "Vox Chip";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    default-font-family: Theme.font-text;
+
+    init => { root.size-changed(root.pill-width, root.pill-height); }
+    changed pill-width => { root.size-changed(root.pill-width, root.pill-height); }
+    changed pill-height => { root.size-changed(root.pill-width, root.pill-height); }
+    changed show-key => { root.entering = true; }
+
+    enter := Timer {
+        interval: 16ms;
+        running: root.entering;
+        triggered => { root.entering = false; }
+    }
+
+    if root.opaque-backing: Rectangle {
+        x: 0;
+        y: 0;
+        width: root.pill-width;
+        height: root.pill-height;
+        background: Theme.panel;
+        border-radius: self.height / 2;
+    }
+
+    pill := Rectangle {
+        property <float> scale: root.hiding ? 0.9 : root.entering ? 0.82 : touch.pressed ? 0.96 : 1;
+
+        x: 0;
+        y: 0;
+        width: root.pill-width;
+        height: root.pill-height;
+        background: touch.has-hover && !root.hiding ? Theme.hover : Theme.panel;
+        border-radius: self.height / 2;
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+        clip: true;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-scale-x: self.scale * 100%;
+        transform-scale-y: self.scale * 100%;
+        opacity: root.hiding || root.entering ? 0 : 1;
+        animate transform-scale-x, transform-scale-y {
+            duration: root.entering ? 0ms : root.hiding ? root.exit-time : Motion.reduce ? 1ms : touch.pressed ? 80ms : root.enter-time;
+            easing: root.hiding ? ease-in : ease-out;
+        }
+        animate opacity {
+            duration: root.entering ? 0ms : root.hiding ? root.exit-time : root.enter-time;
+            easing: root.hiding ? ease-in : ease-out;
+        }
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        accessible-role: AccessibleRole.button;
+        accessible-label: root.data.label;
+        accessible-action-default => {
+            if (!root.hiding) {
+                root.pressed(true);
+            }
+        }
+
+        lay := HorizontalLayout {
+            padding-left: (root.pill-height - 16px) / 2;
+            padding-right: 14px;
+            spacing: 8px;
+
+            VerticalLayout {
+                alignment: center;
+                dot := ArtThumb {
+                    property <float> scale: root.entering ? 0.6 : 1;
+                    width: 16px;
+                    height: 16px;
+                    round: true;
+                    source: root.data.art;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    transform-scale-x: self.scale * 100%;
+                    transform-scale-y: self.scale * 100%;
+                    animate transform-scale-x, transform-scale-y {
+                        duration: root.entering ? 0ms : root.enter-time;
+                        easing: ease-out;
+                    }
+                }
+            }
+            Text {
+                text: root.data.label;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+
+    }
+    // A press anywhere in the window is a chip press (the window may be a little larger than the pill).
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down && !root.hiding) {
+                root.pressed(e.button == PointerEventButton.left);
+            }
+        }
+    }
+}

@@ -1,0 +1,420 @@
+// Settings → Account (ui-settings-widget.md §2.2). The header badge, the key body (form / demo / stored), the
+// limited-key and migration notices, then the credits card. Every dynamic string comes from `data` (Rust picks the
+// form's copy: `lead`, `field-label`, `hint`, `submit-label`, `error`).
+//
+// Body selection: the key form shows while `form-open` or when no key is stored (state no-key); otherwise the demo
+// body (state demo) or the stored-key body (state stored). The form's Cancel shows whenever a body exists behind it
+// (state demo / stored), and then the field takes focus when the form opens (spec: "Add key" / "Replace" auto-focus).
+// The field stays editable while saving; only the buttons show busy. The error replaces the hint.
+import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, TextField, FormField, Badge, BadgeKind, BadgeDot,
+    NumberText, Skeleton, Divider } from "../../design/index.slint";
+import { AccountData, AccountState, BadgeTone, CreditsState } from "../../models.slint";
+import { SectionHead, Notice, Meter, WrapText, AlertLine } from "parts.slint";
+
+// A 40-px glyph tile for the key bodies (the key itself is never shown).
+component KeyTile inherits Rectangle {
+    in property <image> icon;
+
+    width: 40px;
+    height: 40px;
+    border-radius: Theme.radius-thumb;
+    background: Theme.chip;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    accessible-role: none;
+
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: root.icon;
+        size: 18px;
+        color: Theme.text;
+    }
+}
+
+// 24 masked dots ("API key stored, hidden").
+component MaskedKey inherits HorizontalLayout {
+    spacing: 5px;
+    alignment: start;
+    height: 12px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "API key stored, hidden";
+
+    for i in 24: VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: Theme.text-secondary;
+        }
+    }
+}
+
+export component AccountSection inherits Rectangle {
+    in property <AccountData> data;
+    // The key field's text (in-out; Rust clears it after a successful save / when the form closes).
+    in-out property <string> key-draft;
+
+    // Submit the key field (Enter or the button); Rust trims, validates and answers through `data`.
+    callback save-key(string);
+    // Typing clears the error.
+    callback key-edited();
+    // "Replace" / "Add key" open the form; "Cancel" closes it.
+    callback open-form();
+    callback cancel-form();
+    // "Remove" → confirmation dialog (main window dialog slot).
+    callback remove-key();
+    // "Get a key" / "Manage keys" open elevenlabs.io.
+    callback get-key();
+    // Credits card "Try again".
+    callback credits-retry();
+
+    property <bool> show-form: root.data.form-open || root.data.state == AccountState.no-key;
+    property <bool> can-cancel: root.data.state != AccountState.no-key;
+    property <CreditsState> cs: root.data.credits.state;
+    // Text width beside the 40-px key tile, and inside the credits card (wrapped text needs known widths).
+    property <length> body-width: max(0px, root.width - 40px - Theme.space-4);
+    property <length> card-width: max(0px, root.width - 2 * Theme.space-5);
+
+    // Pinned horizontal size info: conditional blocks below take the section's width explicitly (see parts.slint).
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    horizontal-stretch: 1;
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Account";
+
+    VerticalLayout {
+        spacing: Theme.space-5;
+
+        SectionHead {
+            title: "Account";
+            if root.data.badge.text != "": Badge {
+                text: root.data.badge.text;
+                dot: root.data.badge.tone == BadgeTone.success ? BadgeDot.success
+                    : root.data.badge.tone == BadgeTone.attention ? BadgeDot.danger : BadgeDot.none;
+                kind: root.data.badge.tone == BadgeTone.attention ? BadgeKind.outline : BadgeKind.filled;
+            }
+        }
+
+        // The stored key could not be migrated / read (R-API-key).
+        if root.data.notice != "": Notice {
+            width: root.width;
+            warning: true;
+            body: root.data.notice;
+        }
+
+        // ── A. Key form ──
+        if root.show-form: VerticalLayout {
+            width: root.width;
+            spacing: Theme.space-4;
+
+            if root.data.lead != "": WrapText {
+                width: root.width;
+                text: root.data.lead;
+                size: Theme.size-body;
+                weight: Theme.weight-regular;
+            }
+
+            VerticalLayout {
+                spacing: Theme.space-2;
+                FormField {
+                    label: root.data.field-label;
+                    // The error replaces the hint (drawn below as an AlertLine so long errors wrap).
+                    hint: root.data.error == "" ? root.data.hint : "";
+
+                    key-field := TextField {
+                        text <=> root.key-draft;
+                        icon: Icons.key-round;
+                        placeholder: "sk_…";
+                        password: true;
+                        label: root.data.field-label;
+                        has-error: root.data.error != "";
+                        edited => { root.key-edited(); }
+                        accepted(t) => { root.save-key(t); }
+                        init => {
+                            if (root.can-cancel) {
+                                self.focus-input();
+                            }
+                        }
+                    }
+                }
+                if root.data.error != "": AlertLine {
+                    width: root.width;
+                    text: root.data.error;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                alignment: start;
+                Button {
+                    text: root.data.submit-label;
+                    kind: ButtonKind.primary;
+                    size: ButtonSize.sm;
+                    loading: root.data.busy;
+                    clicked => { root.save-key(root.key-draft); }
+                }
+                if root.can-cancel: Button {
+                    text: "Cancel";
+                    size: ButtonSize.sm;
+                    enabled: !root.data.busy;
+                    clicked => { root.cancel-form(); }
+                }
+                Button {
+                    text: "Get a key";
+                    kind: ButtonKind.ghost;
+                    size: ButtonSize.sm;
+                    trailing-icon: Icons.arrow-up-right;
+                    clicked => { root.get-key(); }
+                }
+            }
+        }
+
+        // ── B. Demo account ──
+        if !root.show-form && root.data.state == AccountState.demo: HorizontalLayout {
+            width: root.width;
+            spacing: Theme.space-4;
+            VerticalLayout {
+                alignment: start;
+                KeyTile { icon: Icons.sparkles; }
+            }
+            VerticalLayout {
+                width: root.body-width;
+                spacing: Theme.space-1;
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    Text {
+                        text: "Demo account";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "Sample data. No key stored.";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+                }
+                WrapText {
+                    width: root.body-width;
+                    text: "Add your own ElevenLabs key to read real text.";
+                }
+                Rectangle { height: Theme.space-3; }
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    Button {
+                        text: "Add key";
+                        kind: ButtonKind.primary;
+                        size: ButtonSize.sm;
+                        icon: Icons.key-round;
+                        clicked => { root.open-form(); }
+                    }
+                    Button {
+                        text: "Get a key";
+                        kind: ButtonKind.ghost;
+                        size: ButtonSize.sm;
+                        trailing-icon: Icons.arrow-up-right;
+                        clicked => { root.get-key(); }
+                    }
+                }
+            }
+        }
+
+        // ── C. Key stored ──
+        if !root.show-form && root.data.state == AccountState.stored: HorizontalLayout {
+            width: root.width;
+            spacing: Theme.space-4;
+            VerticalLayout {
+                alignment: start;
+                KeyTile { icon: Icons.key-round; }
+            }
+            VerticalLayout {
+                width: root.body-width;
+                spacing: Theme.space-1;
+                Text {
+                    text: "ElevenLabs API key";
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                Rectangle { height: 2px; }
+                MaskedKey { }
+                Rectangle { height: 2px; }
+                WrapText {
+                    width: root.body-width;
+                    text: "Encrypted with Windows DPAPI. It never leaves this PC except to call ElevenLabs.";
+                }
+                Rectangle { height: Theme.space-3; }
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    Button {
+                        text: "Replace";
+                        size: ButtonSize.sm;
+                        clicked => { root.open-form(); }
+                    }
+                    Button {
+                        text: "Remove";
+                        kind: ButtonKind.danger;
+                        size: ButtonSize.sm;
+                        loading: root.data.remove-busy;
+                        accessible-text: "Remove API key";
+                        clicked => { root.remove-key(); }
+                    }
+                    Button {
+                        text: "Manage keys";
+                        kind: ButtonKind.ghost;
+                        size: ButtonSize.sm;
+                        trailing-icon: Icons.arrow-up-right;
+                        clicked => { root.get-key(); }
+                    }
+                }
+            }
+        }
+
+        // Limited key: the last save worked but cannot read account info.
+        if root.data.limited-warning != "" && root.data.state == AccountState.stored: Notice {
+            width: root.width;
+            title: "Limited key";
+            body: root.data.limited-warning;
+        }
+
+        // ── Credits ──
+        Rectangle {
+            border-radius: Theme.radius-card;
+            border-width: Theme.hairline;
+            border-color: Theme.divider;
+            accessible-role: groupbox;
+            accessible-label: "Credits";
+
+            VerticalLayout {
+                padding: Theme.space-5;
+                spacing: Theme.space-3;
+
+                HorizontalLayout {
+                    spacing: Theme.space-3;
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "Credits";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-label;
+                        vertical-alignment: center;
+                    }
+                    if root.data.credits.tier != "": Badge { text: root.data.credits.tier; }
+                }
+
+                // Loading: skeletons.
+                if root.cs == CreditsState.loading: VerticalLayout {
+                    spacing: Theme.space-3;
+                    padding-top: Theme.space-1;
+                    HorizontalLayout {
+                        Skeleton { width: 96px; height: 30px; radius: 8px; }
+                    }
+                    Skeleton { height: 4px; }
+                    HorizontalLayout {
+                        Skeleton { width: 180px; height: 10px; }
+                    }
+                }
+
+                // Ready / demo: the big percentage, the meter and the facts.
+                if root.cs == CreditsState.ready || root.cs == CreditsState.demo: VerticalLayout {
+                    width: root.card-width;
+                    spacing: Theme.space-3;
+                    HorizontalLayout {
+                        spacing: Theme.space-4;
+                        NumberText {
+                            text: root.data.credits.percent;
+                            color: root.data.credits.low ? Theme.danger : Theme.text;
+                            vertical-alignment: bottom;
+                            accessible-label: root.data.credits.percent-accessible;
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: end;
+                            padding-bottom: 6px;
+                            Text {
+                                text: root.data.credits.facts;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-label;
+                                font-weight: Theme.weight-medium;
+                                color: Theme.text-secondary;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                    Meter {
+                        value: root.data.credits.fraction;
+                        alert: root.data.credits.low;
+                        label: "Credits left this period";
+                        value-text: root.data.credits.detail;
+                    }
+                    if root.data.credits.reset != "": Text {
+                        text: root.data.credits.reset;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        overflow: elide;
+                    }
+                }
+
+                // No key / restricted key: an empty meter and the message.
+                if root.cs == CreditsState.no-key || root.cs == CreditsState.restricted: VerticalLayout {
+                    width: root.card-width;
+                    spacing: Theme.space-3;
+                    padding-top: Theme.space-1;
+                    Meter {
+                        value: 0;
+                        label: "Credits left";
+                        value-text: root.data.credits.message;
+                    }
+                    WrapText {
+                        width: root.card-width;
+                        text: root.data.credits.message;
+                    }
+                }
+
+                // Error with no older data: the message and Try again.
+                if root.cs == CreditsState.error: HorizontalLayout {
+                    width: root.card-width;
+                    spacing: Theme.space-4;
+                    VerticalLayout {
+                        min-width: 0px;
+                        preferred-width: 0px;
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        AlertLine {
+                            quiet: true;
+                            text: root.data.credits.message;
+                        }
+                    }
+                    if root.data.credits.action-label != "": VerticalLayout {
+                        alignment: center;
+                        Button {
+                            text: root.data.credits.action-label;
+                            size: ButtonSize.sm;
+                            icon: Icons.refresh-cw;
+                            loading: root.data.credits.refreshing;
+                            clicked => { root.credits-retry(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

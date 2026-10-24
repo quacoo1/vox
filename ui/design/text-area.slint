@@ -1,0 +1,116 @@
+// TextArea: a multi-line input (Quick read, notes). `field` fill, `field-border`, radius 12, min 96 h.
+//
+//   in-out text: string               the value
+//   in    placeholder: string         text-muted, top-left
+//   in    enabled: bool, read-only: bool
+//   in    has-error: bool             danger border
+//   in    label: string               accessible label
+//   in    show-focus: bool            draw the focused look without focus (previews)
+//   out   has-focus: bool
+//   callback edited(text: string)
+//   function focus-input(), select-all()
+// Height: set a height or let a layout stretch it (min 96 px). The text word-wraps and scrolls vertically to keep
+// the cursor visible; the wheel scrolls when the text is taller than the box.
+
+import { Theme } from "theme.slint";
+
+export component TextArea inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <bool> enabled: true;
+    in property <bool> read-only <=> input.read-only;
+    in property <bool> has-error: false;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: input.has-focus;
+
+    callback edited(text: string);
+
+    public function focus-input() {
+        input.focus();
+    }
+    public function select-all() {
+        input.select-all();
+    }
+
+    property <bool> focused-look: input.has-focus || root.show-focus;
+    property <length> pad-x: 14px;
+    property <length> pad-y: 12px;
+
+    min-height: 96px;
+    preferred-height: 120px;
+    min-width: 160px;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    border-radius: Theme.radius-field;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: root.has-error ? Theme.danger
+        : root.focused-look ? Theme.field-border-focus
+        : touch.has-hover ? Theme.field-border-focus : Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: input;
+
+    accessible-role: text-input;
+    accessible-label: root.label != "" ? root.label : root.placeholder;
+    accessible-placeholder-text: root.placeholder;
+    accessible-value: root.text;
+    accessible-enabled: root.enabled;
+    accessible-read-only: root.read-only;
+
+    animate border-color { duration: Theme.fast; easing: ease-out; }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+
+    Text {
+        x: root.pad-x;
+        y: root.pad-y;
+        width: root.width - 2 * root.pad-x;
+        text: root.text == "" ? root.placeholder : "";
+        font-family: Theme.font-text;
+        font-size: Theme.size-body;
+        font-weight: Theme.weight-regular;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+
+    flick := Flickable {
+        x: root.pad-x;
+        y: root.pad-y;
+        width: root.width - 2 * root.pad-x;
+        height: root.height - 2 * root.pad-y;
+        interactive: false;
+        content-width: self.width;
+        content-height: max(self.height, input.preferred-height);
+
+        input := TextInput {
+            width: flick.width;
+            height: max(flick.height, self.preferred-height);
+            enabled: root.enabled;
+            single-line: false;
+            wrap: word-wrap;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text;
+            selection-background-color: Theme.selection;
+            selection-foreground-color: Theme.text;
+            page-height: flick.height;
+            accessible-role: none;
+
+            edited => { root.edited(self.text); }
+            cursor-position-changed(pos) => {
+                if (pos.y + flick.content-y < 0px) {
+                    flick.content-y = -pos.y;
+                } else if (pos.y + flick.content-y > flick.height - 20px) {
+                    flick.content-y = min(0px, flick.height - 20px - pos.y);
+                }
+            }
+        }
+    }
+}

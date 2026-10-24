@@ -1,0 +1,22 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.loading"
+    },
+    "in-use": "In use: George",
+    "count": "",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [],
+    "category-options": [],
+    "refreshing": true,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [],
+    "revision": 1
+  }
+}

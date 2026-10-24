@@ -1,0 +1,11 @@
+{
+  "art-george": { "$image": "art/thumb-george.png" },
+  "art-charlotte": { "$image": "art/thumb-charlotte.png" },
+  "art-brian": { "$image": "art/thumb-brian.png" },
+  "art-lily": { "$image": "art/thumb-lily.png" },
+  "art-daniel": { "$image": "art/thumb-daniel.png" },
+  "art-aria": { "$image": "art/thumb-aria.png" },
+  "now-art": { "$image": "art/small-george.png" },
+  "backdrop-dark": { "$image": "art/backdrop-dark.png" },
+  "backdrop-light": { "$image": "art/backdrop-light.png" }
+}

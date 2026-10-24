@@ -1,0 +1,430 @@
+@font-face {
+  font-family: 'Doto';
+  src: url('fonts/doto.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('fonts/space-grotesk.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: block;
+}
+
+:root {
+  --canvas: #ececec;
+  --card: #0b0b0b;
+  --card-2: #1b1b1b;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --text: #ffffff;
+  --text-2: #a6a6a6;
+  --text-3: #6b6b6b;
+  --dot-off: #3a3a3a;
+  --dot-buffer: #6b6b6b;
+  --red: #d71921;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --font-dot: 'Doto', ui-monospace, monospace;
+  --font-title: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --card: #111111;
+    --card-2: #1f1f1f;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--canvas);
+}
+
+body {
+  width: 340px;
+  font: 13px/1.45 var(--font-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 26px;
+  padding: 22px;
+}
+
+.card.small {
+  border-radius: 20px;
+  padding: 16px 18px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+.between {
+  justify-content: space-between;
+}
+.gap-8 {
+  gap: 8px;
+}
+
+.label {
+  /* Small labels in a plain grotesk: Doto turns to stipple at this size (same rule as the app). */
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* ── status ── */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* System UI face: Doto's '.' is a diamond, so 'VOX 0.1.0' would read 'VOX 0+1+0'. */
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-buffer);
+  transition: background-color 200ms var(--ease);
+}
+/* One accent only (red = attention): connected is plain white. */
+.status[data-state='online'] .status-dot {
+  background: #f2f2f2;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+.status[data-state='online'] {
+  color: var(--text);
+}
+.status[data-state='offline'] .status-dot {
+  background: var(--red);
+  box-shadow: 0 0 0 3px rgba(215, 25, 33, 0.18);
+}
+.status[data-state='checking'] .status-dot {
+  animation: blink 1s steps(2, jump-none) infinite;
+}
+
+/* ── hero ── */
+.title {
+  margin: 18px 0 2px;
+  font: 500 24px/1.15 var(--font-title);
+  letter-spacing: -0.01em;
+}
+.sub {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.sub b,
+.hint b,
+.steps b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Dotted strip, like the reference progress bars: lit while Vox is reachable, a wave while it plays. */
+.meter {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+  margin: 18px 0 18px;
+}
+.meter i {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--dot-off);
+  transition: background-color 200ms var(--ease);
+  transition-delay: calc(var(--i) * 14ms);
+}
+.meter[data-state='online'] i {
+  background: var(--dot-buffer);
+}
+.meter[data-state='online'] i:nth-child(-n + 6) {
+  background: var(--text);
+}
+.meter[data-state='offline'] i:first-child {
+  background: var(--red);
+}
+.meter[data-state='playing'] i {
+  background: var(--text);
+  animation: wave 1.4s var(--ease) infinite;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+/* ── buttons ── */
+.actions {
+  gap: 8px;
+}
+.btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-2);
+  color: var(--text);
+  font: 500 13px/1 var(--font-ui);
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease),
+    transform 180ms var(--ease),
+    opacity 180ms var(--ease);
+}
+.btn:hover {
+  background: #2a2a2a;
+}
+.btn-primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+.btn-primary:hover {
+  background: #e4e4e4;
+}
+.btn:active,
+.icon-btn:active {
+  transform: scale(0.97);
+}
+.btn[aria-busy='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.transport {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-2);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease),
+    opacity 180ms var(--ease),
+    transform 180ms var(--ease);
+}
+.icon-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.icon-btn .icon-play,
+.icon-btn[data-playing='false'] .icon-pause {
+  display: none;
+}
+.icon-btn[data-playing='false'] .icon-play {
+  display: block;
+}
+
+:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+.btn-primary:focus-visible {
+  outline-color: var(--red);
+}
+
+/* ── notice ── */
+.notice {
+  display: grid;
+  grid-template-columns: 8px 1fr 24px;
+  gap: 10px;
+  align-items: start;
+  margin-top: 14px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 16px;
+  background: var(--card-2);
+}
+.notice[hidden] {
+  display: none;
+}
+.notice-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.notice[data-kind='ok'] .notice-dot {
+  background: var(--text);
+}
+.notice-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.notice-text small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.notice-close {
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.notice-close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+.notice-close svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* ── port ── */
+.port {
+  width: 92px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-2);
+  color: var(--text);
+  font: 700 16px/1 var(--font-dot);
+  letter-spacing: 0.06em;
+  text-align: center;
+  transition: border-color 160ms var(--ease);
+}
+.port:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.port:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+.port[aria-invalid='true'] {
+  border-color: var(--red);
+}
+.hint {
+  margin: 10px 0 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+/* ── how-to ── */
+.steps {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.steps li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.num {
+  font: 800 16px/1 var(--font-dot);
+  color: var(--text);
+}
+.keys {
+  white-space: nowrap;
+}
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--card-2);
+  color: var(--text);
+  font: 500 11px/16px var(--font-ui);
+  text-align: center;
+}
+a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 2px;
+}
+a:hover {
+  text-decoration-color: var(--text);
+}
+.privacy {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes wave {
+  0%,
+  100% {
+    background: var(--dot-buffer);
+  }
+  30% {
+    background: var(--text);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

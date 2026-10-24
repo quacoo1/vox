@@ -1,0 +1,1570 @@
+// The floating player (DESIGN.md "Floating widget"; ui-settings-widget.md §6; shell.md §6.3). A frameless, transparent,
+// always-on-top, never-activating window that is exactly the card (380 w full card, 48-h compact pill; radius 20).
+// The Window does **not** bind its own width/height: the card lays out at the window's top-left at its preferred size
+// and reports it through `card-width`/`card-height` + `size-changed`; Rust then applies position and size in one
+// SetWindowPos (keeping the anchored edges fixed, shell.md §6.3.3) and Slint follows WM_SIZE — so a bottom-anchored
+// card never grows downward for a frame. Rust starts a native move from `drag-start` (pointer-down on a text/label
+// handle — never on a control). Always dark (Theme.dark = true, D-USW-20). The card replays its enter animation when
+// `data.card-key` changes (0 ms under Motion.reduce). Compact pill (D-USW-21): art dot, play/pause, then the compact
+// toast / ended-early note / "Synthesizing" loader / small progress bar, time, close.
+//
+// Views (`data.view`, chosen by Rust per spec §6.2):
+//   full     380 w. Header: voice art, source over voice (the warning note takes the voice's place), speed pill,
+//            close. Body (exactly two sentence lines): the sentence with word highlighting (`body: sentence`), the
+//            title (`title`) or the toast banner (`banner`: glyph, title over a two-line message, action pill;
+//            centred in the whole body band). Seek line. Footer: status glyph + label (left), previous / play-pause /
+//            next (centred), time (right).
+//   idle     the full card's frame: product name, "Nothing playing" + the hint, an empty inert line, "Ready", close.
+//   error    380 w. Header without the speed pill; a danger glyph + error title (Display) + detail (or the banner);
+//            footer: red light + status label, the action pill ("Open settings" / "Try again") when set.
+//   toast    380 w standalone toast: the bare kind glyph (no tile, never a red fill, as the app's toasts), title
+//            (two lines) over the message (three), the action pill under the text, close; glyph and close sit on the
+//            first text line.
+//   compact  340 × 48 pill: art dot, play/pause, middle (compact toast | ended-early note | Synthesizing loader |
+//            small seek line), right (red dot 6 px before the time, or an invisible grip when the middle holds a
+//            note), close. Rhythm: art (concentric with the left cap), 10, play, 14, middle.
+// Drag handles (contracts.md §1.4, shell.md §6.3.5): the art, the source / voice labels, the sentence or title body,
+// the banner and toast glyph + message, the status label, the time, the compact loader / plain note / grip. Every
+// handle is its own box; no control (buttons, the seek line, the warning link) ever sits inside one. A handle gets no
+// mouse moves, so text whose tooltip matters (the warning note, the compact red dot) is never a handle. A warning
+// link's hit area covers the whole 36-px label column (source line included, which then stops being a handle), so the
+// link meets the 32-px minimum target (spec §6.12) without touching a handle.
+// Tooltips: the warning note and the compact red dot carry the raw engine message, so they use WarningTip (the
+// TooltipBubble look, 300 px wide, up to 6 lines; one line in the 48-px pill). Slint draws widget tooltips as
+// ChildWindow popups clipped to this window: they can never leave the card.
+// Sentence (spec §6.10): one StyledText (spoken `text`, current word `text` underlined, upcoming `text-muted`) in a
+// two-line viewport; a long sentence scrolls so the line where the current word starts is the top line (never past
+// the last full lines). Invisible copies of "spoken + current", "spoken" and "current" measure that line (greedy
+// wrapping of a prefix breaks exactly like the whole sentence): the prefix's last line minus the extra lines of a
+// word that wraps; a word with a break inside (URL, path, hyphen) may start on the spoken text's last line, so the
+// view keeps that line on top.
+// While scrolled, the viewport clips 1 px below its top so descenders of the hidden line above never bleed in. A new
+// `sentence-key` fades the sentence in (240 ms, +4 px). A new toast `key` fades the banner / compact toast in (180 ms,
+// +4 px). Every animation is 0 ms under Motion.reduce.
+// Size: full / idle 380×198 (the body is always two sentence lines, so status changes never resize the window); error
+// and toast cards hug their text (error 171–228, toast 52–168); compact 340×48. Rust receives the size rounded up to
+// whole pixels. The card is `panel` at 96 % alpha with the `panel-border` hairline; everything outside its rounded
+// corners stays transparent. Wrapped text that sets the card height is never inside an `if` (a conditional wrapper
+// loses height-for-width in the preferred height).
+// Icons: the idle "logo mark" uses `audio-lines` (there is no product-mark icon in ui/icons).
+import { Theme } from "../design/theme.slint";
+import {
+    Icons, Icon, Pressable, FocusRing, Button, ButtonKind, ButtonSize, IconButton, IconButtonKind, IconButtonSize,
+    ProgressLine, ArtThumb, Tip, Spinner
+} from "../design/index.slint";
+import { Brand, Motion, WidgetData, PlayerAction, WidgetView, WidgetBody, PlayerPhase, MainAction, ToastData, ToastTone } from "../models.slint";
+
+// ───────────────────────────── metrics ─────────────────────────────
+
+global WidgetMetrics {
+    out property <length> full-width: 380px;
+    out property <length> compact-width: 340px;
+    out property <length> compact-height: 48px;
+    out property <length> pad-x: 18px;
+    out property <length> art: 36px;
+    out property <length> time-width: 48px;
+    out property <duration> enter: 180ms;
+}
+
+// ───────────────────────────── small private helpers ─────────────────────────────
+
+// A window-drag handle: pointer-down with the left button starts a native move (Rust: `drag-start`). It fills its
+// parent and must only ever be placed in text / label / art boxes, never around a control.
+component Handle inherits TouchArea {
+    callback start();
+    mouse-cursor: MouseCursor.default;
+    pointer-event(event) => {
+        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+            root.start();
+        }
+    }
+}
+
+// The warning tooltip's bubble: TooltipBubble's look (Theme.tooltip fill, 12 / 600 `on-tooltip` text, radius 10, a
+// pill when one line, the same padding), but up to 300 px wide and `max-lines` lines (6 on the card, so
+// "{message}\nOpen settings" shows in full; 1 in the 48-px pill, where the newline reads as a space). Exported only so
+// the previews can render it (ui/previews/widget-tips.slint).
+export component WidgetTipBubble {
+    in property <string> text;
+    in property <int> max-lines: 6;
+    in property <length> max-text-width: 300px;
+
+    property <bool> one-line: label.preferred-height < 24px;
+
+    preferred-width: lay.preferred-width;
+    preferred-height: lay.preferred-height;
+    min-width: lay.min-width;
+    min-height: lay.min-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Rectangle {
+        border-radius: root.one-line ? root.height / 2 : 10px;
+        background: Theme.tooltip;
+        drop-shadow-blur: 12px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    lay := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+
+        label := Text {
+            max-width: root.max-text-width;
+            // On one line (the pill), "{message}\nOpen settings" reads as one sentence.
+            text: root.max-lines == 1 ? root.text.replace-all("\n", " ") : root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.on-tooltip;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            max-lines: root.max-lines;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+}
+
+// Attaches a WidgetTipBubble tooltip to the element it is placed in (fills its parent, like the design Tip).
+component WarningTip inherits Rectangle {
+    in property <string> text;
+    in property <int> max-lines: 6;
+
+    background: transparent;
+
+    if root.text != "": Tooltip {
+        WidgetTipBubble {
+            // One line (the pill): the message and "Open settings" read as one sentence.
+            text: root.text;
+            max-lines: root.max-lines;
+        }
+    }
+}
+
+// Three small bars that move while audio plays; still when paused or under reduced motion.
+component LevelBars {
+    in property <bool> active;
+
+    property <bool> moving: root.active && !Motion.reduce;
+    property <float> t: root.moving ? mod(animation-tick() / 1ms, 900) / 900 : 0;
+
+    width: 14px;
+    height: 14px;
+    accessible-role: none;
+
+    for i in 3: Rectangle {
+        property <float> level: root.moving ? 0.5 + 0.5 * sin((root.t + i * 0.27) * 360deg)
+            : root.active ? (i == 1 ? 0.9 : 0.55) : (i == 1 ? 0.6 : 0.35);
+        x: i * 5px;
+        width: 3px;
+        height: 4px + 10px * self.level;
+        y: root.height - self.height;
+        border-radius: 1.5px;
+        background: root.active ? Theme.text : Theme.text-secondary;
+    }
+}
+
+// The status glyph before the status label: red light (error), loader (loading), level bars (playing / paused),
+// alert (stopped early), check (finished), else the logo mark.
+component StatusGlyph {
+    in property <PlayerPhase> phase;
+    in property <bool> loading;
+    in property <bool> error;
+    in property <bool> stopped-early;
+
+    width: 16px;
+    height: 16px;
+    accessible-role: none;
+
+    if root.error: Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: Theme.danger-soft;
+        Rectangle {
+            x: 3px;
+            y: 3px;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: Theme.danger;
+        }
+    }
+    if !root.error && root.loading: Spinner {
+        width: 100%;
+        height: 100%;
+        size: 13px;
+        label: "";
+        accessible-role: none;
+    }
+    if !root.error && !root.loading && (root.phase == PlayerPhase.playing || root.phase == PlayerPhase.paused): LevelBars {
+        x: 1px;
+        y: 1px;
+        active: root.phase == PlayerPhase.playing;
+    }
+    if !root.error && !root.loading && root.phase == PlayerPhase.ended: Icon {
+        width: 100%;
+        height: 100%;
+        source: root.stopped-early ? Icons.triangle-alert : Icons.check;
+        size: 15px;
+        color: root.stopped-early ? Theme.danger : Theme.text;
+    }
+    if !root.error && !root.loading && (root.phase == PlayerPhase.idle || root.phase == PlayerPhase.loading): Icon {
+        width: 100%;
+        height: 100%;
+        source: Icons.audio-lines;
+        size: 15px;
+        color: Theme.text-muted;
+    }
+}
+
+// Status glyph + label ("Reading", "Synthesizing", "Stopped early", …). The label is a drag handle.
+component StatusLabel inherits HorizontalLayout {
+    in property <string> text;
+    in property <PlayerPhase> phase;
+    in property <bool> loading;
+    in property <bool> error;
+    in property <bool> stopped-early;
+    callback drag();
+
+    spacing: 8px;
+    alignment: start;
+
+    VerticalLayout {
+        alignment: center;
+        StatusGlyph {
+            phase: root.phase;
+            loading: root.loading;
+            error: root.error;
+            stopped-early: root.stopped-early;
+        }
+    }
+    Text {
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-semibold;
+        color: root.error || root.stopped-early ? Theme.text : Theme.text-secondary;
+        vertical-alignment: center;
+        overflow: elide;
+        min-width: 0px;
+        accessible-role: AccessibleRole.text;
+        accessible-label: self.text;
+        // "Reading" → "Paused" → "Finished" / "Stopped early" are announced (spec §6.3: polite).
+        accessible-live-region: AccessibleLiveness.polite;
+        Handle {
+            start => { root.drag(); }
+        }
+    }
+}
+
+// The remaining / total time. Callers give it the fixed `time-width` box (no jitter while it ticks), except next to
+// the compact red dot, where it hugs its text. `≈` estimates are dimmer.
+component TimeLabel inherits Text {
+    in property <bool> estimate;
+    in property <string> spoken;
+    callback drag();
+
+    horizontal-stretch: 0;
+    font-family: Theme.font-text;
+    font-size: Theme.size-caption;
+    font-weight: Theme.weight-semibold;
+    color: root.estimate ? Theme.text-muted : Theme.text-secondary;
+    horizontal-alignment: right;
+    vertical-alignment: center;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.spoken != "" ? root.spoken : root.text;
+
+    Handle {
+        start => { root.drag(); }
+    }
+}
+
+// The close glyph (28-px ghost circle) with an invisible 32-px hit area around it (spec §6.12: minimum hit target).
+component CloseButton inherits Rectangle {
+    callback clicked();
+
+    width: 32px;
+    height: 32px;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+    IconButton {
+        x: 2px;
+        y: 2px;
+        icon: Icons.x;
+        label: "Close";
+        tooltip: "Close";
+        size: IconButtonSize.sm;
+        clicked => { root.clicked(); }
+    }
+}
+
+// The main transport circle: Pause / Play / Play again.
+component MainButton inherits IconButton {
+    in property <MainAction> main-action;
+
+    icon: root.main-action == MainAction.pause ? Icons.pause-fill
+        : root.main-action == MainAction.play ? Icons.play-fill : Icons.rotate-ccw;
+    label: root.main-action == MainAction.pause ? "Pause"
+        : root.main-action == MainAction.play ? "Play"
+        : root.main-action == MainAction.play-again ? "Play again" : "Try again";
+    kind: IconButtonKind.primary;
+}
+
+// The warning note ("Stops early · out of credits"). Settings-fixable codes make it a link (chevron) to Settings →
+// Account; otherwise plain text with the raw message as tooltip. Never a drag handle (its tooltip needs mouse moves).
+//   full layout: red dot, "{lead} · {reason}" on one line; compact: lead over reason, no " · ".
+// The hit / tooltip box can reach past the note (`hit-top` above, `hit-bottom` below, `hit-width` wide; 0 = the
+// note's own width): the card header stretches a link over the whole label column so it is at least 32 px tall.
+component WarningNote inherits Rectangle {
+    in property <string> lead;
+    in property <string> reason;
+    in property <bool> link;
+    in property <string> tooltip;
+    in property <bool> compact;
+    in property <length> hit-top;
+    in property <length> hit-bottom;
+    in property <length> hit-width;
+    // Tooltip lines (the 48-px pill keeps it to one).
+    in property <int> tip-lines: 6;
+    callback clicked();
+
+    property <bool> hot: root.link && press.has-hover;
+
+    min-width: 0px;
+    preferred-width: lay.preferred-width;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    forward-focus: press;
+    accessible-role: none;
+
+    // The accessible node (the role must be constant): a link-like button, or plain text.
+    if root.link: Rectangle {
+        accessible-role: AccessibleRole.button;
+        accessible-label: root.lead + ": " + root.reason + ". Open settings";
+        accessible-action-default => { root.clicked(); }
+    }
+    if !root.link: Rectangle {
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.lead + ": " + root.reason;
+    }
+
+    lay := HorizontalLayout {
+        spacing: root.compact ? 8px : 6px;
+        alignment: start;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.danger;
+            }
+        }
+        if !root.compact: Text {
+            text: root.lead + " · " + root.reason;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            min-width: 0px;
+            horizontal-stretch: 0;
+            accessible-role: none;
+        }
+        if root.compact: VerticalLayout {
+            alignment: center;
+            spacing: 0px;
+            min-width: 0px;
+            horizontal-stretch: 0;
+            Text {
+                text: root.lead;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            Text {
+                text: root.reason;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+        if root.link: VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Icons.chevron-right;
+                size: 14px;
+                color: root.hot ? Theme.text : Theme.text-secondary;
+            }
+        }
+    }
+
+    FocusRing {
+        radius: 6px;
+        gap: 2px;
+        shown: press.focus-visible;
+    }
+    // The hit box (and the tooltip's hover box): the note, or the wider / taller box the owner asked for.
+    Rectangle {
+        x: 0;
+        y: -root.hit-top;
+        width: root.hit-width > 0 ? min(root.width, root.hit-width) : root.width;
+        height: root.height + root.hit-top + root.hit-bottom;
+
+        press := Pressable {
+            enabled: root.link;
+            cursor: root.link ? MouseCursor.pointer : MouseCursor.default;
+            activated => { root.clicked(); }
+        }
+        WarningTip {
+            text: root.tooltip;
+            max-lines: root.tip-lines;
+        }
+    }
+}
+
+// The kind glyph of a toast: alert (error, in `danger`), check (success), info.
+component ToastGlyph inherits Icon {
+    in property <ToastTone> tone;
+    source: root.tone == ToastTone.error ? Icons.circle-alert
+        : root.tone == ToastTone.success ? Icons.circle-check : Icons.info;
+    color: root.tone == ToastTone.error ? Theme.danger : Theme.text;
+}
+
+// Replays a short enter (fade + 4 px rise, 180 ms) on creation and whenever `key` changes; 0 ms under Motion.reduce.
+// Its content is laid out by the owner inside it (it fills the owner's box).
+component EnterFade inherits Rectangle {
+    in property <int> key;
+
+    property <bool> entering: true;
+    changed key => { root.entering = true; }
+
+    Timer {
+        interval: 16ms;
+        running: root.entering;
+        triggered => { root.entering = false; }
+    }
+
+    // The owner's children, moved and faded together.
+    Rectangle {
+        y: root.entering ? 4px : 0px;
+        height: root.height;
+        opacity: root.entering ? 0 : 1;
+        animate y, opacity {
+            duration: root.entering || Motion.reduce ? 0ms : 180ms;
+            easing: ease-out;
+        }
+        @children
+    }
+}
+
+// The toast banner that replaces the full / error card's body: glyph, title (one line) over the message (up to two
+// lines; a drag handle), action pill. It is centred in the card's whole body band, so a titled toast keeps two message
+// lines (a saved path such as "C:\Users\…\Vox history 2026-10-17.csv" shows in full). With a title the glyph sits on
+// the title line, as in the app's toasts.
+component ToastBanner inherits Rectangle {
+    in property <ToastData> toast;
+    callback action();
+    callback drag();
+
+    property <bool> has-title: root.toast.title != "";
+
+    min-width: lay.min-width;
+    preferred-width: lay.preferred-width;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.has-title ? root.toast.title + ". " + root.toast.message : root.toast.message;
+    accessible-live-region: root.toast.tone == ToastTone.error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+
+    EnterFade {
+        key: root.toast.key;
+
+        lay := HorizontalLayout {
+            spacing: 12px;
+
+            Rectangle {
+                width: 20px;
+                ToastGlyph {
+                    x: 0;
+                    y: root.has-title ? (parent.height - texts.preferred-height) / 2 + (title.preferred-height - self.height) / 2
+                        : (parent.height - self.height) / 2;
+                    width: 20px;
+                    height: 20px;
+                    tone: root.toast.tone;
+                    size: 18px;
+                }
+            }
+            texts := VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+
+                // Always laid out; collapsed without a title.
+                VerticalLayout {
+                    padding-bottom: root.has-title ? 1px : 0px;
+                    title := Text {
+                        height: root.has-title ? self.preferred-height : 0px;
+                        visible: root.has-title;
+                        text: root.toast.title;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        overflow: elide;
+                        accessible-role: none;
+                        Handle {
+                            start => { root.drag(); }
+                        }
+                    }
+                }
+                Text {
+                    text: root.toast.message;
+                    font-family: Theme.font-text;
+                    font-size: root.has-title ? Theme.size-label : Theme.size-body;
+                    font-weight: Theme.weight-medium;
+                    color: root.has-title ? Theme.text-secondary : Theme.text;
+                    wrap: word-wrap;
+                    max-lines: 2;
+                    overflow: elide;
+                    accessible-role: none;
+                    Handle {
+                        start => { root.drag(); }
+                    }
+                }
+            }
+            if root.toast.action-label != "": VerticalLayout {
+                alignment: center;
+                Button {
+                    text: root.toast.action-label;
+                    kind: ButtonKind.secondary;
+                    size: ButtonSize.sm;
+                    clicked => { root.action(); }
+                }
+            }
+        }
+    }
+}
+
+// The sentence with word highlighting in an exactly-two-line viewport (module header).
+component SentenceView inherits Rectangle {
+    in property <string> spoken;
+    in property <string> current;
+    in property <string> upcoming;
+    in property <int> sentence-key;
+    callback drag();
+
+    // Height of one sentence line (the parent sizes the viewport to two of them).
+    out property <length> line-height: one.preferred-height;
+
+    property <string> sep-a: root.spoken != "" && (root.current != "" || root.upcoming != "") ? " " : "";
+    property <string> sep-b: root.current != "" && root.upcoming != "" ? " " : "";
+    property <length> lh: max(1px, root.line-height);
+    property <length> content-height: full.preferred-height;
+    // Line counts of "spoken + current", of "spoken" and of the current word laid out on its own.
+    property <int> prefix-lines: round(prefix.preferred-height / root.lh);
+    property <int> spoken-lines: root.spoken == "" ? 0 : round(sp.preferred-height / root.lh);
+    property <int> current-lines: max(1, round(cur.preferred-height / root.lh));
+    // A word with a break opportunity inside (URL, path, hyphenated word) can leave its first piece on the spoken
+    // text's last line; any other word starts a line of its own when it does not fit.
+    property <bool> breakable: root.current.replace-all("/", "") != root.current
+        || root.current.replace-all("-", "") != root.current
+        || root.current.replace-all("–", "") != root.current
+        || root.current.replace-all("—", "") != root.current;
+    // The line where the current word starts.
+    property <int> current-line: root.current == "" ? 0
+        : root.breakable && root.prefix-lines > root.spoken-lines ? max(0, root.spoken-lines - 1)
+        : max(0, root.prefix-lines - root.current-lines);
+    property <length> offset: max(0px, min(root.current-line * root.line-height, root.content-height - root.height));
+    // While scrolled, clip 1 px below the top: descenders of the hidden line above (/ ( ) [ ] _ |, a wrapped
+    // underline) can reach about a pixel into the first visible line's box, which only holds ascent space there.
+    property <length> inset: root.offset > 0 ? 1px : 0px;
+    // The sentence's top in this viewport: scrolled up by `offset`, or 4 px low while a new sentence fades in.
+    property <length> text-y: root.entering ? 4px : -root.offset;
+    animate text-y {
+        duration: root.entering || Motion.reduce ? 0ms : 260ms;
+        easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    property <int> key: root.sentence-key;
+    property <bool> entering;
+    changed key => { root.entering = true; }
+
+    clip: true;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.spoken + root.sep-a + root.current + root.sep-b + root.upcoming;
+
+    fade := Timer {
+        interval: 16ms;
+        running: root.entering;
+        triggered => { root.entering = false; }
+    }
+
+    // Measuring copies (transparent): one line, the text up to the current word, the spoken words, the current word.
+    one := StyledText {
+        x: 0;
+        y: 0;
+        width: root.width;
+        default-color: transparent;
+        default-font-family: Theme.font-display;
+        default-font-size: Theme.size-sentence;
+        text: @markdown("Xg");
+        accessible-role: none;
+    }
+    prefix := StyledText {
+        x: 0;
+        y: 0;
+        width: root.width;
+        default-color: transparent;
+        default-font-family: Theme.font-display;
+        default-font-size: Theme.size-sentence;
+        text: @markdown("\{root.spoken}\{root.sep-a}\{root.current}");
+        accessible-role: none;
+    }
+    sp := StyledText {
+        x: 0;
+        y: 0;
+        width: root.width;
+        default-color: transparent;
+        default-font-family: Theme.font-display;
+        default-font-size: Theme.size-sentence;
+        text: @markdown("\{root.spoken}");
+        accessible-role: none;
+    }
+    cur := StyledText {
+        x: 0;
+        y: 0;
+        width: root.width;
+        default-color: transparent;
+        default-font-family: Theme.font-display;
+        default-font-size: Theme.size-sentence;
+        text: @markdown("\{root.current}");
+        accessible-role: none;
+    }
+
+    viewport := Rectangle {
+        x: 0;
+        y: root.inset;
+        width: root.width;
+        height: root.height - root.inset;
+        clip: true;
+
+        full := StyledText {
+            x: 0;
+            // The scroll animates in card coordinates, so moving the clip edge never makes the text jump.
+            y: root.text-y - root.inset;
+            width: root.width;
+            opacity: root.entering ? 0 : 1;
+            default-color: Theme.text;
+            default-font-family: Theme.font-display;
+            default-font-size: Theme.size-sentence;
+            text: @markdown("\{root.spoken}\{root.sep-a}<u>\{root.current}</u>\{root.sep-b}<font color=\"\{Theme.text-muted}\">\{root.upcoming}</font>");
+            accessible-role: none;
+            animate opacity {
+                duration: root.entering || Motion.reduce ? 0ms : 240ms;
+                easing: ease-out;
+            }
+        }
+    }
+
+    Handle {
+        start => { root.drag(); }
+    }
+}
+
+// Header: art, source over voice (or the warning note), speed pill, close.
+component CardHeader inherits HorizontalLayout {
+    in property <image> art;
+    in property <string> source;
+    in property <string> voice;
+    in property <bool> show-rate;
+    in property <string> rate;
+    in property <bool> warning-visible;
+    in property <string> warning-lead;
+    in property <string> warning-reason;
+    in property <bool> warning-link;
+    in property <string> warning-tooltip;
+    callback cycle-rate();
+    callback close();
+    callback warning-clicked();
+    callback drag();
+
+    spacing: 12px;
+    height: WidgetMetrics.art;
+
+    ArtThumb {
+        width: WidgetMetrics.art;
+        height: WidgetMetrics.art;
+        source: root.art;
+        label: root.voice;
+        Handle {
+            start => { root.drag(); }
+        }
+    }
+    // The label column. With a warning link, the link's hit box spans the column's full height (source line included,
+    // which then is no drag handle) and the width of the longer label.
+    col := Rectangle {
+        horizontal-stretch: 1;
+        min-width: 0px;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 1px;
+
+            src := Text {
+                text: root.source;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                min-width: 0px;
+                if !(root.warning-visible && root.warning-link): Handle {
+                    start => { root.drag(); }
+                }
+            }
+            if root.warning-visible: WarningNote {
+                lead: root.warning-lead;
+                reason: root.warning-reason;
+                link: root.warning-link;
+                tooltip: root.warning-tooltip;
+                hit-top: root.warning-link ? self.y : 0px;
+                hit-bottom: root.warning-link ? max(0px, col.height - self.y - self.height) : 0px;
+                hit-width: root.warning-link ? max(src.preferred-width, self.preferred-width) + 4px : 0px;
+                clicked => { root.warning-clicked(); }
+            }
+            if !root.warning-visible && root.voice != "": Text {
+                text: root.voice;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                overflow: elide;
+                min-width: 0px;
+                Handle {
+                    start => { root.drag(); }
+                }
+            }
+        }
+    }
+    if root.show-rate: VerticalLayout {
+        alignment: center;
+        Button {
+            text: root.rate;
+            kind: ButtonKind.secondary;
+            size: ButtonSize.sm;
+            accessible-text: "Playback speed " + root.rate;
+            clicked => { root.cycle-rate(); }
+            Tip { text: "Playback speed"; }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        CloseButton {
+            clicked => { root.close(); }
+        }
+    }
+}
+
+// ───────────────────────────── views ─────────────────────────────
+
+// The full player card (and, with `idle`, the idle card).
+component FullView inherits VerticalLayout {
+    in property <WidgetData> data;
+    in property <bool> idle;
+    callback action(PlayerAction);
+    callback seek(float);
+    callback warning-clicked();
+    callback toast-action();
+    callback drag();
+
+    property <bool> stopped-early: root.data.phase == PlayerPhase.ended && root.data.warning-visible;
+    property <bool> banner: root.data.body == WidgetBody.banner && root.data.toast-visible;
+    property <length> body-height: 2 * measure.line-height;
+
+    padding-left: WidgetMetrics.pad-x;
+    padding-right: 8px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    spacing: 0px;
+
+    CardHeader {
+        art: root.data.art;
+        source: root.idle && root.data.source == "" ? Brand.app-name : root.data.source;
+        voice: root.idle ? "" : root.data.voice;
+        show-rate: !root.idle && root.data.show-rate;
+        rate: root.data.rate;
+        warning-visible: !root.idle && root.data.warning-visible;
+        warning-lead: root.data.warning-lead;
+        warning-reason: root.data.warning-reason;
+        warning-link: root.data.warning-link;
+        warning-tooltip: root.data.warning-tooltip;
+        cycle-rate => { root.action(PlayerAction.cycle-rate); }
+        close => { root.action(PlayerAction.close); }
+        warning-clicked => { root.warning-clicked(); }
+        drag => { root.drag(); }
+    }
+
+    // Body: exactly two sentence lines tall, whatever it shows (a toast banner centres in the whole band, gaps included).
+    Rectangle {
+        height: root.body-height + 12px + 10px;
+
+        // Invisible: one sentence line, so every body kind is exactly two sentence lines tall.
+        measure := StyledText {
+            property <length> line-height: self.preferred-height;
+            x: 0;
+            y: 0;
+            width: 200px;
+            height: 0px;
+            opacity: 0;
+            default-color: transparent;
+            default-font-family: Theme.font-display;
+            default-font-size: Theme.size-sentence;
+            text: @markdown("Xg");
+            accessible-role: none;
+        }
+
+        HorizontalLayout {
+            y: root.banner && !root.idle ? 0px : 12px;
+            height: root.banner && !root.idle ? parent.height : root.body-height;
+            padding-right: 10px;
+
+            if root.idle: VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                Text {
+                    text: "Nothing playing";
+                    font-family: Theme.font-display;
+                    font-size: Theme.size-sentence;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text-muted;
+                    overflow: elide;
+                    Handle {
+                        start => { root.drag(); }
+                    }
+                }
+                Text {
+                    text: "Select text, right-click, " + Brand.read-with-label;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-label;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-secondary;
+                    overflow: elide;
+                    Handle {
+                        start => { root.drag(); }
+                    }
+                }
+            }
+            if !root.idle && root.banner: ToastBanner {
+                toast: root.data.toast;
+                action => { root.toast-action(); }
+                drag => { root.drag(); }
+            }
+            if !root.idle && !root.banner && root.data.body == WidgetBody.sentence: SentenceView {
+                spoken: root.data.spoken;
+                current: root.data.current;
+                upcoming: root.data.upcoming;
+                sentence-key: root.data.sentence-key;
+                drag => { root.drag(); }
+            }
+            if !root.idle && !root.banner && root.data.body != WidgetBody.sentence: Text {
+                text: root.data.title;
+                font-family: Theme.font-display;
+                font-size: Theme.size-sentence;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                wrap: word-wrap;
+                max-lines: 2;
+                overflow: elide;
+                vertical-alignment: top;
+                Handle {
+                    start => { root.drag(); }
+                }
+            }
+        }
+    }
+
+    // Seek line (inert and empty when idle or without audio).
+    HorizontalLayout {
+        padding-right: 10px;
+        ProgressLine {
+            value: root.idle ? 0 : root.data.progress;
+            buffered: root.idle ? 0 : root.data.buffered;
+            interactive: !root.idle && root.data.seekable;
+            label: root.idle ? "Progress" : "Seek";
+            value-text: root.idle ? "" : root.data.progress-accessible;
+            seek(v) => { root.seek(v); }
+        }
+    }
+
+    // Footer: status (left), transport (centred), time (right).
+    HorizontalLayout {
+        padding-top: 2px;
+        padding-right: 10px;
+        height: 46px;
+
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            StatusLabel {
+                text: root.data.status;
+                phase: root.idle ? PlayerPhase.idle : root.data.phase;
+                loading: !root.idle && root.data.status-loading;
+                stopped-early: !root.idle && root.stopped-early;
+                drag => { root.drag(); }
+            }
+        }
+        if !root.idle: HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: Icons.skip-back;
+                    label: root.data.previous-label;
+                    tooltip: root.data.previous-label;
+                    enabled: root.data.previous-enabled;
+                    clicked => { root.action(PlayerAction.previous); }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                MainButton {
+                    main-action: root.data.main-action;
+                    size: IconButtonSize.lg;
+                    clicked => { root.action(PlayerAction.toggle); }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: Icons.skip-forward;
+                    label: root.data.next-label;
+                    tooltip: root.data.next-label;
+                    enabled: root.data.next-enabled;
+                    clicked => { root.action(PlayerAction.next); }
+                }
+            }
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            alignment: end;
+            if !root.idle: TimeLabel {
+                width: WidgetMetrics.time-width;
+                text: root.data.time;
+                estimate: root.data.time-estimate;
+                spoken: root.data.time-accessible;
+                drag => { root.drag(); }
+            }
+        }
+    }
+}
+
+// The fatal error card.
+component ErrorView inherits VerticalLayout {
+    in property <WidgetData> data;
+    callback action(PlayerAction);
+    callback error-action();
+    callback toast-action();
+    callback drag();
+
+    property <bool> banner: root.data.body == WidgetBody.banner && root.data.toast-visible;
+
+    padding-left: WidgetMetrics.pad-x;
+    padding-right: 8px;
+    padding-top: 16px;
+    padding-bottom: 14px;
+    spacing: 14px;
+
+    CardHeader {
+        art: root.data.art;
+        source: root.data.source == "" ? Brand.app-name : root.data.source;
+        voice: root.data.voice;
+        show-rate: false;
+        close => { root.action(PlayerAction.close); }
+        drag => { root.drag(); }
+    }
+
+    // Body. The error text is always laid out (a wrapped Text inside an `if` loses its width-for-height in the
+    // card's preferred height); a toast banner is drawn over the same box instead.
+    Rectangle {
+        height: max(error-body.preferred-height, !root.banner ? 0px : root.data.toast.title != "" ? 56px : 40px);
+
+        Rectangle {
+            visible: !root.banner;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.data.error-title + ". " + root.data.error-detail;
+            accessible-live-region: AccessibleLiveness.assertive;
+
+            error-body := HorizontalLayout {
+                padding-right: 10px;
+                spacing: 10px;
+
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 2px;
+                    Icon {
+                        source: Icons.circle-alert;
+                        size: 18px;
+                        width: 20px;
+                        height: 20px;
+                        color: Theme.danger;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: root.data.error-title;
+                        font-family: Theme.font-display;
+                        font-size: Theme.size-sentence;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                        max-lines: 2;
+                        overflow: elide;
+                        accessible-role: none;
+                        Handle {
+                            start => { root.drag(); }
+                        }
+                    }
+                    // Never empty (Rust falls back to "The text could not be read aloud.").
+                    Text {
+                        text: root.data.error-detail;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                        max-lines: 3;
+                        overflow: elide;
+                        accessible-role: none;
+                        Handle {
+                            start => { root.drag(); }
+                        }
+                    }
+                }
+            }
+        }
+        if root.banner: HorizontalLayout {
+            padding-right: 10px;
+            ToastBanner {
+                toast: root.data.toast;
+                action => { root.toast-action(); }
+                drag => { root.drag(); }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding-right: 10px;
+        height: 32px;
+        spacing: 12px;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            StatusLabel {
+                text: root.data.status;
+                phase: PlayerPhase.error;
+                error: true;
+                drag => { root.drag(); }
+            }
+        }
+        if root.data.error-action != "": Button {
+            text: root.data.error-action;
+            kind: ButtonKind.primary;
+            size: ButtonSize.sm;
+            clicked => { root.error-action(); }
+        }
+    }
+}
+
+// The standalone toast card: the bare kind glyph (as in the app's toasts: no tile, never a red fill) and the close
+// glyph both centred on the first text line; title (up to two lines) over the message (up to three), the primary
+// action pill under the text. The glyph column and the message are drag handles.
+component ToastView inherits HorizontalLayout {
+    in property <ToastData> toast;
+    callback toast-action();
+    callback close();
+    callback drag();
+
+    property <bool> has-title: root.toast.title != "";
+    // The first text line's height (title and message are both 14 px).
+    property <length> first-line: line.preferred-height;
+
+    padding-left: WidgetMetrics.pad-x;
+    padding-right: 8px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    spacing: 12px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.has-title ? root.toast.title + ". " + root.toast.message : root.toast.message;
+    accessible-live-region: root.toast.tone == ToastTone.error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+
+    Rectangle {
+        width: 20px;
+
+        line := Text {
+            x: 0;
+            y: 0;
+            visible: false;
+            text: "Xg";
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            accessible-role: none;
+        }
+        ToastGlyph {
+            x: 0;
+            y: (root.first-line - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            tone: root.toast.tone;
+            size: 18px;
+        }
+        Handle {
+            start => { root.drag(); }
+        }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        min-width: 0px;
+        min-height: 20px;
+        alignment: start;
+
+        // Always laid out (a wrapped Text inside an `if` would not grow the card); collapsed when there is no title.
+        VerticalLayout {
+            padding-bottom: root.has-title ? 2px : 0px;
+            Text {
+                height: root.has-title ? self.preferred-height : 0px;
+                visible: root.has-title;
+                text: root.toast.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                wrap: word-wrap;
+                max-lines: 2;
+                overflow: elide;
+                accessible-role: none;
+                Handle {
+                    start => { root.drag(); }
+                }
+            }
+        }
+        Text {
+            text: root.toast.message;
+            font-family: Theme.font-text;
+            font-size: root.has-title ? Theme.size-label : Theme.size-body;
+            font-weight: root.has-title ? Theme.weight-medium : Theme.weight-semibold;
+            color: root.has-title ? Theme.text-secondary : Theme.text;
+            wrap: word-wrap;
+            max-lines: 3;
+            overflow: elide;
+            accessible-role: none;
+            Handle {
+                start => { root.drag(); }
+            }
+        }
+        if root.toast.action-label != "": HorizontalLayout {
+            padding-top: 12px;
+            alignment: start;
+            Button {
+                text: root.toast.action-label;
+                kind: ButtonKind.primary;
+                size: ButtonSize.sm;
+                clicked => { root.toast-action(); }
+            }
+        }
+    }
+    // The close glyph centred on the first line (it overhangs into the top padding, so a one-line toast stays short).
+    Rectangle {
+        width: 32px;
+        CloseButton {
+            x: 0;
+            y: (root.first-line - self.height) / 2;
+            clicked => { root.close(); }
+        }
+    }
+}
+
+// The compact toast (pill middle, spec §6.9): a two-line message. With an action the whole message is a link button
+// with a chevron (tooltip = the action label, accessible "{message}. {action}"; a hidden text announces the message,
+// since the button node has no live region); without one, plain text (a drag handle). A new toast `key` fades it in.
+component CompactToast inherits Rectangle {
+    in property <ToastData> toast;
+    callback action();
+    callback drag();
+
+    property <bool> link: root.toast.action-label != "";
+
+    horizontal-stretch: 1;
+    min-width: 0px;
+
+    EnterFade {
+        key: root.toast.key;
+
+        HorizontalLayout {
+            if root.link: Rectangle {
+                horizontal-stretch: 1;
+                accessible-role: AccessibleRole.button;
+                accessible-label: root.toast.message + ". " + root.toast.action-label;
+                accessible-action-default => { root.action(); }
+                forward-focus: link-press;
+
+                Text {
+                    x: 0;
+                    y: 0;
+                    width: 1px;
+                    height: 1px;
+                    text: "";
+                    color: transparent;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: root.toast.message;
+                    accessible-live-region: root.toast.tone == ToastTone.error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    Text {
+                        text: root.toast.message;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                        max-lines: 2;
+                        overflow: elide;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            source: Icons.chevron-right;
+                            size: 14px;
+                            color: link-press.has-hover ? Theme.text : Theme.text-secondary;
+                        }
+                    }
+                }
+                FocusRing {
+                    radius: 8px;
+                    shown: link-press.focus-visible;
+                }
+                link-press := Pressable {
+                    activated => { root.action(); }
+                }
+                Tip { text: root.toast.action-label; }
+            }
+            if !root.link: Text {
+                text: root.toast.message;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                wrap: word-wrap;
+                max-lines: 2;
+                overflow: elide;
+                vertical-alignment: center;
+                accessible-role: AccessibleRole.text;
+                accessible-label: self.text;
+                accessible-live-region: root.toast.tone == ToastTone.error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+                Handle {
+                    start => { root.drag(); }
+                }
+            }
+        }
+    }
+}
+
+// The compact pill. Rhythm: art (concentric with the left cap), 10, play, 14, middle, right, close.
+component CompactView inherits HorizontalLayout {
+    in property <WidgetData> data;
+    callback action(PlayerAction);
+    callback seek(float);
+    callback warning-clicked();
+    callback toast-action();
+    callback drag();
+
+    property <bool> toast: root.data.toast-visible;
+    property <bool> ended-early: root.data.phase == PlayerPhase.ended && root.data.warning-visible;
+    property <bool> note: root.toast || root.ended-early;
+
+    padding: 6px;
+    padding-right: 8px;
+    spacing: 0px;
+
+    ArtThumb {
+        width: WidgetMetrics.art;
+        height: WidgetMetrics.art;
+        round: true;
+        source: root.data.art;
+        label: root.data.voice;
+        Handle {
+            start => { root.drag(); }
+        }
+    }
+    Rectangle { width: 10px; }
+    VerticalLayout {
+        alignment: center;
+        MainButton {
+            main-action: root.data.main-action;
+            size: IconButtonSize.md;
+            clicked => { root.action(PlayerAction.toggle); }
+        }
+    }
+    Rectangle { width: 14px; }
+
+    // Middle.
+    HorizontalLayout {
+        horizontal-stretch: 1;
+        min-width: 0px;
+
+        if root.toast: CompactToast {
+            toast: root.data.toast;
+            action => { root.toast-action(); }
+            drag => { root.drag(); }
+        }
+        if !root.toast && root.ended-early: WarningNote {
+            compact: true;
+            tip-lines: 1;
+            lead: root.data.warning-lead;
+            reason: root.data.warning-reason;
+            link: root.data.warning-link;
+            tooltip: root.data.warning-tooltip;
+            clicked => { root.warning-clicked(); }
+        }
+        if !root.note && root.data.compact-loading: HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                // Silent: the label next to it is the accessible text.
+                Spinner {
+                    size: 13px;
+                    label: "";
+                    accessible-role: none;
+                }
+            }
+            Text {
+                text: root.data.status;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
+                Handle {
+                    start => { root.drag(); }
+                }
+            }
+        }
+        if !root.note && !root.data.compact-loading: VerticalLayout {
+            alignment: center;
+            ProgressLine {
+                value: root.data.progress;
+                buffered: root.data.buffered;
+                interactive: root.data.seekable;
+                label: "Seek";
+                value-text: root.data.progress-accessible;
+                seek(v) => { root.seek(v); }
+            }
+        }
+    }
+
+    // Right: an invisible grip when the middle holds a note; else the time in a fixed box (no jitter while it ticks),
+    // preceded by the red dot (warning, read still going) 6 px before the time it qualifies.
+    if root.note: Rectangle {
+        width: 20px;
+        Handle {
+            start => { root.drag(); }
+        }
+    }
+    if !root.note: HorizontalLayout {
+        width: 4px + WidgetMetrics.time-width + (root.data.warning-visible ? 12px : 0px);
+        padding-left: 4px;
+        alignment: end;
+        spacing: 0px;
+
+        if root.data.warning-visible: Rectangle {
+            width: 12px;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.data.warning-lead;
+            Rectangle {
+                x: 0;
+                y: (parent.height - self.height) / 2;
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.danger;
+            }
+            WarningTip {
+                text: root.data.warning-dot-tooltip;
+                max-lines: 1;
+            }
+        }
+        if root.data.warning-visible: TimeLabel {
+            text: root.data.time;
+            estimate: root.data.time-estimate;
+            spoken: root.data.time-accessible;
+            drag => { root.drag(); }
+        }
+        if !root.data.warning-visible: TimeLabel {
+            width: WidgetMetrics.time-width;
+            text: root.data.time;
+            estimate: root.data.time-estimate;
+            spoken: root.data.time-accessible;
+            drag => { root.drag(); }
+        }
+    }
+    Rectangle { width: 4px; }
+    VerticalLayout {
+        alignment: center;
+        CloseButton {
+            clicked => { root.action(PlayerAction.close); }
+        }
+    }
+}
+
+// ───────────────────────────── the window ─────────────────────────────
+
+export component WidgetWindow inherits Window {
+    in property <WidgetData> data;
+    // An opaque panel under the card (same shape). Rust sets it: Skia on DirectX 12 presents an opaque swap chain, so
+    // transparent pixels show black and the card's enter fade / 0.96 panel would blend over black (the window region,
+    // SetWindowRgn, already cuts the corners). Previews leave it off and keep the transparent corners.
+    in property <bool> opaque-backing;
+    // The card's preferred size (Rust sizes the native window to it).
+    out property <length> card-width: root.compact ? WidgetMetrics.compact-width : WidgetMetrics.full-width;
+    out property <length> card-height: root.compact ? WidgetMetrics.compact-height : ceil(views.preferred-height / 1px) * 1px;
+
+    // Transport and chrome: toggle, previous, next, cycle-rate, close.
+    callback action(PlayerAction);
+    // Progress released at a 0..1 fraction (only when `seekable`).
+    callback seek(float);
+    // Error card button ("Open settings" / "Try again").
+    callback error-action();
+    // Warning note link (settings-fixable codes) → Settings → Account.
+    callback warning-clicked();
+    // Toast action button / dismissal by click.
+    callback toast-action();
+    // Pointer-down on a drag handle.
+    callback drag-start();
+    // The card's size changed (also called once after the first layout).
+    callback size-changed(length, length);
+
+    property <bool> compact: root.data.view == WidgetView.compact;
+    property <int> card-key: root.data.card-key;
+    property <bool> entering;
+
+    title: "Vox Player";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    default-font-family: Theme.font-text;
+    // StyledText (the sentence) takes its weight from the window.
+    default-font-weight: Theme.weight-semibold;
+
+    init => { root.size-changed(root.card-width, root.card-height); }
+    changed card-width => { root.size-changed(root.card-width, root.card-height); }
+    changed card-height => { root.size-changed(root.card-width, root.card-height); }
+    changed card-key => { root.entering = true; }
+
+    enter := Timer {
+        interval: 16ms;
+        running: root.entering;
+        triggered => { root.entering = false; }
+    }
+
+    if root.opaque-backing: Rectangle {
+        x: 0;
+        y: 0;
+        width: root.card-width;
+        height: root.card-height;
+        background: Theme.panel;
+        border-radius: root.compact ? self.height / 2 : Theme.radius-widget;
+    }
+
+    card := Rectangle {
+        x: 0;
+        y: 0;
+        width: root.card-width;
+        height: root.card-height;
+        background: Theme.panel.with-alpha(0.96);
+        border-radius: root.compact ? self.height / 2 : Theme.radius-widget;
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+        clip: true;
+        // Enter: scale 0.985 → 1 with a fade; scale only (the window ends at the card's edge).
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-scale-x: root.entering ? 98.5% : 100%;
+        transform-scale-y: root.entering ? 98.5% : 100%;
+        opacity: root.entering ? 0 : 1;
+        animate transform-scale-x, transform-scale-y, opacity {
+            duration: root.entering || Motion.reduce ? 0ms : WidgetMetrics.enter;
+            easing: ease-out;
+        }
+
+        accessible-role: AccessibleRole.groupbox;
+        accessible-label: root.data.view == WidgetView.error ? Brand.app-name + " error" : Brand.app-name + " player";
+
+        views := VerticalLayout {
+            width: root.card-width;
+            height: root.card-height;
+
+            if root.data.view == WidgetView.full || root.data.view == WidgetView.idle: FullView {
+                data: root.data;
+                idle: root.data.view == WidgetView.idle;
+                action(a) => { root.action(a); }
+                seek(v) => { root.seek(v); }
+                warning-clicked => { root.warning-clicked(); }
+                toast-action => { root.toast-action(); }
+                drag => { root.drag-start(); }
+            }
+            if root.data.view == WidgetView.error: ErrorView {
+                data: root.data;
+                action(a) => { root.action(a); }
+                error-action => { root.error-action(); }
+                toast-action => { root.toast-action(); }
+                drag => { root.drag-start(); }
+            }
+            if root.data.view == WidgetView.toast: ToastView {
+                toast: root.data.toast;
+                toast-action => { root.toast-action(); }
+                close => { root.action(PlayerAction.close); }
+                drag => { root.drag-start(); }
+            }
+            if root.compact: CompactView {
+                data: root.data;
+                action(a) => { root.action(a); }
+                seek(v) => { root.seek(v); }
+                warning-clicked => { root.warning-clicked(); }
+                toast-action => { root.toast-action(); }
+                drag => { root.drag-start(); }
+            }
+        }
+    }
+}

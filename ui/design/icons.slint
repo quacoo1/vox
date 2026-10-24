@@ -1,0 +1,111 @@
+// Icons: every Lucide SVG in ui/icons as an image property, so pages can write `Icons.play`.
+// Generated from the folder listing. After adding icons (tools/icons/icons.txt + extract-lucide.mjs), regenerate:
+//   cd ui && (for f in icons/*.svg; do n=$(basename "$f" .svg); echo "    out property <image> $n: @image-url(\"../icons/$n.svg\");"; done)
+// and paste the lines into the global below (keep the header and the filled transport glyphs at the end).
+// The SVGs are white strokes: recolour with `Icon { color: ... }` or `Image { colorize: ... }`.
+//
+// Filled transport glyphs (ui/design/glyphs, Lucide geometry with a fill): use them inside solid circles
+// (IconButtonKind.primary Play / Pause, the widget's transport), where outline bars read as "00".
+//   play-fill, pause-fill, skip-back-fill, skip-forward-fill
+
+export global Icons {
+    out property <image> play-fill: @image-url("glyphs/play-fill.svg");
+    out property <image> pause-fill: @image-url("glyphs/pause-fill.svg");
+    out property <image> skip-back-fill: @image-url("glyphs/skip-back-fill.svg");
+    out property <image> skip-forward-fill: @image-url("glyphs/skip-forward-fill.svg");
+
+    out property <image> app-window: @image-url("../icons/app-window.svg");
+    out property <image> arrow-left: @image-url("../icons/arrow-left.svg");
+    out property <image> arrow-right: @image-url("../icons/arrow-right.svg");
+    out property <image> arrow-up-right: @image-url("../icons/arrow-up-right.svg");
+    out property <image> audio-lines: @image-url("../icons/audio-lines.svg");
+    out property <image> badge-check: @image-url("../icons/badge-check.svg");
+    out property <image> bell: @image-url("../icons/bell.svg");
+    out property <image> calendar: @image-url("../icons/calendar.svg");
+    out property <image> chart-column: @image-url("../icons/chart-column.svg");
+    out property <image> check: @image-url("../icons/check.svg");
+    out property <image> chevron-down: @image-url("../icons/chevron-down.svg");
+    out property <image> chevron-left: @image-url("../icons/chevron-left.svg");
+    out property <image> chevron-right: @image-url("../icons/chevron-right.svg");
+    out property <image> chevron-up: @image-url("../icons/chevron-up.svg");
+    out property <image> circle-alert: @image-url("../icons/circle-alert.svg");
+    out property <image> circle-check: @image-url("../icons/circle-check.svg");
+    out property <image> clipboard-paste: @image-url("../icons/clipboard-paste.svg");
+    out property <image> clipboard: @image-url("../icons/clipboard.svg");
+    out property <image> clock: @image-url("../icons/clock.svg");
+    out property <image> command: @image-url("../icons/command.svg");
+    out property <image> copy: @image-url("../icons/copy.svg");
+    out property <image> download: @image-url("../icons/download.svg");
+    out property <image> external-link: @image-url("../icons/external-link.svg");
+    out property <image> eye-off: @image-url("../icons/eye-off.svg");
+    out property <image> eye: @image-url("../icons/eye.svg");
+    out property <image> file-text: @image-url("../icons/file-text.svg");
+    out property <image> filter: @image-url("../icons/filter.svg");
+    out property <image> flame: @image-url("../icons/flame.svg");
+    out property <image> folder-open: @image-url("../icons/folder-open.svg");
+    out property <image> gauge: @image-url("../icons/gauge.svg");
+    out property <image> globe: @image-url("../icons/globe.svg");
+    out property <image> hand: @image-url("../icons/hand.svg");
+    out property <image> hash: @image-url("../icons/hash.svg");
+    out property <image> headphones: @image-url("../icons/headphones.svg");
+    out property <image> history: @image-url("../icons/history.svg");
+    out property <image> house: @image-url("../icons/house.svg");
+    out property <image> info: @image-url("../icons/info.svg");
+    out property <image> key-round: @image-url("../icons/key-round.svg");
+    out property <image> keyboard: @image-url("../icons/keyboard.svg");
+    out property <image> languages: @image-url("../icons/languages.svg");
+    out property <image> layout-grid: @image-url("../icons/layout-grid.svg");
+    out property <image> library: @image-url("../icons/library.svg");
+    out property <image> list-filter: @image-url("../icons/list-filter.svg");
+    out property <image> list: @image-url("../icons/list.svg");
+    out property <image> loader-circle: @image-url("../icons/loader-circle.svg");
+    out property <image> lock: @image-url("../icons/lock.svg");
+    out property <image> log-out: @image-url("../icons/log-out.svg");
+    out property <image> mic: @image-url("../icons/mic.svg");
+    out property <image> minus: @image-url("../icons/minus.svg");
+    out property <image> monitor: @image-url("../icons/monitor.svg");
+    out property <image> moon: @image-url("../icons/moon.svg");
+    out property <image> more-horizontal: @image-url("../icons/more-horizontal.svg");
+    out property <image> mouse-pointer-click: @image-url("../icons/mouse-pointer-click.svg");
+    out property <image> move: @image-url("../icons/move.svg");
+    out property <image> music: @image-url("../icons/music.svg");
+    out property <image> palette: @image-url("../icons/palette.svg");
+    out property <image> panel-bottom: @image-url("../icons/panel-bottom.svg");
+    out property <image> pause: @image-url("../icons/pause.svg");
+    out property <image> pencil: @image-url("../icons/pencil.svg");
+    out property <image> picture-in-picture-2: @image-url("../icons/picture-in-picture-2.svg");
+    out property <image> pin: @image-url("../icons/pin.svg");
+    out property <image> play: @image-url("../icons/play.svg");
+    out property <image> plus: @image-url("../icons/plus.svg");
+    out property <image> power: @image-url("../icons/power.svg");
+    out property <image> puzzle: @image-url("../icons/puzzle.svg");
+    out property <image> refresh-cw: @image-url("../icons/refresh-cw.svg");
+    out property <image> repeat: @image-url("../icons/repeat.svg");
+    out property <image> rotate-ccw: @image-url("../icons/rotate-ccw.svg");
+    out property <image> search: @image-url("../icons/search.svg");
+    out property <image> settings: @image-url("../icons/settings.svg");
+    out property <image> shield-check: @image-url("../icons/shield-check.svg");
+    out property <image> skip-back: @image-url("../icons/skip-back.svg");
+    out property <image> skip-forward: @image-url("../icons/skip-forward.svg");
+    out property <image> sliders-horizontal: @image-url("../icons/sliders-horizontal.svg");
+    out property <image> sparkles: @image-url("../icons/sparkles.svg");
+    out property <image> square: @image-url("../icons/square.svg");
+    out property <image> star: @image-url("../icons/star.svg");
+    out property <image> sun-moon: @image-url("../icons/sun-moon.svg");
+    out property <image> sun: @image-url("../icons/sun.svg");
+    out property <image> terminal: @image-url("../icons/terminal.svg");
+    out property <image> text-cursor-input: @image-url("../icons/text-cursor-input.svg");
+    out property <image> text-select: @image-url("../icons/text-select.svg");
+    out property <image> timer: @image-url("../icons/timer.svg");
+    out property <image> trash-2: @image-url("../icons/trash-2.svg");
+    out property <image> triangle-alert: @image-url("../icons/triangle-alert.svg");
+    out property <image> type: @image-url("../icons/type.svg");
+    out property <image> upload: @image-url("../icons/upload.svg");
+    out property <image> user: @image-url("../icons/user.svg");
+    out property <image> users: @image-url("../icons/users.svg");
+    out property <image> volume-2: @image-url("../icons/volume-2.svg");
+    out property <image> volume-x: @image-url("../icons/volume-x.svg");
+    out property <image> wand-sparkles: @image-url("../icons/wand-sparkles.svg");
+    out property <image> x: @image-url("../icons/x.svg");
+    out property <image> zap: @image-url("../icons/zap.svg");
+}

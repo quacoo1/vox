@@ -1,0 +1,92 @@
+// IconButton: a round glyph button (close, overflow, transport).
+//
+//   in    icon: image               the glyph (Icons.*)
+//   in    label: string             accessible label, required ("Close", "Play", "More actions")
+//   in    kind: IconButtonKind      ghost (default: no fill, hover fill) | secondary (field fill + hairline)
+//                                   | primary (near-white circle, dark glyph: Play). In primary circles use the
+//                                   filled transport glyphs (Icons.play-fill, Icons.pause-fill).
+//   in    size: IconButtonSize      sm (28) | md (36, default) | lg (44, primary transport)
+//   in    checked: bool             toggled look (ghost: pressed fill + text colour glyph), e.g. Star
+//   in    enabled: bool             false = 40 % opacity, no interaction
+//   in    icon-color: brush         overrides the glyph colour (ghost default: text-secondary, hover: text)
+//   in    show-focus: bool          draw the focus ring without focus (previews)
+//   in    tooltip: string           optional hover tooltip (TooltipBubble); empty = none
+//   out   has-focus: bool, has-hover: bool
+//   callback clicked()              click, Enter or Space
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+import { Tip } from "tooltip.slint";
+
+export enum IconButtonKind { ghost, secondary, primary }
+export enum IconButtonSize { sm, md, lg }
+
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <IconButtonKind> kind: IconButtonKind.ghost;
+    in property <IconButtonSize> size: IconButtonSize.md;
+    in property <bool> checked: false;
+    in property <bool> enabled: true;
+    in property <brush> icon-color: transparent;
+    in property <bool> show-focus: false;
+    in property <string> tooltip;
+    out property <bool> has-focus: press.has-focus;
+    out property <bool> has-hover: press.has-hover;
+
+    callback clicked();
+
+    property <bool> is-primary: root.kind == IconButtonKind.primary;
+    property <length> side: root.size == IconButtonSize.sm ? 28px : root.size == IconButtonSize.lg ? 44px : 36px;
+    property <brush> rest-fill: root.is-primary ? Theme.primary-fill
+        : root.kind == IconButtonKind.secondary ? Theme.pill-fill
+        : root.checked ? Theme.hover : transparent;
+    property <brush> hover-fill: root.is-primary ? Theme.primary-fill-hover : Theme.hover;
+    property <brush> pressed-fill: root.is-primary ? Theme.primary-pressed : Theme.pressed;
+    property <brush> glyph: root.icon-color != transparent ? root.icon-color
+        : root.is-primary ? Theme.on-primary
+        : (press.has-hover || root.checked || root.kind == IconButtonKind.secondary) ? Theme.text
+        : Theme.text-secondary;
+
+    width: root.side;
+    height: root.side;
+    border-radius: self.height / 2;
+    background: press.pressed ? root.pressed-fill : press.has-hover ? root.hover-fill : root.rest-fill;
+    border-width: root.kind == IconButtonKind.secondary ? Theme.hairline : 0px;
+    border-color: press.has-hover ? Theme.field-border-focus : Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-checkable: root.checked;
+    accessible-checked: root.checked;
+    accessible-action-default => { press.activated(); }
+
+    animate background, border-color { duration: Theme.fast; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: root.icon;
+        size: root.size == IconButtonSize.sm ? 16px : root.size == IconButtonSize.lg ? 20px : 18px;
+        color: root.glyph;
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.clicked(); }
+    }
+
+    Tip {
+        text: root.tooltip;
+        enabled: root.enabled;
+    }
+}

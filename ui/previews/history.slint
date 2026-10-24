@@ -1,0 +1,53 @@
+// History page preview: HistoryPage alone on the panel, as it sits in MainWindow's content area.
+//   target/release/vox-shot ui/previews/history.slint --data ui/previews/history-<state>.json --size 892x700 \
+//       --out shots/ui/history/<state>-dark.png        (add --set Theme.dark=false for Paper; --size 720x700 = narrow)
+// States (ui/previews/history-<state>.json): loading, empty (nothing yet, with keycaps), empty-nokeys, no-results
+// (search + source), no-source (only a source filter: "No reads here"), starred, starred-empty, error, populated (day
+// groups; end of history), expanded, expanded-failed (a Failed read open: error note, no Window / Page, an even
+// detail count; then an open read with Window and no Page, an odd count), delete-undo, load-more, loading-more, long,
+// refreshing (dimmed). The list's footer sits below the fold at 700 px: load-more, loading-more and populated are
+// also rendered at --size 892x1500 (`*-tall-*.png`); long, expanded and expanded-failed also at 840x700 (`*-840-*`,
+// the tightest wide layout the real window reaches: MainWindow min 940 minus the rail).
+// `proof-*.png` come from a scratch copy of the page (not this preview): forced focus rings (row toggle, Replay, ⋯,
+// search) and keyboard focus scrolled into view (focus requested on the last read of load-more, by nonce and by a
+// rebuilt row taking focus back).
+// The shell owns the header and the toast stack; `toast-*` draws one design Toast bottom-right only to show the
+// delete-with-undo state in context.
+
+import { Theme, Toast, ToastKind } from "../design/index.slint";
+import { HistoryData } from "../models.slint";
+import { HistoryPage } from "../pages/history.slint";
+
+export { Theme }
+
+export component HistoryPreview inherits Window {
+    in property <HistoryData> data;
+    in-out property <string> search-text;
+    in property <int> focus-search-nonce;
+    in property <string> toast-title;
+    in property <string> toast-message;
+    in property <string> toast-action;
+
+    title: "History preview";
+    preferred-width: 892px;
+    preferred-height: 700px;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    HistoryPage {
+        width: 100%;
+        height: 100%;
+        data: root.data;
+        search-text <=> root.search-text;
+        focus-search-nonce: root.focus-search-nonce;
+    }
+
+    if root.toast-message != "": Toast {
+        x: parent.width - self.width - Theme.space-6;
+        y: parent.height - self.height - Theme.space-6;
+        kind: ToastKind.success;
+        title: root.toast-title;
+        message: root.toast-message;
+        action-text: root.toast-action;
+    }
+}

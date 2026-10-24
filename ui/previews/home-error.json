@@ -1,0 +1,144 @@
+{
+ "data": {
+  "state": {
+   "$enum": "LoadState.error"
+  },
+  "error-title": "Couldn’t load your reading stats",
+  "error-body": "The history file is locked by another program. Close it and try again.",
+  "retrying": false,
+  "greeting": "Good evening",
+  "date-line": "Friday, October 17",
+  "now": {
+   "idle": true,
+   "art": {
+    "$image": "art/thumb-george.png"
+   },
+   "title": "",
+   "meta": "",
+   "meta-is-error": false,
+   "badges": [],
+   "phase": {
+    "$enum": "PlayerPhase.idle"
+   },
+   "time": "",
+   "time-estimate": false,
+   "time-accessible": "",
+   "progress": 0,
+   "buffered": 0,
+   "seekable": false,
+   "can-stop": false,
+   "can-previous": false,
+   "can-next": false,
+   "main-action": {
+    "$enum": "MainAction.play"
+   },
+   "main-enabled": false,
+   "title-tooltip": "",
+   "idle-title": "Select text, then right-click",
+   "idle-sub": "Choose “Read with Vox” or press",
+   "idle-keys": [
+    "Ctrl",
+    "Alt",
+    "R"
+   ],
+   "idle-keys-spoken": "Ctrl plus Alt plus R",
+   "replay-last-visible": false,
+   "replay-last-tooltip": "",
+   "replay-last-busy": false
+  },
+  "today": {
+   "loading": true,
+   "label": "Today",
+   "badge": "Goal 15m",
+   "value": "0m",
+   "value-accessible": "0 seconds listened today",
+   "caption": "0 reads · 0 words",
+   "sub": "15m to your daily goal",
+   "fraction": 0.0,
+   "accessible-value": "0% of the daily goal",
+   "done": false
+  },
+  "credits": {
+   "state": {
+    "$enum": "CreditsState.ready"
+   },
+   "title": "",
+   "tier": "Creator",
+   "percent": "39%",
+   "percent-accessible": "39 percent of credits left",
+   "fraction": 0.388,
+   "low": false,
+   "facts": "38.8K of 100K left",
+   "reset": "Resets in 12 days",
+   "detail": "38,766 of 100,000 characters left. Resets in 12 days",
+   "message": "",
+   "action-label": "",
+   "refreshing": false
+  },
+  "week": {
+   "loading": true,
+   "title": "Last 7 days",
+   "total": "",
+   "bars": [],
+   "streak": "",
+   "best": "",
+   "streak-active": true,
+   "accessible-description": ""
+  },
+  "quick-read-words": "",
+  "quick-read-can-read": false,
+  "read-busy": false,
+  "clipboard-busy": false,
+  "recent-loading": false,
+  "recent": [],
+  "ways": [
+   {
+    "title": "Right-click chip",
+    "body": "Select text, right-click, then pick “Read with Vox” beside the menu.",
+    "key-groups": [],
+    "icon": "mouse-pointer-click",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Hotkeys",
+    "body": "",
+    "key-groups": [
+     {
+      "label": "Selection",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "R"
+      ]
+     },
+     {
+      "label": "Clipboard",
+      "keys": [
+       "Ctrl",
+       "Alt",
+       "V"
+      ]
+     }
+    ],
+    "icon": "keyboard",
+    "section": "triggers",
+    "off": false
+   },
+   {
+    "title": "Browser extension",
+    "body": "Adds “Read with Vox” to the Chrome and Edge right-click menu.",
+    "key-groups": [],
+    "icon": "globe",
+    "section": "integrations",
+    "off": false
+   }
+  ],
+  "voice-name": "George",
+  "voice-meta": "Flash v2.5 · 1×",
+  "voice-art": {
+   "$image": "art/small-george.png"
+  },
+  "voice-accessible": "Voice: George. Flash v2.5, speed 1 times. Change voice"
+ }
+}

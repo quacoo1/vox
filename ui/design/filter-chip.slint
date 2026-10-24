@@ -1,0 +1,107 @@
+// FilterChip: a selectable 32-h pill for filter rows (History: All, sources, Starred; Voices: Male, Cloned...).
+//
+//   in    text: string              13 / 600
+//   in    icon: image               optional 14 px leading glyph
+//   in    art: image                optional 16 px round art dot (source / voice); ignored when `icon` is set
+//   in    count: string             optional trailing count in a lighter tone ("128")
+//   in    selected: bool            selected = `primary` fill with `on-primary` text; else field fill + hairline
+//   in    enabled: bool
+//   in    show-focus: bool          draw the focus ring without focus (previews)
+//   out   has-focus: bool
+//   callback clicked()              click, Enter or Space (the owner flips `selected`)
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+import { ArtThumb } from "art-thumb.slint";
+
+export component FilterChip {
+    in property <string> text;
+    in property <image> icon;
+    in property <image> art;
+    in property <string> count;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: press.has-focus;
+
+    callback clicked();
+
+    property <color> fg: root.selected ? Theme.on-primary : Theme.text;
+
+    height: 32px;
+    min-width: 48px;
+    preferred-width: row.preferred-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: button;
+    accessible-label: root.count != "" ? root.text + ", " + root.count : root.text;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { press.activated(); }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: root.selected ? (press.has-hover ? Theme.primary-fill-hover : Theme.primary-fill)
+            : press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+        border-width: root.selected ? 0px : Theme.hairline;
+        border-color: press.has-hover ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    row := HorizontalLayout {
+        padding-left: (root.icon.width > 0 || root.art.width > 0) ? 10px : 14px;
+        padding-right: 14px;
+        spacing: 6px;
+        alignment: center;
+
+        if root.icon.width > 0: Icon {
+            source: root.icon;
+            size: 14px;
+            color: root.fg;
+        }
+        if root.icon.width == 0 && root.art.width > 0: VerticalLayout {
+            alignment: center;
+            ArtThumb {
+                width: 16px;
+                height: 16px;
+                round: true;
+                source: root.art;
+            }
+        }
+        Text {
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: root.fg;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        if root.count != "": Text {
+            text: root.count;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: root.selected ? Theme.on-primary.with-alpha(0.55) : Theme.text-muted;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.clicked(); }
+    }
+
+    @children
+}

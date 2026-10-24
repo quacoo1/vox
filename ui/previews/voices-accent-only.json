@@ -1,0 +1,84 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: My reading voice",
+    "count": "3 voices",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      }
+    ],
+    "category-options": [],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "clone-02",
+        "name": "Interview voice (podcast)",
+        "art": {
+          "$image": "art/thumb-will.png"
+        },
+        "subtitle": "Cloned · American · Podcast",
+        "description": "Cloned from the March episodes.",
+        "tags": [],
+        "caption": "Cloned · Podcast",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-03",
+        "name": "Grandad’s stories",
+        "art": {
+          "$image": "art/thumb-bill.png"
+        },
+        "subtitle": "Cloned · British · Storytelling",
+        "description": "Cloned from old cassette recordings.",
+        "tags": [],
+        "caption": "Cloned · Storytelling",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-01",
+        "name": "My reading voice",
+        "art": {
+          "$image": "art/thumb-river.png"
+        },
+        "subtitle": "Cloned",
+        "description": "No description.",
+        "tags": [],
+        "caption": "Cloned",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.none"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

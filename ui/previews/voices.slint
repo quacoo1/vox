@@ -1,0 +1,32 @@
+// Voices page preview: VoicesPage on the panel fill, as it sits inside the main window's content area.
+//   vox-shot ui/previews/voices.slint --component VoicesPreview --data ui/previews/voices-<state>.json
+//            --size 892x700 --out shots/ui/voices/<state>-dark.png   (... --set Theme.dark=false for -light)
+// Sizes: 892x700 (<state>-*), 720x700 (<state>-narrow-*), 812x548 (<state>-min-*: the content area of the
+// 940x640 minimum window).
+// States (ui-settings-widget.md §4.4): loading, loading-no-settings (in-use ""), no-key, error, empty, no-match,
+// populated (24 voices, own voices first), refreshing (list shown while Refresh spins), filtered, in-use (own clone
+// in use), in-use-playing (sample playing on the in-use row), preview-loading, preview-playing, long (long names /
+// labels / query), and the facet edge cases no-gender (pickers, no pills), accent-only, gender-only (no pickers).
+
+import { Theme } from "../design/theme.slint";
+import { VoicesData } from "../models.slint";
+import { VoicesPage } from "../pages/voices.slint";
+
+export { Theme }
+
+export component VoicesPreview inherits Window {
+    in property <VoicesData> data;
+    in-out property <string> search-text;
+
+    preferred-width: 892px;
+    preferred-height: 700px;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    VoicesPage {
+        width: 100%;
+        height: 100%;
+        data: root.data;
+        search-text <=> root.search-text;
+    }
+}

@@ -1,0 +1,68 @@
+// Spinner: an indeterminate activity ring (an arc turning over a faint track). Nothing bounces.
+//
+//   in    size: length         default 20 px (16 inside buttons, 32 for page loading)
+//   in    color: brush         arc colour, default Theme.text
+//   in    track-color: brush   ring colour, default Theme.track (transparent = arc only)
+//   in    arc: angle           arc length, default 110° (buttons use 270° without a track)
+//   in    running: bool        false = stops turning (static arc)
+//   in    label: string        accessible label, default "Loading"
+// Preferred size is size x size; the ring stays centred when a layout stretches the box.
+
+import { Theme } from "theme.slint";
+
+export component Spinner {
+    in property <length> size: 20px;
+    in property <brush> color: Theme.text;
+    in property <brush> track-color: Theme.track;
+    in property <angle> arc: 110deg;
+    in property <bool> running: true;
+    in property <string> label: "Loading";
+
+    property <length> stroke: max(1.5px, root.size / 10);
+    // Radius of the stroke centre line in a 100 x 100 view box.
+    property <float> r: 50 - root.stroke / root.size * 50;
+    property <float> turn: root.running
+        ? mod(animation-tick() / 1ms, Theme.spin / 1ms) / (Theme.spin / 1ms) : 0.1;
+
+    min-width: root.size;
+    min-height: root.size;
+    preferred-width: root.size;
+    preferred-height: root.size;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: progress-indicator;
+    accessible-label: root.label;
+
+    Rectangle {
+        x: (root.width - root.size) / 2;
+        y: (root.height - root.size) / 2;
+        width: root.size;
+        height: root.size;
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: self.width / 2;
+            border-width: root.stroke;
+            border-color: root.track-color;
+        }
+
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-x: 0;
+            viewbox-y: 0;
+            viewbox-width: 100;
+            viewbox-height: 100;
+            commands: "M 50 " + (50 - root.r) + " A " + root.r + " " + root.r + " 0 "
+                + (root.arc > 180deg ? "1" : "0") + " 1 "
+                + (50 + root.r * sin(root.arc)) + " " + (50 - root.r * cos(root.arc));
+            stroke: root.color;
+            stroke-width: root.stroke;
+            stroke-line-cap: round;
+            fill: transparent;
+            transform-origin: { x: self.width / 2, y: self.height / 2 };
+            transform-rotation: root.turn * 360deg;
+        }
+    }
+}

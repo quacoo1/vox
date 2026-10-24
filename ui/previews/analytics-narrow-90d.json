@@ -1,0 +1,3001 @@
+{
+ "data": {
+  "state": {
+   "$enum": "LoadState.ready"
+  },
+  "dimmed": false,
+  "retrying": false,
+  "range": "90d",
+  "ranges": [
+   {
+    "value": "7d",
+    "label": "7D",
+    "accessible-label": "Last 7 days"
+   },
+   {
+    "value": "30d",
+    "label": "30D",
+    "accessible-label": "Last 30 days"
+   },
+   {
+    "value": "90d",
+    "label": "90D",
+    "accessible-label": "Last 90 days"
+   },
+   {
+    "value": "365d",
+    "label": "1Y",
+    "accessible-label": "Last 12 months"
+   },
+   {
+    "value": "all",
+    "label": "ALL",
+    "accessible-label": "All time"
+   }
+  ],
+  "range-label": "Last 90 days",
+  "refresh-failed": false,
+  "error": "",
+  "empty": false,
+  "empty-title": "Nothing listened in the last 90 days",
+  "empty-body": "Select text anywhere, right-click and choose “Read with Vox”. Your stats fill in as you listen.",
+  "listened": "18h 57m",
+  "listened-accessible": "18 hours 57 minutes",
+  "today": "38m",
+  "today-accessible": "Today, 38 minutes",
+  "days-active": "76/90",
+  "days-active-accessible": "76 of 90 days",
+  "days-active-fraction": 0.8444444444444444,
+  "audio-generated": "20h 39m of audio generated",
+  "kpis": [
+   {
+    "icon": "type",
+    "label": "Words read",
+    "value": "216K",
+    "value-accessible": "216,007 words",
+    "spark-label": "Words read, last 7 days",
+    "unit": "",
+    "sub": "657 per read on average",
+    "spark": [
+     0.690711175616836,
+     0.2111756168359942,
+     0.2978229317851959,
+     0.5447024673439768,
+     0.5388969521044993,
+     0.23280116110304788,
+     1.0
+    ],
+    "dots": []
+   },
+   {
+    "icon": "play",
+    "label": "Reads",
+    "value": "329",
+    "value-accessible": "329",
+    "spark-label": "Reads, last 7 days",
+    "unit": "",
+    "sub": "81% listened to the end",
+    "spark": [
+     1.0,
+     0.5714285714285714,
+     0.2857142857142857,
+     0.8571428571428571,
+     0.5714285714285714,
+     0.2857142857142857,
+     1.0
+    ],
+    "dots": []
+   },
+   {
+    "icon": "zap",
+    "label": "Streak",
+    "value": "13",
+    "value-accessible": "13 days",
+    "spark-label": "",
+    "unit": "days",
+    "sub": "Longest 21 days",
+    "spark": [],
+    "dots": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   {
+    "icon": "gauge",
+    "label": "Pace",
+    "value": "166",
+    "value-accessible": "166 words per minute",
+    "spark-label": "",
+    "unit": "wpm",
+    "sub": "≈ 15h 7m of silent reading",
+    "spark": [],
+    "dots": []
+   }
+  ],
+  "daily": [
+   {
+    "level": 0.4320690098869847,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Jul 20",
+    "tooltip-value": "19m",
+    "tooltip-sub": "5 reads · 4,044 words",
+    "accessible": "Mon, Jul 20: 19m, 5 reads"
+   },
+   {
+    "level": 0.3159101296536765,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Jul 21",
+    "tooltip-value": "14m",
+    "tooltip-sub": "5 reads · 2,558 words",
+    "accessible": "Tue, Jul 21: 14m, 5 reads"
+   },
+   {
+    "level": 0.3263927158771127,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Jul 22",
+    "tooltip-value": "14m",
+    "tooltip-sub": "5 reads · 2,969 words",
+    "accessible": "Wed, Jul 22: 14m, 5 reads"
+   },
+   {
+    "level": 0.45002239315122783,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Jul 23",
+    "tooltip-value": "20m",
+    "tooltip-sub": "6 reads · 4,155 words",
+    "accessible": "Thu, Jul 23: 20m, 6 reads"
+   },
+   {
+    "level": 0.11288055996192303,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Jul 24",
+    "tooltip-value": "5m",
+    "tooltip-sub": "2 reads · 914 words",
+    "accessible": "Fri, Jul 24: 5m, 2 reads"
+   },
+   {
+    "level": 1.0,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Jul 25",
+    "tooltip-value": "45m",
+    "tooltip-sub": "11 reads · 9,136 words",
+    "accessible": "Sat, Jul 25: 45m, 11 reads"
+   },
+   {
+    "level": 0.14858963435390057,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Jul 26",
+    "tooltip-value": "6m",
+    "tooltip-sub": "3 reads · 1,156 words",
+    "accessible": "Sun, Jul 26: 6m, 3 reads"
+   },
+   {
+    "level": 0.0798419989973748,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Jul 27",
+    "tooltip-value": "3m",
+    "tooltip-sub": "1 read · 730 words",
+    "accessible": "Mon, Jul 27: 3m, 1 reads"
+   },
+   {
+    "level": 0.41696527507928133,
+    "label": "Jul 28",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Jul 28",
+    "tooltip-value": "18m",
+    "tooltip-sub": "4 reads · 3,422 words",
+    "accessible": "Tue, Jul 28: 18m, 4 reads"
+   },
+   {
+    "level": 0.10681925174329279,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Jul 29",
+    "tooltip-value": "4m",
+    "tooltip-sub": "1 read · 828 words",
+    "accessible": "Wed, Jul 29: 4m, 1 reads"
+   },
+   {
+    "level": 0.4151426950832739,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Jul 30",
+    "tooltip-value": "18m",
+    "tooltip-sub": "6 reads · 3,639 words",
+    "accessible": "Thu, Jul 30: 18m, 6 reads"
+   },
+   {
+    "level": 0.32713832995184083,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Jul 31",
+    "tooltip-value": "14m",
+    "tooltip-sub": "6 reads · 3,069 words",
+    "accessible": "Fri, Jul 31: 14m, 6 reads"
+   },
+   {
+    "level": 0.21488350102046214,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Aug 1",
+    "tooltip-value": "9m",
+    "tooltip-sub": "3 reads · 1,671 words",
+    "accessible": "Sat, Aug 1: 9m, 3 reads"
+   },
+   {
+    "level": 0.18132785267234464,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Aug 2",
+    "tooltip-value": "8m",
+    "tooltip-sub": "2 reads · 1,460 words",
+    "accessible": "Sun, Aug 2: 8m, 2 reads"
+   },
+   {
+    "level": 0.3038387011723016,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Aug 3",
+    "tooltip-value": "13m",
+    "tooltip-sub": "5 reads · 2,524 words",
+    "accessible": "Mon, Aug 3: 13m, 5 reads"
+   },
+   {
+    "level": 0.32355568330113865,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Aug 4",
+    "tooltip-value": "14m",
+    "tooltip-sub": "4 reads · 2,446 words",
+    "accessible": "Tue, Aug 4: 14m, 4 reads"
+   },
+   {
+    "level": 0.16363797604648603,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Aug 5",
+    "tooltip-value": "7m",
+    "tooltip-sub": "4 reads · 1,402 words",
+    "accessible": "Wed, Aug 5: 7m, 4 reads"
+   },
+   {
+    "level": 0.42701690580961754,
+    "label": "Aug 6",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Aug 6",
+    "tooltip-value": "19m",
+    "tooltip-sub": "7 reads · 4,018 words",
+    "accessible": "Thu, Aug 6: 19m, 7 reads"
+   },
+   {
+    "level": 0.7648900212435897,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Aug 7",
+    "tooltip-value": "34m",
+    "tooltip-sub": "11 reads · 6,950 words",
+    "accessible": "Fri, Aug 7: 34m, 11 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sat, Aug 8",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sat, Aug 8: 0s, 0 reads"
+   },
+   {
+    "level": 0.5121722415145993,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Aug 9",
+    "tooltip-value": "23m",
+    "tooltip-sub": "5 reads · 4,809 words",
+    "accessible": "Sun, Aug 9: 23m, 5 reads"
+   },
+   {
+    "level": 0.22229279373188057,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Aug 10",
+    "tooltip-value": "10m",
+    "tooltip-sub": "2 reads · 1,754 words",
+    "accessible": "Mon, Aug 10: 10m, 2 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Tue, Aug 11",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Tue, Aug 11: 0s, 0 reads"
+   },
+   {
+    "level": 0.36052364680572435,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Aug 12",
+    "tooltip-value": "16m",
+    "tooltip-sub": "4 reads · 3,340 words",
+    "accessible": "Wed, Aug 12: 16m, 4 reads"
+   },
+   {
+    "level": 0.28641619072907437,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Aug 13",
+    "tooltip-value": "13m",
+    "tooltip-sub": "4 reads · 2,290 words",
+    "accessible": "Thu, Aug 13: 13m, 4 reads"
+   },
+   {
+    "level": 0.47285716848467807,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Aug 14",
+    "tooltip-value": "21m",
+    "tooltip-sub": "6 reads · 4,044 words",
+    "accessible": "Fri, Aug 14: 21m, 6 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "Aug 15",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sat, Aug 15",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sat, Aug 15: 0s, 0 reads"
+   },
+   {
+    "level": 0.44281885226452977,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Aug 16",
+    "tooltip-value": "20m",
+    "tooltip-sub": "7 reads · 3,513 words",
+    "accessible": "Sun, Aug 16: 20m, 7 reads"
+   },
+   {
+    "level": 0.2847406824400956,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Aug 17",
+    "tooltip-value": "12m",
+    "tooltip-sub": "4 reads · 2,493 words",
+    "accessible": "Mon, Aug 17: 12m, 4 reads"
+   },
+   {
+    "level": 0.4459611631442218,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Aug 18",
+    "tooltip-value": "20m",
+    "tooltip-sub": "5 reads · 3,732 words",
+    "accessible": "Tue, Aug 18: 20m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Wed, Aug 19",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Wed, Aug 19: 0s, 0 reads"
+   },
+   {
+    "level": 0.2711300253293094,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Aug 20",
+    "tooltip-value": "12m",
+    "tooltip-sub": "3 reads · 2,470 words",
+    "accessible": "Thu, Aug 20: 12m, 3 reads"
+   },
+   {
+    "level": 0.18243055606393085,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Aug 21",
+    "tooltip-value": "8m",
+    "tooltip-sub": "2 reads · 1,487 words",
+    "accessible": "Fri, Aug 21: 8m, 2 reads"
+   },
+   {
+    "level": 0.420603029388041,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Aug 22",
+    "tooltip-value": "19m",
+    "tooltip-sub": "4 reads · 3,895 words",
+    "accessible": "Sat, Aug 22: 19m, 4 reads"
+   },
+   {
+    "level": 0.1946318322216196,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Aug 23",
+    "tooltip-value": "8m",
+    "tooltip-sub": "2 reads · 1,801 words",
+    "accessible": "Sun, Aug 23: 8m, 2 reads"
+   },
+   {
+    "level": 0.2293752597921941,
+    "label": "Aug 24",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Aug 24",
+    "tooltip-value": "10m",
+    "tooltip-sub": "2 reads · 2,029 words",
+    "accessible": "Mon, Aug 24: 10m, 2 reads"
+   },
+   {
+    "level": 0.29968976670203673,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Aug 25",
+    "tooltip-value": "13m",
+    "tooltip-sub": "5 reads · 2,734 words",
+    "accessible": "Tue, Aug 25: 13m, 5 reads"
+   },
+   {
+    "level": 0.2379192013050412,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Aug 26",
+    "tooltip-value": "10m",
+    "tooltip-sub": "2 reads · 2,211 words",
+    "accessible": "Wed, Aug 26: 10m, 2 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Thu, Aug 27",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Thu, Aug 27: 0s, 0 reads"
+   },
+   {
+    "level": 0.26610352290018036,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Aug 28",
+    "tooltip-value": "12m",
+    "tooltip-sub": "5 reads · 2,072 words",
+    "accessible": "Fri, Aug 28: 12m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sat, Aug 29",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sat, Aug 29: 0s, 0 reads"
+   },
+   {
+    "level": 0.13652689454402037,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Aug 30",
+    "tooltip-value": "6m",
+    "tooltip-sub": "2 reads · 1,267 words",
+    "accessible": "Sun, Aug 30: 6m, 2 reads"
+   },
+   {
+    "level": 0.32714082763333413,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Aug 31",
+    "tooltip-value": "14m",
+    "tooltip-sub": "5 reads · 2,598 words",
+    "accessible": "Mon, Aug 31: 14m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Tue, Sep 1",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Tue, Sep 1: 0s, 0 reads"
+   },
+   {
+    "level": 0.23084963730954242,
+    "label": "Sep 2",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Sep 2",
+    "tooltip-value": "10m",
+    "tooltip-sub": "4 reads · 1,858 words",
+    "accessible": "Wed, Sep 2: 10m, 4 reads"
+   },
+   {
+    "level": 0.3146608251856679,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Sep 3",
+    "tooltip-value": "14m",
+    "tooltip-sub": "3 reads · 2,473 words",
+    "accessible": "Thu, Sep 3: 14m, 3 reads"
+   },
+   {
+    "level": 0.4546149744193554,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Sep 4",
+    "tooltip-value": "20m",
+    "tooltip-sub": "6 reads · 3,810 words",
+    "accessible": "Fri, Sep 4: 20m, 6 reads"
+   },
+   {
+    "level": 0.13299773447516222,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Sep 5",
+    "tooltip-value": "6m",
+    "tooltip-sub": "2 reads · 1,202 words",
+    "accessible": "Sat, Sep 5: 6m, 2 reads"
+   },
+   {
+    "level": 0.5967928110126762,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Sep 6",
+    "tooltip-value": "27m",
+    "tooltip-sub": "8 reads · 5,066 words",
+    "accessible": "Sun, Sep 6: 27m, 8 reads"
+   },
+   {
+    "level": 0.26081490896280063,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Sep 7",
+    "tooltip-value": "11m",
+    "tooltip-sub": "5 reads · 2,301 words",
+    "accessible": "Mon, Sep 7: 11m, 5 reads"
+   },
+   {
+    "level": 0.343788353328192,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Sep 8",
+    "tooltip-value": "15m",
+    "tooltip-sub": "4 reads · 3,135 words",
+    "accessible": "Tue, Sep 8: 15m, 4 reads"
+   },
+   {
+    "level": 0.16735596174379583,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Sep 9",
+    "tooltip-value": "7m",
+    "tooltip-sub": "3 reads · 1,518 words",
+    "accessible": "Wed, Sep 9: 7m, 3 reads"
+   },
+   {
+    "level": 0.12535332478446828,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Sep 10",
+    "tooltip-value": "5m",
+    "tooltip-sub": "2 reads · 1,009 words",
+    "accessible": "Thu, Sep 10: 5m, 2 reads"
+   },
+   {
+    "level": 0.14239430908644934,
+    "label": "Sep 11",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Sep 11",
+    "tooltip-value": "6m",
+    "tooltip-sub": "3 reads · 1,335 words",
+    "accessible": "Fri, Sep 11: 6m, 3 reads"
+   },
+   {
+    "level": 0.5857616449017587,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Sep 12",
+    "tooltip-value": "26m",
+    "tooltip-sub": "7 reads · 4,993 words",
+    "accessible": "Sat, Sep 12: 26m, 7 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sun, Sep 13",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sun, Sep 13: 0s, 0 reads"
+   },
+   {
+    "level": 0.2711120347860509,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Sep 14",
+    "tooltip-value": "12m",
+    "tooltip-sub": "3 reads · 2,546 words",
+    "accessible": "Mon, Sep 14: 12m, 3 reads"
+   },
+   {
+    "level": 0.28653355132728636,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Sep 15",
+    "tooltip-value": "13m",
+    "tooltip-sub": "4 reads · 2,609 words",
+    "accessible": "Tue, Sep 15: 13m, 4 reads"
+   },
+   {
+    "level": 0.47121393291482133,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Sep 16",
+    "tooltip-value": "21m",
+    "tooltip-sub": "5 reads · 3,584 words",
+    "accessible": "Wed, Sep 16: 21m, 5 reads"
+   },
+   {
+    "level": 0.08626491811487445,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Sep 17",
+    "tooltip-value": "3m",
+    "tooltip-sub": "3 reads · 751 words",
+    "accessible": "Thu, Sep 17: 3m, 3 reads"
+   },
+   {
+    "level": 0.47846352629403316,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Sep 18",
+    "tooltip-value": "21m",
+    "tooltip-sub": "7 reads · 3,867 words",
+    "accessible": "Fri, Sep 18: 21m, 7 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sat, Sep 19",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sat, Sep 19: 0s, 0 reads"
+   },
+   {
+    "level": 0.11528732018128192,
+    "label": "Sep 20",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Sep 20",
+    "tooltip-value": "5m",
+    "tooltip-sub": "1 read · 923 words",
+    "accessible": "Sun, Sep 20: 5m, 1 reads"
+   },
+   {
+    "level": 0.912095132469494,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Sep 21",
+    "tooltip-value": "41m",
+    "tooltip-sub": "12 reads · 8,566 words",
+    "accessible": "Mon, Sep 21: 41m, 12 reads"
+   },
+   {
+    "level": 0.38107355033115453,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Sep 22",
+    "tooltip-value": "17m",
+    "tooltip-sub": "5 reads · 3,327 words",
+    "accessible": "Tue, Sep 22: 17m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Wed, Sep 23",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Wed, Sep 23: 0s, 0 reads"
+   },
+   {
+    "level": 0.09231423789832363,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Sep 24",
+    "tooltip-value": "4m",
+    "tooltip-sub": "1 read · 868 words",
+    "accessible": "Thu, Sep 24: 4m, 1 reads"
+   },
+   {
+    "level": 0.4184360812896932,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Sep 25",
+    "tooltip-value": "19m",
+    "tooltip-sub": "5 reads · 3,899 words",
+    "accessible": "Fri, Sep 25: 19m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sat, Sep 26",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sat, Sep 26: 0s, 0 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sun, Sep 27",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sun, Sep 27: 0s, 0 reads"
+   },
+   {
+    "level": 0.16399753194060243,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Sep 28",
+    "tooltip-value": "7m",
+    "tooltip-sub": "3 reads · 1,348 words",
+    "accessible": "Mon, Sep 28: 7m, 3 reads"
+   },
+   {
+    "level": 0.2620778481990656,
+    "label": "Sep 29",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Sep 29",
+    "tooltip-value": "11m",
+    "tooltip-sub": "5 reads · 2,216 words",
+    "accessible": "Tue, Sep 29: 11m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Wed, Sep 30",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Wed, Sep 30: 0s, 0 reads"
+   },
+   {
+    "level": 0.3751892332020727,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Oct 1",
+    "tooltip-value": "17m",
+    "tooltip-sub": "4 reads · 3,184 words",
+    "accessible": "Thu, Oct 1: 17m, 4 reads"
+   },
+   {
+    "level": 0.10184281729679076,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Oct 2",
+    "tooltip-value": "4m",
+    "tooltip-sub": "1 read · 817 words",
+    "accessible": "Fri, Oct 2: 4m, 1 reads"
+   },
+   {
+    "level": 0.310341443264913,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Oct 3",
+    "tooltip-value": "14m",
+    "tooltip-sub": "5 reads · 2,735 words",
+    "accessible": "Sat, Oct 3: 14m, 5 reads"
+   },
+   {
+    "level": 0.0,
+    "label": "",
+    "today": false,
+    "zero": true,
+    "tooltip-title": "Sun, Oct 4",
+    "tooltip-value": "0m",
+    "tooltip-sub": "0 reads · 0 words",
+    "accessible": "Sun, Oct 4: 0s, 0 reads"
+   },
+   {
+    "level": 0.3580290493567558,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Oct 5",
+    "tooltip-value": "16m",
+    "tooltip-sub": "6 reads · 2,730 words",
+    "accessible": "Mon, Oct 5: 16m, 6 reads"
+   },
+   {
+    "level": 0.17424359405465126,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Oct 6",
+    "tooltip-value": "7m",
+    "tooltip-sub": "1 read · 1,547 words",
+    "accessible": "Tue, Oct 6: 7m, 1 reads"
+   },
+   {
+    "level": 0.2458588754855713,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Oct 7",
+    "tooltip-value": "11m",
+    "tooltip-sub": "3 reads · 2,239 words",
+    "accessible": "Wed, Oct 7: 11m, 3 reads"
+   },
+   {
+    "level": 0.2827394543597142,
+    "label": "Oct 8",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Oct 8",
+    "tooltip-value": "12m",
+    "tooltip-sub": "5 reads · 2,490 words",
+    "accessible": "Thu, Oct 8: 12m, 5 reads"
+   },
+   {
+    "level": 0.4816650859746436,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Oct 9",
+    "tooltip-value": "21m",
+    "tooltip-sub": "6 reads · 4,091 words",
+    "accessible": "Fri, Oct 9: 21m, 6 reads"
+   },
+   {
+    "level": 0.34345960891729893,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sat, Oct 10",
+    "tooltip-value": "15m",
+    "tooltip-sub": "5 reads · 3,114 words",
+    "accessible": "Sat, Oct 10: 15m, 5 reads"
+   },
+   {
+    "level": 0.6186289953744983,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Sun, Oct 11",
+    "tooltip-value": "28m",
+    "tooltip-sub": "7 reads · 4,759 words",
+    "accessible": "Sun, Oct 11: 28m, 7 reads"
+   },
+   {
+    "level": 0.1687144897482771,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Mon, Oct 12",
+    "tooltip-value": "7m",
+    "tooltip-sub": "4 reads · 1,455 words",
+    "accessible": "Mon, Oct 12: 7m, 4 reads"
+   },
+   {
+    "level": 0.22985782941754773,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Tue, Oct 13",
+    "tooltip-value": "10m",
+    "tooltip-sub": "2 reads · 2,052 words",
+    "accessible": "Tue, Oct 13: 10m, 2 reads"
+   },
+   {
+    "level": 0.4798363481779238,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Wed, Oct 14",
+    "tooltip-value": "21m",
+    "tooltip-sub": "6 reads · 3,753 words",
+    "accessible": "Wed, Oct 14: 21m, 6 reads"
+   },
+   {
+    "level": 0.42087862979408597,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Thu, Oct 15",
+    "tooltip-value": "19m",
+    "tooltip-sub": "4 reads · 3,713 words",
+    "accessible": "Thu, Oct 15: 19m, 4 reads"
+   },
+   {
+    "level": 0.20275614407014395,
+    "label": "",
+    "today": false,
+    "zero": false,
+    "tooltip-title": "Fri, Oct 16",
+    "tooltip-value": "9m",
+    "tooltip-sub": "2 reads · 1,604 words",
+    "accessible": "Fri, Oct 16: 9m, 2 reads"
+   },
+   {
+    "level": 0.847797123577249,
+    "label": "Oct 17",
+    "today": true,
+    "zero": false,
+    "tooltip-title": "Sat, Oct 17",
+    "tooltip-value": "38m",
+    "tooltip-sub": "7 reads · 6,890 words",
+    "accessible": "Sat, Oct 17: 38m, 7 reads"
+   }
+  ],
+  "daily-avg": "Avg 14m",
+  "daily-avg-accessible": "Average per active day, 14 minutes",
+  "daily-peak": "Peak 45m",
+  "daily-peak-accessible": "Busiest day, 45 minutes",
+  "daily-empty": "",
+  "daily-summary": "Daily listening, last 90 days: 18 hours 57 minutes over 76 active days. Busiest day Sat, Jul 25 with 45 minutes.",
+  "heat": [
+   {
+    "day": 0,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 00:00–01:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 01:00–02:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 02:00–03:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 03:00–04:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 04:00–05:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 05:00–06:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 6,
+    "level": 0.28345551185200624,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 06:00–07:00",
+    "tooltip-value": "2m",
+    "accessible": "Monday 06:00–07:00: 2m"
+   },
+   {
+    "day": 0,
+    "hour": 7,
+    "level": 0.7702424677346185,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 07:00–08:00",
+    "tooltip-value": "19m",
+    "accessible": "Monday 07:00–08:00: 19m"
+   },
+   {
+    "day": 0,
+    "hour": 8,
+    "level": 0.8588096616608053,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 08:00–09:00",
+    "tooltip-value": "24m",
+    "accessible": "Monday 08:00–09:00: 24m"
+   },
+   {
+    "day": 0,
+    "hour": 9,
+    "level": 0.19856327516024558,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 09:00–10:00",
+    "tooltip-value": "1m",
+    "accessible": "Monday 09:00–10:00: 1m"
+   },
+   {
+    "day": 0,
+    "hour": 10,
+    "level": 0.2624163970687413,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 10:00–11:00",
+    "tooltip-value": "2m",
+    "accessible": "Monday 10:00–11:00: 2m"
+   },
+   {
+    "day": 0,
+    "hour": 11,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 11:00–12:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 11:00–12:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 12,
+    "level": 0.6359291880858666,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 12:00–13:00",
+    "tooltip-value": "13m",
+    "accessible": "Monday 12:00–13:00: 13m"
+   },
+   {
+    "day": 0,
+    "hour": 13,
+    "level": 0.5075856794001758,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 13:00–14:00",
+    "tooltip-value": "8m",
+    "accessible": "Monday 13:00–14:00: 8m"
+   },
+   {
+    "day": 0,
+    "hour": 14,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 14:00–15:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 14:00–15:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 15,
+    "level": 0.33402935400738615,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 15:00–16:00",
+    "tooltip-value": "3m",
+    "accessible": "Monday 15:00–16:00: 3m"
+   },
+   {
+    "day": 0,
+    "hour": 16,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 16:00–17:00",
+    "tooltip-value": "0m",
+    "accessible": "Monday 16:00–17:00: 0s"
+   },
+   {
+    "day": 0,
+    "hour": 17,
+    "level": 0.5828985087835565,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 17:00–18:00",
+    "tooltip-value": "11m",
+    "accessible": "Monday 17:00–18:00: 11m"
+   },
+   {
+    "day": 0,
+    "hour": 18,
+    "level": 0.650818339230812,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 18:00–19:00",
+    "tooltip-value": "14m",
+    "accessible": "Monday 18:00–19:00: 14m"
+   },
+   {
+    "day": 0,
+    "hour": 19,
+    "level": 0.41368404965238964,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 19:00–20:00",
+    "tooltip-value": "5m",
+    "accessible": "Monday 19:00–20:00: 5m"
+   },
+   {
+    "day": 0,
+    "hour": 20,
+    "level": 0.8273842082065286,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 20:00–21:00",
+    "tooltip-value": "22m",
+    "accessible": "Monday 20:00–21:00: 22m"
+   },
+   {
+    "day": 0,
+    "hour": 21,
+    "level": 0.8781874667046787,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 21:00–22:00",
+    "tooltip-value": "25m",
+    "accessible": "Monday 21:00–22:00: 25m"
+   },
+   {
+    "day": 0,
+    "hour": 22,
+    "level": 0.6569968011228021,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 22:00–23:00",
+    "tooltip-value": "14m",
+    "accessible": "Monday 22:00–23:00: 14m"
+   },
+   {
+    "day": 0,
+    "hour": 23,
+    "level": 0.3662190063311922,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Mon · 23:00–00:00",
+    "tooltip-value": "4m",
+    "accessible": "Monday 23:00–00:00: 4m"
+   },
+   {
+    "day": 1,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 00:00–01:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 01:00–02:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 02:00–03:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 03:00–04:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 04:00–05:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 05:00–06:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 6,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 06:00–07:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 06:00–07:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 7,
+    "level": 0.7464829668111483,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 07:00–08:00",
+    "tooltip-value": "18m",
+    "accessible": "Tuesday 07:00–08:00: 18m"
+   },
+   {
+    "day": 1,
+    "hour": 8,
+    "level": 0.8769464801512656,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 08:00–09:00",
+    "tooltip-value": "25m",
+    "accessible": "Tuesday 08:00–09:00: 25m"
+   },
+   {
+    "day": 1,
+    "hour": 9,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 09:00–10:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 09:00–10:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 10,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 10:00–11:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 10:00–11:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 11,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 11:00–12:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 11:00–12:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 12,
+    "level": 0.5742509407663018,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 12:00–13:00",
+    "tooltip-value": "11m",
+    "accessible": "Tuesday 12:00–13:00: 11m"
+   },
+   {
+    "day": 1,
+    "hour": 13,
+    "level": 0.5466227387240241,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 13:00–14:00",
+    "tooltip-value": "9m",
+    "accessible": "Tuesday 13:00–14:00: 9m"
+   },
+   {
+    "day": 1,
+    "hour": 14,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 14:00–15:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 14:00–15:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 15,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 15:00–16:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 15:00–16:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 16,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 16:00–17:00",
+    "tooltip-value": "0m",
+    "accessible": "Tuesday 16:00–17:00: 0s"
+   },
+   {
+    "day": 1,
+    "hour": 17,
+    "level": 0.49450236904319944,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 17:00–18:00",
+    "tooltip-value": "8m",
+    "accessible": "Tuesday 17:00–18:00: 8m"
+   },
+   {
+    "day": 1,
+    "hour": 18,
+    "level": 0.5672075773043913,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 18:00–19:00",
+    "tooltip-value": "10m",
+    "accessible": "Tuesday 18:00–19:00: 10m"
+   },
+   {
+    "day": 1,
+    "hour": 19,
+    "level": 0.4327777892335652,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 19:00–20:00",
+    "tooltip-value": "6m",
+    "accessible": "Tuesday 19:00–20:00: 6m"
+   },
+   {
+    "day": 1,
+    "hour": 20,
+    "level": 0.8636447731953506,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 20:00–21:00",
+    "tooltip-value": "24m",
+    "accessible": "Tuesday 20:00–21:00: 24m"
+   },
+   {
+    "day": 1,
+    "hour": 21,
+    "level": 0.845901812718346,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 21:00–22:00",
+    "tooltip-value": "23m",
+    "accessible": "Tuesday 21:00–22:00: 23m"
+   },
+   {
+    "day": 1,
+    "hour": 22,
+    "level": 0.7122388101420598,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 22:00–23:00",
+    "tooltip-value": "16m",
+    "accessible": "Tuesday 22:00–23:00: 16m"
+   },
+   {
+    "day": 1,
+    "hour": 23,
+    "level": 0.39615821708131843,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Tue · 23:00–00:00",
+    "tooltip-value": "5m",
+    "accessible": "Tuesday 23:00–00:00: 5m"
+   },
+   {
+    "day": 2,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 00:00–01:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 01:00–02:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 02:00–03:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 03:00–04:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 04:00–05:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 05:00–06:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 6,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 06:00–07:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 06:00–07:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 7,
+    "level": 0.7303201151328383,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 07:00–08:00",
+    "tooltip-value": "17m",
+    "accessible": "Wednesday 07:00–08:00: 17m"
+   },
+   {
+    "day": 2,
+    "hour": 8,
+    "level": 0.8028902099885996,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 08:00–09:00",
+    "tooltip-value": "21m",
+    "accessible": "Wednesday 08:00–09:00: 21m"
+   },
+   {
+    "day": 2,
+    "hour": 9,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 09:00–10:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 09:00–10:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 10,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 10:00–11:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 10:00–11:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 11,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 11:00–12:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 11:00–12:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 12,
+    "level": 0.6150519606081186,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 12:00–13:00",
+    "tooltip-value": "12m",
+    "accessible": "Wednesday 12:00–13:00: 12m"
+   },
+   {
+    "day": 2,
+    "hour": 13,
+    "level": 0.5612765018544704,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 13:00–14:00",
+    "tooltip-value": "10m",
+    "accessible": "Wednesday 13:00–14:00: 10m"
+   },
+   {
+    "day": 2,
+    "hour": 14,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 14:00–15:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 14:00–15:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 15,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 15:00–16:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 15:00–16:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 16,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 16:00–17:00",
+    "tooltip-value": "0m",
+    "accessible": "Wednesday 16:00–17:00: 0s"
+   },
+   {
+    "day": 2,
+    "hour": 17,
+    "level": 0.5042257599096466,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 17:00–18:00",
+    "tooltip-value": "8m",
+    "accessible": "Wednesday 17:00–18:00: 8m"
+   },
+   {
+    "day": 2,
+    "hour": 18,
+    "level": 0.6779047974594231,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 18:00–19:00",
+    "tooltip-value": "15m",
+    "accessible": "Wednesday 18:00–19:00: 15m"
+   },
+   {
+    "day": 2,
+    "hour": 19,
+    "level": 0.5160397414268506,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 19:00–20:00",
+    "tooltip-value": "8m",
+    "accessible": "Wednesday 19:00–20:00: 8m"
+   },
+   {
+    "day": 2,
+    "hour": 20,
+    "level": 0.853169669656116,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 20:00–21:00",
+    "tooltip-value": "24m",
+    "accessible": "Wednesday 20:00–21:00: 24m"
+   },
+   {
+    "day": 2,
+    "hour": 21,
+    "level": 0.873677452925521,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 21:00–22:00",
+    "tooltip-value": "25m",
+    "accessible": "Wednesday 21:00–22:00: 25m"
+   },
+   {
+    "day": 2,
+    "hour": 22,
+    "level": 0.7263248072696263,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 22:00–23:00",
+    "tooltip-value": "17m",
+    "accessible": "Wednesday 22:00–23:00: 17m"
+   },
+   {
+    "day": 2,
+    "hour": 23,
+    "level": 0.3864476244902927,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Wed · 23:00–00:00",
+    "tooltip-value": "4m",
+    "accessible": "Wednesday 23:00–00:00: 4m"
+   },
+   {
+    "day": 3,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 00:00–01:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 01:00–02:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 02:00–03:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 03:00–04:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 04:00–05:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 05:00–06:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 6,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 06:00–07:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 06:00–07:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 7,
+    "level": 0.7648039224532122,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 07:00–08:00",
+    "tooltip-value": "19m",
+    "accessible": "Thursday 07:00–08:00: 19m"
+   },
+   {
+    "day": 3,
+    "hour": 8,
+    "level": 0.7888802289797296,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 08:00–09:00",
+    "tooltip-value": "20m",
+    "accessible": "Thursday 08:00–09:00: 20m"
+   },
+   {
+    "day": 3,
+    "hour": 9,
+    "level": 0.37907351834655817,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 09:00–10:00",
+    "tooltip-value": "4m",
+    "accessible": "Thursday 09:00–10:00: 4m"
+   },
+   {
+    "day": 3,
+    "hour": 10,
+    "level": 0.3255812862863404,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 10:00–11:00",
+    "tooltip-value": "3m",
+    "accessible": "Thursday 10:00–11:00: 3m"
+   },
+   {
+    "day": 3,
+    "hour": 11,
+    "level": 0.2632903555467095,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 11:00–12:00",
+    "tooltip-value": "2m",
+    "accessible": "Thursday 11:00–12:00: 2m"
+   },
+   {
+    "day": 3,
+    "hour": 12,
+    "level": 0.6407370190635133,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 12:00–13:00",
+    "tooltip-value": "13m",
+    "accessible": "Thursday 12:00–13:00: 13m"
+   },
+   {
+    "day": 3,
+    "hour": 13,
+    "level": 0.4503837611875691,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 13:00–14:00",
+    "tooltip-value": "6m",
+    "accessible": "Thursday 13:00–14:00: 6m"
+   },
+   {
+    "day": 3,
+    "hour": 14,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 14:00–15:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 14:00–15:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 15,
+    "level": 0.30715924445697607,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 15:00–16:00",
+    "tooltip-value": "3m",
+    "accessible": "Thursday 15:00–16:00: 3m"
+   },
+   {
+    "day": 3,
+    "hour": 16,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 16:00–17:00",
+    "tooltip-value": "0m",
+    "accessible": "Thursday 16:00–17:00: 0s"
+   },
+   {
+    "day": 3,
+    "hour": 17,
+    "level": 0.6125219537030083,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 17:00–18:00",
+    "tooltip-value": "12m",
+    "accessible": "Thursday 17:00–18:00: 12m"
+   },
+   {
+    "day": 3,
+    "hour": 18,
+    "level": 0.6260937209298675,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 18:00–19:00",
+    "tooltip-value": "13m",
+    "accessible": "Thursday 18:00–19:00: 13m"
+   },
+   {
+    "day": 3,
+    "hour": 19,
+    "level": 0.5194964287615469,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 19:00–20:00",
+    "tooltip-value": "9m",
+    "accessible": "Thursday 19:00–20:00: 9m"
+   },
+   {
+    "day": 3,
+    "hour": 20,
+    "level": 0.742867461973184,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 20:00–21:00",
+    "tooltip-value": "18m",
+    "accessible": "Thursday 20:00–21:00: 18m"
+   },
+   {
+    "day": 3,
+    "hour": 21,
+    "level": 0.7658367139495409,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 21:00–22:00",
+    "tooltip-value": "19m",
+    "accessible": "Thursday 21:00–22:00: 19m"
+   },
+   {
+    "day": 3,
+    "hour": 22,
+    "level": 0.7078377020361583,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 22:00–23:00",
+    "tooltip-value": "16m",
+    "accessible": "Thursday 22:00–23:00: 16m"
+   },
+   {
+    "day": 3,
+    "hour": 23,
+    "level": 0.3662612460605297,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Thu · 23:00–00:00",
+    "tooltip-value": "4m",
+    "accessible": "Thursday 23:00–00:00: 4m"
+   },
+   {
+    "day": 4,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 00:00–01:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 01:00–02:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 02:00–03:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 03:00–04:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 04:00–05:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 05:00–06:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 6,
+    "level": 0.2763073572499888,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 06:00–07:00",
+    "tooltip-value": "2m",
+    "accessible": "Friday 06:00–07:00: 2m"
+   },
+   {
+    "day": 4,
+    "hour": 7,
+    "level": 0.685763009014037,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 07:00–08:00",
+    "tooltip-value": "15m",
+    "accessible": "Friday 07:00–08:00: 15m"
+   },
+   {
+    "day": 4,
+    "hour": 8,
+    "level": 0.7350702417054513,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 08:00–09:00",
+    "tooltip-value": "18m",
+    "accessible": "Friday 08:00–09:00: 18m"
+   },
+   {
+    "day": 4,
+    "hour": 9,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 09:00–10:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 09:00–10:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 10,
+    "level": 0.38813447774760845,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 10:00–11:00",
+    "tooltip-value": "5m",
+    "accessible": "Friday 10:00–11:00: 5m"
+   },
+   {
+    "day": 4,
+    "hour": 11,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 11:00–12:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 11:00–12:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 12,
+    "level": 0.5838054453988003,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 12:00–13:00",
+    "tooltip-value": "11m",
+    "accessible": "Friday 12:00–13:00: 11m"
+   },
+   {
+    "day": 4,
+    "hour": 13,
+    "level": 0.5130173769641555,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 13:00–14:00",
+    "tooltip-value": "8m",
+    "accessible": "Friday 13:00–14:00: 8m"
+   },
+   {
+    "day": 4,
+    "hour": 14,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 14:00–15:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 14:00–15:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 15,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 15:00–16:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 15:00–16:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 16,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 16:00–17:00",
+    "tooltip-value": "0m",
+    "accessible": "Friday 16:00–17:00: 0s"
+   },
+   {
+    "day": 4,
+    "hour": 17,
+    "level": 0.5673203110255298,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 17:00–18:00",
+    "tooltip-value": "10m",
+    "accessible": "Friday 17:00–18:00: 10m"
+   },
+   {
+    "day": 4,
+    "hour": 18,
+    "level": 0.6890338544075607,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 18:00–19:00",
+    "tooltip-value": "15m",
+    "accessible": "Friday 18:00–19:00: 15m"
+   },
+   {
+    "day": 4,
+    "hour": 19,
+    "level": 0.46684454311255313,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 19:00–20:00",
+    "tooltip-value": "7m",
+    "accessible": "Friday 19:00–20:00: 7m"
+   },
+   {
+    "day": 4,
+    "hour": 20,
+    "level": 0.7666849647239599,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 20:00–21:00",
+    "tooltip-value": "19m",
+    "accessible": "Friday 20:00–21:00: 19m"
+   },
+   {
+    "day": 4,
+    "hour": 21,
+    "level": 0.9042312570298114,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 21:00–22:00",
+    "tooltip-value": "27m",
+    "accessible": "Friday 21:00–22:00: 27m"
+   },
+   {
+    "day": 4,
+    "hour": 22,
+    "level": 0.6456412546743573,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 22:00–23:00",
+    "tooltip-value": "13m",
+    "accessible": "Friday 22:00–23:00: 13m"
+   },
+   {
+    "day": 4,
+    "hour": 23,
+    "level": 0.3961646891502132,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Fri · 23:00–00:00",
+    "tooltip-value": "5m",
+    "accessible": "Friday 23:00–00:00: 5m"
+   },
+   {
+    "day": 5,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 00:00–01:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 01:00–02:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 02:00–03:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 03:00–04:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 04:00–05:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 05:00–06:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 6,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 06:00–07:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 06:00–07:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 7,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 07:00–08:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 07:00–08:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 8,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 08:00–09:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 08:00–09:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 9,
+    "level": 0.4814674806996331,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 09:00–10:00",
+    "tooltip-value": "7m",
+    "accessible": "Saturday 09:00–10:00: 7m"
+   },
+   {
+    "day": 5,
+    "hour": 10,
+    "level": 0.6768547731005549,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 10:00–11:00",
+    "tooltip-value": "15m",
+    "accessible": "Saturday 10:00–11:00: 15m"
+   },
+   {
+    "day": 5,
+    "hour": 11,
+    "level": 0.6373159509869473,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 11:00–12:00",
+    "tooltip-value": "13m",
+    "accessible": "Saturday 11:00–12:00: 13m"
+   },
+   {
+    "day": 5,
+    "hour": 12,
+    "level": 0.31421976575503907,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 12:00–13:00",
+    "tooltip-value": "3m",
+    "accessible": "Saturday 12:00–13:00: 3m"
+   },
+   {
+    "day": 5,
+    "hour": 13,
+    "level": 0.3039000351108127,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 13:00–14:00",
+    "tooltip-value": "3m",
+    "accessible": "Saturday 13:00–14:00: 3m"
+   },
+   {
+    "day": 5,
+    "hour": 14,
+    "level": 0.4859477301846663,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 14:00–15:00",
+    "tooltip-value": "7m",
+    "accessible": "Saturday 14:00–15:00: 7m"
+   },
+   {
+    "day": 5,
+    "hour": 15,
+    "level": 0.5312940136413182,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 15:00–16:00",
+    "tooltip-value": "9m",
+    "accessible": "Saturday 15:00–16:00: 9m"
+   },
+   {
+    "day": 5,
+    "hour": 16,
+    "level": 0.5128115871061775,
+    "peak": false,
+    "now": true,
+    "tooltip-title": "Sat · 16:00–17:00",
+    "tooltip-value": "8m",
+    "accessible": "Saturday 16:00–17:00: 8m"
+   },
+   {
+    "day": 5,
+    "hour": 17,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 17:00–18:00",
+    "tooltip-value": "0m",
+    "accessible": "Saturday 17:00–18:00: 0s"
+   },
+   {
+    "day": 5,
+    "hour": 18,
+    "level": 0.20444537924601558,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 18:00–19:00",
+    "tooltip-value": "1m",
+    "accessible": "Saturday 18:00–19:00: 1m"
+   },
+   {
+    "day": 5,
+    "hour": 19,
+    "level": 0.5651443261572331,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 19:00–20:00",
+    "tooltip-value": "10m",
+    "accessible": "Saturday 19:00–20:00: 10m"
+   },
+   {
+    "day": 5,
+    "hour": 20,
+    "level": 0.7567764718750777,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 20:00–21:00",
+    "tooltip-value": "19m",
+    "accessible": "Saturday 20:00–21:00: 19m"
+   },
+   {
+    "day": 5,
+    "hour": 21,
+    "level": 1.0,
+    "peak": true,
+    "now": false,
+    "tooltip-title": "Sat · 21:00–22:00",
+    "tooltip-value": "33m",
+    "accessible": "Saturday 21:00–22:00: 33m"
+   },
+   {
+    "day": 5,
+    "hour": 22,
+    "level": 0.8388563797625217,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 22:00–23:00",
+    "tooltip-value": "23m",
+    "accessible": "Saturday 22:00–23:00: 23m"
+   },
+   {
+    "day": 5,
+    "hour": 23,
+    "level": 0.4876690169830814,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sat · 23:00–00:00",
+    "tooltip-value": "7m",
+    "accessible": "Saturday 23:00–00:00: 7m"
+   },
+   {
+    "day": 6,
+    "hour": 0,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 00:00–01:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 00:00–01:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 1,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 01:00–02:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 01:00–02:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 2,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 02:00–03:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 02:00–03:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 3,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 03:00–04:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 03:00–04:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 4,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 04:00–05:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 04:00–05:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 5,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 05:00–06:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 05:00–06:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 6,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 06:00–07:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 06:00–07:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 7,
+    "level": 0.26805888897213354,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 07:00–08:00",
+    "tooltip-value": "2m",
+    "accessible": "Sunday 07:00–08:00: 2m"
+   },
+   {
+    "day": 6,
+    "hour": 8,
+    "level": 0.28043262352936654,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 08:00–09:00",
+    "tooltip-value": "2m",
+    "accessible": "Sunday 08:00–09:00: 2m"
+   },
+   {
+    "day": 6,
+    "hour": 9,
+    "level": 0.4838372758191954,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 09:00–10:00",
+    "tooltip-value": "7m",
+    "accessible": "Sunday 09:00–10:00: 7m"
+   },
+   {
+    "day": 6,
+    "hour": 10,
+    "level": 0.702810741957672,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 10:00–11:00",
+    "tooltip-value": "16m",
+    "accessible": "Sunday 10:00–11:00: 16m"
+   },
+   {
+    "day": 6,
+    "hour": 11,
+    "level": 0.6600695834387161,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 11:00–12:00",
+    "tooltip-value": "14m",
+    "accessible": "Sunday 11:00–12:00: 14m"
+   },
+   {
+    "day": 6,
+    "hour": 12,
+    "level": 0.24972232708166975,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 12:00–13:00",
+    "tooltip-value": "2m",
+    "accessible": "Sunday 12:00–13:00: 2m"
+   },
+   {
+    "day": 6,
+    "hour": 13,
+    "level": 0.22201940484032268,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 13:00–14:00",
+    "tooltip-value": "1m",
+    "accessible": "Sunday 13:00–14:00: 1m"
+   },
+   {
+    "day": 6,
+    "hour": 14,
+    "level": 0.48798578265526144,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 14:00–15:00",
+    "tooltip-value": "7m",
+    "accessible": "Sunday 14:00–15:00: 7m"
+   },
+   {
+    "day": 6,
+    "hour": 15,
+    "level": 0.49515818289648467,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 15:00–16:00",
+    "tooltip-value": "8m",
+    "accessible": "Sunday 15:00–16:00: 8m"
+   },
+   {
+    "day": 6,
+    "hour": 16,
+    "level": 0.4671490205822718,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 16:00–17:00",
+    "tooltip-value": "7m",
+    "accessible": "Sunday 16:00–17:00: 7m"
+   },
+   {
+    "day": 6,
+    "hour": 17,
+    "level": 0.3326179080651904,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 17:00–18:00",
+    "tooltip-value": "3m",
+    "accessible": "Sunday 17:00–18:00: 3m"
+   },
+   {
+    "day": 6,
+    "hour": 18,
+    "level": 0.0,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 18:00–19:00",
+    "tooltip-value": "0m",
+    "accessible": "Sunday 18:00–19:00: 0s"
+   },
+   {
+    "day": 6,
+    "hour": 19,
+    "level": 0.4676615232404725,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 19:00–20:00",
+    "tooltip-value": "7m",
+    "accessible": "Sunday 19:00–20:00: 7m"
+   },
+   {
+    "day": 6,
+    "hour": 20,
+    "level": 0.7744944898886257,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 20:00–21:00",
+    "tooltip-value": "20m",
+    "accessible": "Sunday 20:00–21:00: 20m"
+   },
+   {
+    "day": 6,
+    "hour": 21,
+    "level": 0.7784580035390576,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 21:00–22:00",
+    "tooltip-value": "20m",
+    "accessible": "Sunday 21:00–22:00: 20m"
+   },
+   {
+    "day": 6,
+    "hour": 22,
+    "level": 0.6008498422481627,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 22:00–23:00",
+    "tooltip-value": "12m",
+    "accessible": "Sunday 22:00–23:00: 12m"
+   },
+   {
+    "day": 6,
+    "hour": 23,
+    "level": 0.291228104727331,
+    "peak": false,
+    "now": false,
+    "tooltip-title": "Sun · 23:00–00:00",
+    "tooltip-value": "2m",
+    "accessible": "Sunday 23:00–00:00: 2m"
+   }
+  ],
+  "heat-peak": "Peak Sat 21:00",
+  "heat-day-labels": [
+   "Mon",
+   "Tue",
+   "Wed",
+   "Thu",
+   "Fri",
+   "Sat",
+   "Sun"
+  ],
+  "heat-hour-labels": [
+   "00",
+   "01",
+   "02",
+   "03",
+   "04",
+   "05",
+   "06",
+   "07",
+   "08",
+   "09",
+   "10",
+   "11",
+   "12",
+   "13",
+   "14",
+   "15",
+   "16",
+   "17",
+   "18",
+   "19",
+   "20",
+   "21",
+   "22",
+   "23"
+  ],
+  "heat-summary": "Listening by weekday and hour. Busiest time: Saturdays, 21:00–22:00, 33 minutes.",
+  "sources": [
+   {
+    "key": "context-chip",
+    "rank": "",
+    "icon": "mouse-pointer-click",
+    "label": "Right-click chip",
+    "sub": "",
+    "value": "92",
+    "percent": "28%",
+    "fraction": 0.2796352583586626,
+    "first": true,
+    "accessible": "Right-click chip, 92 reads, 28%"
+   },
+   {
+    "key": "hotkey",
+    "rank": "",
+    "icon": "keyboard",
+    "label": "Hotkey",
+    "sub": "",
+    "value": "79",
+    "percent": "24%",
+    "fraction": 0.24012158054711247,
+    "first": false,
+    "accessible": "Hotkey, 79 reads, 24%"
+   },
+   {
+    "key": "selection-popup",
+    "rank": "",
+    "icon": "text-cursor-input",
+    "label": "Selection popup",
+    "sub": "",
+    "value": "56",
+    "percent": "17%",
+    "fraction": 0.1702127659574468,
+    "first": false,
+    "accessible": "Selection popup, 56 reads, 17%"
+   },
+   {
+    "key": "browser-extension",
+    "rank": "",
+    "icon": "globe",
+    "label": "Browser extension",
+    "sub": "",
+    "value": "49",
+    "percent": "15%",
+    "fraction": 0.14893617021276595,
+    "first": false,
+    "accessible": "Browser extension, 49 reads, 15%"
+   },
+   {
+    "key": "clipboard",
+    "rank": "",
+    "icon": "clipboard",
+    "label": "Clipboard",
+    "sub": "",
+    "value": "33",
+    "percent": "10%",
+    "fraction": 0.10030395136778116,
+    "first": false,
+    "accessible": "Clipboard, 33 reads, 10%"
+   }
+  ],
+  "sources-empty": "No reads in this range yet",
+  "sources-summary": "Reads by source: Right-click chip 92 (28%), Hotkey 79 (24%), Selection popup 56 (17%), Browser extension 49 (15%), Clipboard 33 (10%).",
+  "top-apps": [
+   {
+    "key": "chrome",
+    "rank": "01",
+    "icon": "",
+    "art": {
+     "$image": "art/small-river.png"
+    },
+    "label": "Chrome",
+    "sub": "102 reads",
+    "value": "5h 52m",
+    "percent": "",
+    "fraction": 1.0,
+    "first": true,
+    "accessible": "Chrome, 5h 52m, 102 reads"
+   },
+   {
+    "key": "outlook",
+    "rank": "02",
+    "icon": "",
+    "art": {
+     "$image": "art/small-eric.png"
+    },
+    "label": "Outlook",
+    "sub": "72 reads",
+    "value": "4h 10m",
+    "percent": "",
+    "fraction": 0.7096774193548386,
+    "first": false,
+    "accessible": "Outlook, 4h 10m, 72 reads"
+   },
+   {
+    "key": "word",
+    "rank": "03",
+    "icon": "",
+    "art": {
+     "$image": "art/small-sarah.png"
+    },
+    "label": "Word",
+    "sub": "56 reads",
+    "value": "3h 13m",
+    "percent": "",
+    "fraction": 0.5483870967741936,
+    "first": false,
+    "accessible": "Word, 3h 13m, 56 reads"
+   },
+   {
+    "key": "slack",
+    "rank": "04",
+    "icon": "",
+    "art": {
+     "$image": "art/small-will.png"
+    },
+    "label": "Slack",
+    "sub": "36 reads",
+    "value": "2h 5m",
+    "percent": "",
+    "fraction": 0.3548387096774193,
+    "first": false,
+    "accessible": "Slack, 2h 5m, 36 reads"
+   },
+   {
+    "key": "kindle",
+    "rank": "05",
+    "icon": "",
+    "art": {
+     "$image": "art/small-matilda.png"
+    },
+    "label": "Kindle",
+    "sub": "26 reads",
+    "value": "1h 30m",
+    "percent": "",
+    "fraction": 0.25806451612903225,
+    "first": false,
+    "accessible": "Kindle, 1h 30m, 26 reads"
+   },
+   {
+    "key": "notion",
+    "rank": "06",
+    "icon": "",
+    "art": {
+     "$image": "art/small-bill.png"
+    },
+    "label": "Notion",
+    "sub": "16 reads",
+    "value": "56m",
+    "percent": "",
+    "fraction": 0.16129032258064518,
+    "first": false,
+    "accessible": "Notion, 56m, 16 reads"
+   }
+  ],
+  "top-apps-summary": "Top apps by listening time: Chrome 5h 52m, Outlook 4h 10m, Word 3h 13m, Slack 2h 5m, Kindle 1h 30m, Notion 56m.",
+  "top-voices": [
+   {
+    "key": "george",
+    "rank": "01",
+    "icon": "",
+    "art": {
+     "$image": "art/small-george.png"
+    },
+    "label": "George",
+    "sub": "145 reads",
+    "value": "8h 20m",
+    "percent": "",
+    "fraction": 1.0,
+    "first": true,
+    "accessible": "George, 8h 20m, 145 reads"
+   },
+   {
+    "key": "charlotte",
+    "rank": "02",
+    "icon": "",
+    "art": {
+     "$image": "art/small-charlotte.png"
+    },
+    "label": "Charlotte",
+    "sub": "79 reads",
+    "value": "4h 32m",
+    "percent": "",
+    "fraction": 0.5454545454545454,
+    "first": false,
+    "accessible": "Charlotte, 4h 32m, 79 reads"
+   },
+   {
+    "key": "brian",
+    "rank": "03",
+    "icon": "",
+    "art": {
+     "$image": "art/small-brian.png"
+    },
+    "label": "Brian",
+    "sub": "46 reads",
+    "value": "2h 39m",
+    "percent": "",
+    "fraction": 0.31818181818181823,
+    "first": false,
+    "accessible": "Brian, 2h 39m, 46 reads"
+   },
+   {
+    "key": "lily",
+    "rank": "04",
+    "icon": "",
+    "art": {
+     "$image": "art/small-lily.png"
+    },
+    "label": "Lily",
+    "sub": "30 reads",
+    "value": "1h 42m",
+    "percent": "",
+    "fraction": 0.20454545454545453,
+    "first": false,
+    "accessible": "Lily, 1h 42m, 30 reads"
+   },
+   {
+    "key": "daniel",
+    "rank": "05",
+    "icon": "",
+    "art": {
+     "$image": "art/small-daniel.png"
+    },
+    "label": "Daniel",
+    "sub": "16 reads",
+    "value": "56m",
+    "percent": "",
+    "fraction": 0.11363636363636365,
+    "first": false,
+    "accessible": "Daniel, 56m, 16 reads"
+   }
+  ],
+  "top-voices-summary": "Top voices by listening time: George 8h 20m, Charlotte 4h 32m, Brian 2h 39m, Lily 1h 42m, Daniel 56m.",
+  "credits": {
+   "state": {
+    "$enum": "CreditsState.ready"
+   },
+   "title": "",
+   "tier": "Pro",
+   "percent": "39%",
+   "percent-accessible": "39 percent of credits left",
+   "fraction": 0.39,
+   "low": false,
+   "facts": "195.2K of 500K left",
+   "reset": "Resets in 12 days",
+   "detail": "195,234 of 500,000 characters left. Resets in 12 days",
+   "message": "",
+   "action-label": "",
+   "refreshing": false
+  },
+  "billed": "1.1M billed"
+ }
+}

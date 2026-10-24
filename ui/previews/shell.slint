@@ -1,0 +1,46 @@
+// Shell previews: the whole MainWindow with fixture data (ui/previews/shell-<fixture>.json; page data is copied from
+// the pages' own fixtures so the shell frames real content), rendered to shots/ui/shell/<render>-dark.png / -light.png.
+//   target/release/vox-shot ui/previews/shell.slint --component MainWindow --data ui/previews/shell-home.json \
+//       --size 1180x780 --out shots/ui/shell/home-dark.png
+//   light: add --set Theme.dark=false --set theme-dark=false
+//          --set 'backdrop={"$image":"ui/previews/art/backdrop-light.png"}'   (the path is relative to the repo root;
+//          leave it out for no-backdrop)
+//
+// States (fixture → size → render; the sidebar rails below 1100 px wide):
+//   home              1180x780 → home         Home; a read is playing, so the sidebar's now-playing card is hidden
+//                     1000x700 → rail         rail sidebar (ghost search button, current page ringed)
+//                     1100x700 → full-1100    just above the rail threshold: full sidebar, 607 px tall
+//   no-backdrop       1180x780 → no-backdrop  the soft placeholder while the backdrop art is missing
+//   toasts            1180x780 → toasts       success with title, info + Undo, error + Retry: one shared column width
+//                     1000x700 → toasts-rail
+//   toasts-cap        1180x780 → toasts-cap   the 4-toast cap on History (newest last)
+//   dialog            1180x780 → dialog       "Clear all history?" over History (header actions under the scrim),
+//                     1000x700 → dialog-rail  Cancel focused
+//   dialog-busy       1180x780 → dialog-busy  confirm spinner, Clear all disabled
+//   dialog-retention  1180x780 → dialog-retention  Settings → Library: "Delete 12,345 reads older than 30 days?"
+//                                             (a title too long for 400 px uses the 520-px dialog)
+//   onboarding        1180x780 → onboarding      Try step without a key; error toast + "Add key" bottom-centre
+//                     1000x700 → onboarding-700  the same toast still clears Back / Continue (bottom-centre)
+//   onboarding-min    940x640  → onboarding-min  minimum size, key step, a 3-line error toast with an action: no room
+//                                                under the card, so the stack sits top-centre over the card header
+//   history           1180x780 → history            "214 reads", Export + Clear all; now-playing card (playing)
+//   history-exporting 1180x780 → history-exporting  Export spinner; now-playing paused
+//   history-empty     1180x780 → history-empty      "nothing yet": header actions hidden
+//   analytics         1180x780 → analytics          range segmented + "· Couldn’t refresh" over a ready summary;
+//                                                   "Add your ElevenLabs key" footer
+//   player-loading    1180x780 → player-loading     now-playing "Preparing" (spinner, Play disabled); no credits line
+//   player-error      1180x780 → player-error       now-playing "Couldn’t read" with the error line; low credits (9 %)
+//   credits-loading   1180x780 → credits-loading    no now-playing, no credits line: the footer is the hint only
+//   long              1180x780 → long               long title / eyebrow / credits line / toast; no hotkey
+//                                                   ("Right-click → Read with Vox")
+//   tight             1180x640 → tight              minimum height with the card: stage 2 (no section label, no hint)
+//                     1180x700 → tight-700          stage 1 (tighter paddings, no section label; hint kept)
+//   tight-nocard      1180x640 → tight-nocard       minimum height without the card: full layout, add-key footer
+//   rail-playing      1000x700 → rail-playing       rail now-playing button (Pause) with the live dot; History actions
+//   rail-paused       1000x700 → rail-paused        rail button (Play), no dot
+//   rail-loading      1000x700 → rail-loading       rail button: spinner only ("Open player")
+//   rail-search       1000x700 → rail-search        Ctrl+K in rail mode: the floating search pill beside the rail
+//   rail-error        940x640  → rail-error         minimum size, rail, now-playing error (alert glyph + danger dot)
+export { Theme } from "../design/theme.slint";
+export { Brand, Motion } from "../models.slint";
+export { MainWindow } from "../windows/main-window.slint";

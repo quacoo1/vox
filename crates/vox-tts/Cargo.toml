@@ -1,0 +1,26 @@
+[package]
+name = "vox-tts"
+description = "Vox speech synthesis: ElevenLabs client (TTS with timestamps, voices, models, subscription), TtsEngine with bounded look-ahead and cancellation, mock synthesiser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+vox-text.workspace = true
+serde_json.workspace = true
+ureq = { workspace = true, features = ["platform-verifier"] }
+url.workspace = true
+icu_collator.workspace = true
+sha2.workspace = true
+hex.workspace = true
+base64.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+# The engine tests run against a local mock ElevenLabs server (ARCHITECTURE.md §9).
+tiny_http.workspace = true
+tempfile.workspace = true

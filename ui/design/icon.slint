@@ -1,0 +1,35 @@
+// Icon: a Lucide glyph from ui/icons (white stroke), recoloured and centred in its box.
+//
+//   in    source: image        Icons.play (icons.slint) or @image-url("../icons/play.svg")
+//   in    size: length         glyph size, default 20 px (16 px inside buttons)
+//   in    color: brush         default Theme.text
+// Preferred size is size x size. Inside a layout the box may be stretched (for example to the row height) and
+// the glyph stays centred, so icons line up with text without extra wrappers.
+// Decorative: accessible-role is none. Give the owning control the accessible label.
+
+import { Theme } from "theme.slint";
+
+export component Icon {
+    in property <image> source;
+    in property <length> size: 20px;
+    in property <brush> color: Theme.text;
+
+    min-width: root.size;
+    min-height: root.size;
+    preferred-width: root.size;
+    preferred-height: root.size;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    Image {
+        x: (root.width - root.size) / 2;
+        y: (root.height - root.size) / 2;
+        width: root.size;
+        height: root.size;
+        source: root.source;
+        colorize: root.color;
+        image-fit: contain;
+        accessible-role: none;
+        animate colorize { duration: Theme.fast; easing: ease-out; }
+    }
+}

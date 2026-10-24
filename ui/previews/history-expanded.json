@@ -1,0 +1,374 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.list"
+  },
+  "dimmed": false,
+  "count-label": "214 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "",
+  "state-title": "",
+  "state-body": "",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "",
+  "rows": [
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Today",
+    "header-label": "Today",
+    "header-meta": "4 reads · 14m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r0",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-brian.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "Why the best interfaces disappear: a short history of calm technology, from Mark Weiser’s ubiquitous computing to today’s ambient assistants.",
+    "meta": "Firefox · Brian · ~6:05 · 8 minutes ago",
+    "time-tooltip": "Friday, October 17, 2026 at 8:57 PM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.62,
+    "percent": "62%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": true,
+    "full-text": "Why the best interfaces disappear: a short history of calm technology, from Mark Weiser’s ubiquitous computing to today’s ambient assistants. In 1991 Weiser wrote that the most profound technologies are those that disappear; they weave themselves into the fabric of everyday life until they are indistinguishable from it. Thirty years later, the screens around us are louder than ever. This essay looks at what it would take to build software that respects attention: interfaces that wait, that speak only when spoken to, and that leave the room as gracefully as they enter it. We start with the thermostat, move through the e-reader and the smart speaker, and end with a modest proposal for notifications that expire on their own.",
+    "notes": [
+     "Only a short preview was saved for this read (full text storage is off)."
+    ],
+    "facts": [
+     {
+      "label": "Chars",
+      "value": "5,482",
+      "tooltip": "5,482 characters"
+     },
+     {
+      "label": "Words",
+      "value": "912",
+      "tooltip": "912 words"
+     },
+     {
+      "label": "Credits",
+      "value": "5,482",
+      "tooltip": "5,482 characters billed"
+     },
+     {
+      "label": "Heard",
+      "value": "62%",
+      "tooltip": "62% listened"
+     }
+    ],
+    "details": [
+     {
+      "label": "Source",
+      "value": "Browser extension · Firefox",
+      "tooltip": ""
+     },
+     {
+      "label": "Window",
+      "value": "Why the best interfaces disappear — The Calm Web — Mozilla Firefox",
+      "tooltip": "Why the best interfaces disappear — The Calm Web — Mozilla Firefox"
+     },
+     {
+      "label": "Voice",
+      "value": "Brian · Eleven Flash v2.5",
+      "tooltip": ""
+     },
+     {
+      "label": "Audio",
+      "value": "about 6:05",
+      "tooltip": ""
+     },
+     {
+      "label": "Read",
+      "value": "Friday, October 17, 2026 at 8:57 PM",
+      "tooltip": ""
+     }
+    ],
+    "url-label": "calmweb.org/essays/why-interfaces-disappear"
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r1",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-george.png"
+    },
+    "source-icon": "mouse-pointer-click",
+    "source-label": "Right-click chip",
+    "title": "Hi all, following up on Thursday’s planning session: the Q4 roadmap is attached, and I’d love comments on the onboarding section before Monday.",
+    "meta": "Outlook · George · 4:23 · 12 minutes ago",
+    "time-tooltip": "Friday, October 17, 2026 at 8:53 PM",
+    "favorite": false,
+    "badges": [
+     "Playing"
+    ],
+    "progress": 0.38,
+    "percent": "38%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r2",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-charlotte.png"
+    },
+    "source-icon": "keyboard",
+    "source-label": "Hotkey",
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen, and the moment it began to speak back.",
+    "meta": "Chrome · Charlotte · 2:10 · 1 hour ago",
+    "time-tooltip": "Friday, October 17, 2026 at 7:41 PM",
+    "favorite": true,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r4",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-lily.png"
+    },
+    "source-icon": "text-select",
+    "source-label": "Selection popup",
+    "title": "Chapter 3. The garden had gone quiet by the time she returned, and the gate stood open.",
+    "meta": "Word · Lily · 0:48 · 5 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 3:20 PM",
+    "favorite": false,
+    "badges": [
+     "Failed"
+    ],
+    "progress": 0.0,
+    "percent": "0%",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "Replay",
+    "replay-tooltip": "Audio no longer cached and full text wasn’t saved",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Yesterday",
+    "header-label": "Yesterday",
+    "header-meta": "2 reads · 5m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r5",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-daniel.png"
+    },
+    "source-icon": "clipboard",
+    "source-label": "Clipboard",
+    "title": "Release notes 2.4: faster startup, a new compact player, and fixes for the selection popup on high-DPI displays.",
+    "meta": "Clipboard · Daniel · 1:32 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 10:04 PM",
+    "favorite": false,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r6",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-aria.png"
+    },
+    "source-icon": "type",
+    "source-label": "Typed in app",
+    "title": "Remember to call the pharmacy before five, then pick up the parcel at the post office.",
+    "meta": "Typed in app · Aria · 3:47 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 6:30 PM",
+    "favorite": true,
+    "badges": [
+     "Paused"
+    ],
+    "progress": 0.74,
+    "percent": "74%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   }
+  ],
+  "footer": "Showing 50 of 214",
+  "can-load-more": true,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

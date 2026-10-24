@@ -1,0 +1,49 @@
+// Widget tooltip previews: the WarningTip bubble (ui/windows/widget-window.slint) as it appears over the card. Tooltips
+// only show on hover, so this file draws the bubbles directly on a widget-wide panel (380 w, the card's fill):
+//   card-tip   the full card's warning link, "{message}\nOpen settings" (up to 6 lines, 300 px)
+//   plain-tip  a plain warning note, "{message}"
+//   note-tip   the compact pill's ended-early link: one line (the pill window is 48 px tall), newline read as a space
+//   dot-tip    the compact red dot, "Stops early: {message}", one line, elided
+//   target/release/vox-shot ui/previews/widget-tips.slint --component WidgetTipsPreview \
+//       --data ui/previews/widget-tips.json --size 380x236 --scale 2 --out shots/ui/widget/tips-dark.png
+export { Theme } from "../design/theme.slint";
+import { Theme } from "../design/theme.slint";
+import { WidgetTipBubble } from "../windows/widget-window.slint";
+
+export component WidgetTipsPreview inherits Window {
+    in property <string> card-tip;
+    in property <string> plain-tip;
+    in property <string> note-tip;
+    in property <string> dot-tip;
+
+    background: Theme.panel;
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 14px;
+        alignment: start;
+
+        HorizontalLayout {
+            alignment: start;
+            WidgetTipBubble { text: root.card-tip; }
+        }
+        HorizontalLayout {
+            alignment: start;
+            WidgetTipBubble { text: root.plain-tip; }
+        }
+        HorizontalLayout {
+            alignment: start;
+            WidgetTipBubble {
+                text: root.note-tip;
+                max-lines: 1;
+            }
+        }
+        HorizontalLayout {
+            alignment: start;
+            WidgetTipBubble {
+                text: root.dot-tip;
+                max-lines: 1;
+            }
+        }
+    }
+}

@@ -1,0 +1,2078 @@
+// Analytics (ui-main.md §5, §6.1; DESIGN.md "Screens → Analytics"; R-Analytics).
+//
+// The range segmented control and the eyebrow are rendered by MainWindow's header row (`analytics.ranges`,
+// `analytics.range`, `analytics.range-label` → `analytics-set-range(value)`, ARCHITECTURE.md §7.4). Charts: Rust buckets
+// the daily series for the plot width reported through `daily-width-changed` (nothing is drawn while `data.daily` is
+// empty); the heatmap receives all 24 hour labels and shows every 3rd or 6th one from its own pitch (`3 × pitch ≥
+// 34px` → every 3rd). The keyboard-selected bar / cell exposes its `accessible` text in a hidden Text with
+// `accessible-live-region: AccessibleLiveness.polite` (as ui/design/toast.slint does; D-UM-30).
+//
+// Layout: one layout at every page width (the page is 811 px at the smallest window with the sidebar, 839 px with the
+// rail, up to ~1631 px maximised). The dashboard is a left-aligned column, 40 px gutters, capped at 1120 px (as
+// Settings' column), so very wide windows do not pull it apart:
+//   [empty banner] · Listening time | Credits · Words read │ Reads │ Streak │ Pace · Daily listening (full width) ·
+//   When you listen | How you start reads · Top apps | Top voices.
+//   The heatmap column is exactly as wide as its grid (pitch 8–24 px, so the "Peak" meta and the legend end at the
+//   grid's right edge); the right-hand column (Credits above, sources below) takes the rest, at least 250 px, so the
+//   two vertical rules line up. The top lists split their row evenly. Sections are separated by hairlines; there are
+//   no cards inside the panel. Daily plot widths reported to Rust: 731 px (811-px page) … 1120 px (≥ 1200-px page).
+// States: `state` loading → skeleton (hero | credits, 4 KPI blocks, two chart blocks); error → centred error with "Try
+//   again" (spins while `retrying`; the same panel as History's); ready / empty → the dashboard, dimmed to 70 % while
+//   `dimmed` (only after 300 ms, so the quick refreshes during playback do not flash; undimmed at once). The empty
+//   banner shows when `empty` (no reads and no listening; the rest still renders).
+// Keyboard: Tab reaches the credits button, the daily chart and the heatmap; the page scrolls each into view (with a
+//   24 px margin) when it takes focus, since a Flickable does not. Keys no chart uses scroll the page: ↑/↓ 48 px,
+//   PageUp/PageDown/Space a screen, Home/End. A click on the page focuses it for those keys.
+//
+// Strings arrive ready to show (Rust formats; the page only adds static labels). Fields are shown as is:
+//   `listened` "6h 24m" · `today` "38m" (after the static "Today") · `days-active` "24/30" (after "Days active")
+//   · `audio-generated` "6h 59m of audio generated" · `daily-avg` "Avg 16m" · `daily-peak` "Peak 41m" (empty =
+//   hidden) · `heat-peak` "Peak Sat 21:00" (empty = hidden) · `billed` "368.2K billed" (the credits footer shows
+//   "{range-label} · {billed}") · KPI `value` + optional `unit` word · ShareRow `value` / `percent` / `sub`.
+//   Durations are expected in `format_duration` style ("1h 5m", "38m") and axis / weekday labels in title case
+//   ("Sep 20", "Sat", "Mon") — the redesign never shows the dot-matrix "6H24M" / "SEP 20" forms; Slint cannot re-case.
+//   Icons (`KpiData.icon`, `ShareRow.icon`) are Lucide names from ui/icons ("type", "play", "zap", "gauge",
+//   "mouse-pointer-click", "keyboard", "text-cursor-input", "globe", "folder-open", "clipboard", "rotate-ccw",
+//   "terminal", "info"…); a few semantic aliases from the spec are accepted too ("quote", "bolt", "cursor",
+//   "text-cursor", "folder", "replay", "text"); anything unknown shows the info glyph.
+//
+// Hero: the number (44 px Display, never elided) with Today / Days active beside it; the "audio generated" aside sits
+//   on the bottom line, level with the credits footer.
+// Daily chart: one bar per `daily` entry standing on the baseline (square foot, rounded top), `level` 0..1 of the
+//   tallest; history in `text-secondary`, today in `primary` (as Home's week chart and the KPI sparks); `zero` bars
+//   are a muted stub (today's stub is brighter, so an empty today still shows where today is); `label` "" =
+//   unlabelled (a label within 24 px of an edge is anchored to that edge); `today` emphasises the label. Hover /
+//   keyboard → highlight band + a side tooltip (`tooltip-title`, `tooltip-value`, `tooltip-sub`). Keys: ←/→ ±1,
+//   PageUp −7, PageDown +7, Home, End, Escape clears; a Tab focus selects the newest column; a click focuses the chart
+//   without selecting (any of those keys then enters keyboard mode). `daily-empty` (non-empty) is drawn over the plot.
+// Heatmap: `heat` holds 168 cells ordered Monday→Sunday × 00→23 (index = day × 24 + hour, as
+//   vox_core::charts::heat_cells builds them); rounded cells in `text` at 6 opacity steps of `level`; a ring marks the
+//   `now` cell and the active one; today's weekday label is emphasised. Tooltip below the cell for Mon–Wed, above
+//   otherwise; `peak` adds "Busiest hour". Keys: ←/→ hour, ↑/↓ day, Home/End hour 0/23, Escape clears; a Tab focus
+//   selects the active cell, else the peak, else now (both re-checked against `cells`, so a stale index is ignored).
+// Both charts: leaving the window keeps the keyboard selection and restores it on return; any other blur clears it.
+// Credits (CreditsData, Analytics surface): ready → "Credits [tier]" header, percentage, meter, facts (tooltip
+//   `detail`), reset; loading → placeholders; no-key / error / restricted → `message` + optional `action-label` button
+//   (no-key → add-key(), otherwise refresh-credits()); "Refresh balance" whenever a key exists, spinning while
+//   `refreshing` and disabled while refreshing or loading. `low` tints the percentage and meter with `danger`.
+// Lists: names show a tooltip only when elided. Empty lists show a quiet placeholder row (muted glyph, message,
+//   empty meter) and two faint ghost rows, so the columns keep their height and rhythm.
+
+import {
+    Theme, Icons, Icon, Button, ButtonKind, ButtonSize, IconButton, IconButtonSize, Skeleton, ScrollArea,
+    Divider, Spinner, ArtThumb, FocusRing, Tip
+} from "../design/index.slint";
+import { AnalyticsData, KpiData, BarData, HeatCellData, ShareRow, CreditsData, CreditsState, LoadState, Motion } from "../models.slint";
+
+// Preview hooks for ui/previews/analytics*.slint only; the app never sets them. They pin a chart's active mark so a
+// render can show its tooltip (and the keyboard ring) without a pointer. -1 = off.
+export global AnalyticsPreview {
+    in property <int> daily-active: -1;
+    in property <int> heat-active: -1;
+    in property <bool> show-focus: false;
+}
+
+// Column geometry shared by the dashboard and its skeleton.
+global Geo {
+    // Side gutters and the cap on the column's width (wider pages leave the extra space on the right).
+    out property <length> gutter: 40px;
+    out property <length> content-max: 1120px;
+    // Space on either side of a vertical rule.
+    out property <length> rule-gap: 32px;
+    // The right-hand column (Credits, sources) is at least this wide.
+    out property <length> aside-min: 250px;
+    // Heatmap: weekday label column and the largest cell pitch.
+    out property <length> heat-label-w: 40px;
+    out property <length> heat-max-pitch: 24px;
+    // Gap between KPI tiles (a rule sits in the middle).
+    out property <length> kpi-gap: 40px;
+
+    // The left-hand column (hero, heatmap): as wide as the heatmap grid at its largest pitch, or what is left.
+    public pure function main-width(col: length) -> length {
+        max(self.heat-label-w + 24 * 8px,
+            min(col - 2 * self.rule-gap - 1px - self.aside-min, self.heat-label-w + 24 * self.heat-max-pitch))
+    }
+    public pure function aside-width(col: length) -> length {
+        col - 2 * self.rule-gap - 1px - self.main-width(col)
+    }
+}
+
+// Lucide icon name → glyph.
+global Glyphs {
+    public pure function get(name: string) -> image {
+        if (name == "type" || name == "quote" || name == "text") { return Icons.type; }
+        if (name == "play") { return Icons.play; }
+        if (name == "zap" || name == "bolt") { return Icons.zap; }
+        if (name == "flame") { return Icons.flame; }
+        if (name == "gauge") { return Icons.gauge; }
+        if (name == "timer") { return Icons.timer; }
+        if (name == "clock") { return Icons.clock; }
+        if (name == "hash") { return Icons.hash; }
+        if (name == "headphones") { return Icons.headphones; }
+        if (name == "audio-lines" || name == "voice") { return Icons.audio-lines; }
+        if (name == "file-text") { return Icons.file-text; }
+        if (name == "text-select") { return Icons.text-select; }
+        if (name == "mouse-pointer-click" || name == "cursor") { return Icons.mouse-pointer-click; }
+        if (name == "keyboard") { return Icons.keyboard; }
+        if (name == "text-cursor-input" || name == "text-cursor") { return Icons.text-cursor-input; }
+        if (name == "globe") { return Icons.globe; }
+        if (name == "folder-open" || name == "folder") { return Icons.folder-open; }
+        if (name == "clipboard") { return Icons.clipboard; }
+        if (name == "clipboard-paste") { return Icons.clipboard-paste; }
+        if (name == "rotate-ccw" || name == "replay") { return Icons.rotate-ccw; }
+        if (name == "repeat") { return Icons.repeat; }
+        if (name == "terminal") { return Icons.terminal; }
+        if (name == "app-window") { return Icons.app-window; }
+        if (name == "monitor") { return Icons.monitor; }
+        if (name == "mic") { return Icons.mic; }
+        if (name == "chart-column") { return Icons.chart-column; }
+        if (name == "calendar") { return Icons.calendar; }
+        if (name == "sparkles") { return Icons.sparkles; }
+        if (name == "star") { return Icons.star; }
+        if (name == "hand") { return Icons.hand; }
+        if (name == "command") { return Icons.command; }
+        if (name == "user") { return Icons.user; }
+        return Icons.info;
+    }
+}
+
+// ───────────────────────────── type ─────────────────────────────
+
+// Section heading: 13 / 500 text-label, sentence case.
+component HeadText inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-label;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// Header meta ("Avg 16m", "Peak Sat 21:00"): 13 / 500 text-secondary.
+component MetaText inherits Text {
+    font-family: Theme.font-text;
+    font-size: Theme.size-label;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-secondary;
+    vertical-alignment: center;
+    horizontal-stretch: 0;
+}
+
+// Chart axis label: 11 / 500 text-muted.
+component AxisText inherits Text {
+    font-family: Theme.font-text;
+    font-size: 11px;
+    font-weight: Theme.weight-medium;
+    color: Theme.text-muted;
+    vertical-alignment: center;
+    accessible-role: none;
+}
+
+// A heading row: the label on the left, optional meta / actions on the right (children).
+component SectionHead inherits HorizontalLayout {
+    in property <string> text;
+    height: 28px;
+    spacing: 16px;
+    HeadText {
+        text: root.text;
+        horizontal-stretch: 1;
+    }
+    @children
+}
+
+// ───────────────────────────── small visuals ─────────────────────────────
+
+// A thin rounded meter: `track` with a filled share.
+component LineMeter inherits Rectangle {
+    in property <float> value;
+    in property <brush> fill: Theme.primary;
+    in property <length> thickness: 4px;
+
+    height: root.thickness;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: root.thickness / 2;
+    background: Theme.track;
+
+    Rectangle {
+        x: 0;
+        width: root.value <= 0 ? 0px : max(root.thickness, parent.width * min(1, root.value));
+        height: 100%;
+        border-radius: root.thickness / 2;
+        background: root.fill;
+    }
+}
+
+// Seven mini columns (the last one is today, drawn bright).
+component Spark {
+    in property <[float]> values;
+    in property <string> label;
+
+    property <length> bar: 4px;
+    property <length> gap: 3px;
+
+    width: root.values.length * (root.bar + root.gap) - root.gap;
+    height: 18px;
+    horizontal-stretch: 0;
+    accessible-role: image;
+    accessible-label: root.label;
+
+    for v[i] in root.values: Rectangle {
+        x: i * (root.bar + root.gap);
+        width: root.bar;
+        height: v > 0 ? max(4px, v * root.height) : 2px;
+        y: root.height - self.height;
+        border-radius: 2px;
+        background: v <= 0 ? Theme.track : i == root.values.length - 1 ? Theme.text : Theme.text-muted;
+    }
+}
+
+// Seven activity dots, oldest → newest (decorative).
+component StreakDots {
+    in property <[bool]> dots;
+
+    width: root.dots.length * 11px - 5px;
+    height: 18px;
+    horizontal-stretch: 0;
+    accessible-role: none;
+
+    for on[i] in root.dots: Rectangle {
+        x: i * 11px;
+        y: (root.height - self.height) / 2;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: !on ? transparent : i == root.dots.length - 1 ? Theme.text : Theme.text-secondary;
+        border-width: on ? 0px : 1px;
+        border-color: Theme.field-border-focus;
+    }
+}
+
+// The chart tooltip: an inverse bubble with a title, a large value and an optional sub line. Decorative for screen
+// readers (the live text and the summaries carry the values).
+component ChartTip {
+    in property <string> title;
+    in property <string> value;
+    in property <string> sub;
+
+    preferred-width: lay.preferred-width;
+    preferred-height: lay.preferred-height;
+    accessible-role: none;
+
+    Rectangle {
+        border-radius: 12px;
+        background: Theme.tooltip;
+        drop-shadow-blur: 18px;
+        drop-shadow-offset-y: 6px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    lay := VerticalLayout {
+        padding-left: 12px;
+        padding-right: 14px;
+        padding-top: 8px;
+        padding-bottom: 9px;
+        spacing: 0px;
+        Text {
+            text: root.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-medium;
+            color: Theme.on-tooltip.with-alpha(0.62);
+            accessible-role: none;
+        }
+        Text {
+            text: root.value;
+            font-family: Theme.font-display;
+            font-size: 20px;
+            font-weight: Theme.weight-semibold;
+            color: Theme.on-tooltip;
+            accessible-role: none;
+        }
+        if root.sub != "": Text {
+            text: root.sub;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-medium;
+            color: Theme.on-tooltip.with-alpha(0.62);
+            accessible-role: none;
+        }
+    }
+}
+
+// A 32-px glyph tile (sources, app rows without art, empty placeholders).
+component GlyphTile inherits Rectangle {
+    in property <string> icon;
+    in property <length> side: 32px;
+    in property <bool> muted;
+
+    width: root.side;
+    height: root.side;
+    border-radius: root.side * 0.3;
+    background: root.muted ? transparent : Theme.chip;
+    border-width: 1px;
+    border-color: Theme.field-border;
+
+    Icon {
+        width: 100%;
+        height: 100%;
+        source: Glyphs.get(root.icon);
+        size: root.side >= 40px ? 18px : 16px;
+        color: root.muted ? Theme.text-muted : Theme.text-secondary;
+    }
+}
+
+// ───────────────────────────── hero + KPIs ─────────────────────────────
+
+component StatLine inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> spoken;
+
+    spacing: 12px;
+    height: 20px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.spoken != "" ? root.spoken : root.label + ", " + root.value;
+
+    Text {
+        text: root.label;
+        horizontal-stretch: 1;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-secondary;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+    Text {
+        text: root.value;
+        horizontal-stretch: 0;
+        font-family: Theme.font-text;
+        font-size: Theme.size-body;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+// Listening time, as two lines that span the row's height:
+//   top:    the big number            Today ............ 38m   (on the number's baseline)
+//   bottom: 6h 59m of audio generated  Days active .... 24/30 + meter   (level with the credits footer)
+component Hero inherits VerticalLayout {
+    in property <AnalyticsData> data;
+
+    // Larger than the 34-px stat numbers; "128h 47m" still fits beside the stats at the 811-px minimum page width.
+    property <length> number-size: 44px;
+
+    spacing: 0px;
+    horizontal-stretch: 1;
+
+    SectionHead { text: "Listening time"; }
+    Rectangle { height: 2px; }
+    HorizontalLayout {
+        spacing: 48px;
+        alignment: start;
+        vertical-stretch: 1;
+        VerticalLayout {
+            horizontal-stretch: 0;
+            spacing: 0px;
+            Text {
+                // Never elided: the column always leaves room for it (the stats give way first).
+                min-width: self.preferred-width;
+                text: root.data.listened;
+                font-family: Theme.font-display;
+                font-size: root.number-size;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                vertical-alignment: top;
+                accessible-role: AccessibleRole.text;
+                accessible-label: "Listening time, " + root.data.listened-accessible;
+            }
+            Rectangle {
+                min-height: 8px;
+                vertical-stretch: 1;
+            }
+            Text {
+                height: 16px;
+                text: root.data.audio-generated;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            min-width: 160px;
+            preferred-width: 200px;
+            horizontal-stretch: 1;
+            spacing: 0px;
+            // Puts Today's baseline on the big number's baseline.
+            padding-top: 34px;
+            StatLine {
+                label: "Today";
+                value: root.data.today;
+                spoken: root.data.today-accessible;
+            }
+            Rectangle { height: 10px; }
+            Divider { }
+            Rectangle {
+                min-height: 10px;
+                vertical-stretch: 1;
+            }
+            StatLine {
+                label: "Days active";
+                value: root.data.days-active;
+            }
+            Rectangle { height: 8px; }
+            LineMeter {
+                value: root.data.days-active-fraction;
+                accessible-role: progress-indicator;
+                accessible-label: "Days with listening";
+                accessible-value: root.data.days-active-accessible;
+            }
+        }
+    }
+}
+
+component KpiTile inherits Rectangle {
+    in property <KpiData> kpi;
+    // Draw a vertical rule in the middle of the gap before this tile.
+    in property <bool> rule;
+
+    horizontal-stretch: 1;
+    min-width: 120px;
+    preferred-width: 160px;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.kpi.label + ", " + root.kpi.value-accessible + ". " + root.kpi.sub;
+
+    if root.rule: Rectangle {
+        x: -Geo.kpi-gap / 2;
+        width: 1px;
+        height: 100%;
+        background: Theme.divider;
+    }
+
+    lay := VerticalLayout {
+        spacing: 6px;
+        alignment: start;
+        // Icon, label, then the mini visual right after the label (not pushed to the far edge of wide tiles).
+        HorizontalLayout {
+            height: 20px;
+            spacing: 8px;
+            alignment: start;
+            Icon {
+                source: Glyphs.get(root.kpi.icon);
+                size: 16px;
+                color: Theme.text-secondary;
+            }
+            Text {
+                text: root.kpi.label;
+                horizontal-stretch: 0;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-label;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.kpi.spark.length > 0: VerticalLayout {
+                alignment: center;
+                padding-left: 4px;
+                Spark {
+                    values: root.kpi.spark;
+                    label: root.kpi.spark-label;
+                }
+            }
+            if root.kpi.spark.length == 0 && root.kpi.dots.length > 0: VerticalLayout {
+                alignment: center;
+                padding-left: 4px;
+                StreakDots { dots: root.kpi.dots; }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Text {
+                text: root.kpi.value;
+                font-family: Theme.font-display;
+                font-size: Theme.size-number;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.kpi.unit != "": VerticalLayout {
+                alignment: end;
+                padding-bottom: 8px;
+                Text {
+                    text: root.kpi.unit;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-secondary;
+                    accessible-role: none;
+                }
+            }
+        }
+        Text {
+            text: root.kpi.sub;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+}
+
+component KpiStrip inherits HorizontalLayout {
+    in property <[KpiData]> kpis;
+
+    spacing: Geo.kpi-gap;
+    for k[i] in root.kpis: KpiTile {
+        kpi: k;
+        rule: i > 0;
+    }
+}
+
+// ───────────────────────────── credits ─────────────────────────────
+
+// The plan badge: the design Badge's filled look, but capped in width with an ellipsis (tiers can be long).
+component TierPill inherits Rectangle {
+    in property <string> text;
+
+    height: 22px;
+    min-width: 22px;
+    preferred-width: min(136px, label.preferred-width + 18px);
+    max-width: 136px;
+    horizontal-stretch: 0;
+    border-radius: 11px;
+    background: Theme.chip;
+    border-width: 1px;
+    border-color: Theme.field-border;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    label := Text {
+        x: 9px;
+        width: root.width - 18px;
+        height: root.height;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text-secondary;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+    Tip {
+        text: root.text;
+        enabled: label.preferred-width > label.width + 0.5px;
+    }
+}
+
+component CreditsBlock inherits VerticalLayout {
+    in property <CreditsData> credits;
+    in property <string> range-label;
+    in property <string> billed;
+
+    callback refresh();
+    callback add-key();
+    // A button took focus: bring (y, height) (window coordinates) into view.
+    callback reveal(length, length);
+
+    property <bool> ready: root.credits.state == CreditsState.ready || root.credits.state == CreditsState.demo;
+    property <bool> loading: root.credits.state == CreditsState.loading;
+    property <bool> notice: !root.ready && !root.loading;
+    // The notice has its own refresh pill (error → "Retry"): while it spins, the header button only greys out, so
+    // one refresh never shows two spinners.
+    property <bool> inline-refresh: root.notice && root.credits.state != CreditsState.no-key
+        && root.credits.action-label != "";
+    property <bool> header-spins: root.credits.refreshing && !root.inline-refresh;
+
+    spacing: 6px;
+    // The ready state's height, so the row does not jump when the state changes.
+    min-height: 176px;
+    accessible-role: groupbox;
+    accessible-label: "ElevenLabs credits";
+
+    // "Credits [Pro]" on the left, as on Home; the refresh action at the far right.
+    HorizontalLayout {
+        height: 28px;
+        spacing: 8px;
+        HeadText {
+            text: "Credits";
+            horizontal-stretch: 0;
+        }
+        if root.ready && root.credits.tier != "": VerticalLayout {
+            alignment: center;
+            TierPill { text: root.credits.tier; }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        if root.credits.state != CreditsState.no-key && root.header-spins: Rectangle {
+            width: 28px;
+            height: 28px;
+            Spinner {
+                width: 100%;
+                height: 100%;
+                size: 14px;
+                arc: 270deg;
+                track-color: transparent;
+                color: Theme.text-secondary;
+                label: "Refreshing balance";
+            }
+        }
+        if root.credits.state != CreditsState.no-key && !root.header-spins: IconButton {
+            icon: Icons.refresh-cw;
+            label: "Refresh balance";
+            tooltip: "Refresh balance";
+            size: IconButtonSize.sm;
+            enabled: !root.loading && !root.credits.refreshing;
+            clicked => { root.refresh(); }
+            changed has-focus => {
+                if (self.has-focus) {
+                    root.reveal(root.absolute-position.y, root.height);
+                }
+            }
+        }
+    }
+
+    if root.ready: VerticalLayout {
+        spacing: 10px;
+        // Just the percentage (as Home): the facts line below says what is left.
+        Text {
+            text: root.credits.percent;
+            font-family: Theme.font-display;
+            font-size: Theme.size-number;
+            font-weight: Theme.weight-semibold;
+            color: root.credits.low ? Theme.danger : Theme.text;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.credits.percent-accessible;
+        }
+        LineMeter {
+            value: root.credits.fraction;
+            fill: root.credits.low ? Theme.danger : Theme.primary;
+            accessible-role: progress-indicator;
+            accessible-label: "Credits left this period";
+            accessible-value: root.credits.detail;
+        }
+        Rectangle {
+            height: facts.preferred-height;
+            facts := VerticalLayout {
+                spacing: 2px;
+                Text {
+                    text: root.credits.facts;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-label;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-secondary;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                if root.credits.reset != "": Text {
+                    text: root.credits.reset;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-caption;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-muted;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+            }
+            Tip { text: root.credits.detail; }
+        }
+    }
+
+    if root.loading: VerticalLayout {
+        spacing: 12px;
+        padding-top: 6px;
+        Skeleton { width: 92px; height: 30px; }
+        Skeleton { height: 4px; }
+        Skeleton { width: 140px; height: 10px; }
+        Skeleton { width: 96px; height: 10px; }
+    }
+
+    if root.notice: VerticalLayout {
+        spacing: 14px;
+        padding-top: 4px;
+        Text {
+            text: root.credits.message;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+        }
+        if root.credits.action-label != "": HorizontalLayout {
+            alignment: start;
+            Button {
+                text: root.credits.action-label;
+                size: ButtonSize.sm;
+                kind: root.credits.state == CreditsState.no-key ? ButtonKind.primary : ButtonKind.secondary;
+                icon: root.credits.state == CreditsState.no-key ? Icons.key-round : Icons.refresh-cw;
+                loading: root.credits.state != CreditsState.no-key && root.credits.refreshing;
+                clicked => {
+                    if (root.credits.state == CreditsState.no-key) {
+                        root.add-key();
+                    } else {
+                        root.refresh();
+                    }
+                }
+                changed has-focus => {
+                    if (self.has-focus) {
+                        root.reveal(root.absolute-position.y, root.height);
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        min-height: 6px;
+        vertical-stretch: 1;
+    }
+    Text {
+        height: 16px;
+        text: root.billed != "" ? root.range-label + " · " + root.billed : root.range-label;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-muted;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+// ───────────────────────────── daily chart ─────────────────────────────
+
+component DailyChart {
+    in property <[BarData]> bars;
+    in property <string> empty-note;
+    in property <string> summary;
+
+    // The plot's width in logical px (on creation and on every change).
+    callback plot-width-changed(float);
+    // Keyboard focus or a keyboard move: the section should be scrolled into view.
+    callback revealed();
+
+    property <length> plot-h: 152px;
+    property <length> axis-h: 28px;
+    property <int> n: root.bars.length;
+    property <length> pitch: root.n > 0 ? root.width / root.n : 0px;
+    property <length> bar-w: max(2px, min(28px, root.pitch * 0.5));
+    property <length> bar-r: min(root.bar-w / 2, 6px);
+    property <int> active: -1;
+    property <bool> kb-mode;
+    // Keyboard selection kept while the window is inactive.
+    property <bool> saved-kb;
+    property <int> saved-active: -1;
+    property <int> shown: AnalyticsPreview.daily-active >= 0 && AnalyticsPreview.daily-active < root.n
+        ? AnalyticsPreview.daily-active : root.active;
+    property <bool> ring: (fs.has-focus && root.kb-mode) || (AnalyticsPreview.show-focus && AnalyticsPreview.daily-active >= 0);
+
+    function select(i: int) {
+        root.kb-mode = true;
+        root.active = max(0, min(root.n - 1, i));
+        root.revealed();
+    }
+
+    horizontal-stretch: 1;
+    min-width: 160px;
+    height: root.plot-h + root.axis-h;
+
+    init => {
+        if (root.width > 0px) {
+            root.plot-width-changed(root.width / 1px);
+        }
+    }
+    changed width => {
+        if (root.width > 0px) {
+            root.plot-width-changed(root.width / 1px);
+        }
+    }
+
+    // Grid: top and middle hairlines (faint), and the baseline the bars stand on.
+    Rectangle { y: 0; height: 1px; background: Theme.divider; opacity: 0.6; }
+    Rectangle { y: root.plot-h / 2; height: 1px; background: Theme.divider; opacity: 0.6; }
+    Rectangle { y: root.plot-h; height: 1px; background: Theme.divider; }
+
+    // Highlight band behind the active column.
+    if root.shown >= 0 && root.shown < root.n: Rectangle {
+        x: root.shown * root.pitch + 1px;
+        y: -6px;
+        width: max(2px, root.pitch - 2px);
+        height: root.plot-h + root.axis-h + 2px;
+        border-radius: min(10px, root.pitch / 2);
+        background: Theme.hover;
+    }
+
+    // Bars stand on the baseline: square foot, rounded top. History in grey (text-secondary on Night, the lighter
+    // text-muted on Paper, where near-black history bars would be heavy), today and the active column in primary; the
+    // others dim while one is active.
+    property <color> history-fill: Theme.dark ? Theme.text-secondary : Theme.text-muted;
+    for bar[i] in root.bars: Rectangle {
+        property <bool> empty: bar.zero || bar.level <= 0;
+        property <length> h: self.empty ? 3px : max(4px, min(1, bar.level) * (root.plot-h - 8px));
+        property <length> r: self.empty ? 1.5px : root.bar-r;
+        x: (i + 0.5) * root.pitch - root.bar-w / 2;
+        y: root.plot-h - self.h;
+        width: root.bar-w;
+        height: self.h;
+        border-top-left-radius: self.r;
+        border-top-right-radius: self.r;
+        background: self.empty ? (bar.today ? Theme.text-muted : Theme.track)
+            : bar.today || i == root.shown ? Theme.primary : root.history-fill;
+        opacity: root.shown >= 0 && root.shown != i && !self.empty ? 0.38 : 1;
+        animate opacity { duration: Motion.reduce ? 0ms : Theme.fast; easing: ease-out; }
+    }
+
+    for bar[i] in root.bars: AxisText {
+        property <length> cx: (i + 0.5) * root.pitch;
+        property <bool> at-left: self.cx < 24px;
+        property <bool> at-right: self.cx > root.width - 24px;
+        visible: bar.label != "";
+        x: self.at-left ? 0px : self.at-right ? root.width - 72px : self.cx - 36px;
+        y: root.plot-h + 6px;
+        width: 72px;
+        height: root.axis-h - 6px;
+        horizontal-alignment: self.at-left ? left : self.at-right ? right : center;
+        text: bar.label;
+        color: bar.today || i == root.shown ? Theme.text : Theme.text-muted;
+        font-weight: bar.today ? Theme.weight-semibold : Theme.weight-medium;
+    }
+
+    if root.empty-note != "": Rectangle {
+        width: note.preferred-width + 24px;
+        height: 28px;
+        x: (root.width - self.width) / 2;
+        y: (root.plot-h - self.height) / 2;
+        background: Theme.panel;
+        note := Text {
+            text: root.empty-note;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+        }
+    }
+
+    // Pointer + keyboard.
+    fs := FocusScope {
+        x: 0;
+        y: -6px;
+        width: root.width;
+        height: root.plot-h + root.axis-h + 6px;
+        accessible-role: image;
+        accessible-label: root.summary;
+        accessible-description: "Use the arrow keys to move between columns";
+
+        TouchArea {
+            mouse-cursor: default;
+            // The area takes every press, so focus the chart here (programmatic: no keyboard mode until a key).
+            clicked => { fs.focus(); }
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.move && root.n > 0 && root.pitch > 0) {
+                    root.active = max(0, min(root.n - 1, floor(self.mouse-x / root.pitch)));
+                }
+            }
+            changed has-hover => {
+                if (!self.has-hover && !root.kb-mode) {
+                    root.active = -1;
+                }
+            }
+        }
+
+        focus-gained(reason) => {
+            if (reason == FocusReason.window-activation) {
+                // Back to the window: restore a keyboard selection, nothing else.
+                if (root.saved-kb && root.n > 0) {
+                    root.kb-mode = true;
+                    root.active = max(0, min(root.n - 1, root.saved-active));
+                }
+            } else if (reason == FocusReason.tab-navigation && root.n > 0) {
+                root.kb-mode = true;
+                if (root.active < 0 || root.active >= root.n) {
+                    root.active = root.n - 1;
+                }
+                root.revealed();
+            } else if (reason == FocusReason.tab-navigation) {
+                root.revealed();
+            }
+        }
+        focus-lost(reason) => {
+            root.saved-kb = reason == FocusReason.window-activation && root.kb-mode;
+            root.saved-active = root.active;
+            root.kb-mode = false;
+            root.active = -1;
+        }
+        key-pressed(event) => {
+            if (root.n == 0) {
+                return reject;
+            }
+            let start = root.active >= 0 && root.active < root.n ? root.active : root.n - 1;
+            if (event.text == Key.LeftArrow) { root.select(start - 1); return accept; }
+            if (event.text == Key.RightArrow) { root.select(start + 1); return accept; }
+            if (event.text == Key.PageUp) { root.select(start - 7); return accept; }
+            if (event.text == Key.PageDown) { root.select(start + 7); return accept; }
+            if (event.text == Key.Home) { root.select(0); return accept; }
+            if (event.text == Key.End) { root.select(root.n - 1); return accept; }
+            if (event.text == Key.Escape && root.active >= 0) {
+                root.active = -1;
+                return accept;
+            }
+            reject
+        }
+    }
+
+    // Keyboard focus ring around the plot.
+    Rectangle {
+        x: -10px;
+        y: -10px;
+        width: root.width + 20px;
+        height: root.plot-h + root.axis-h + 12px;
+        FocusRing {
+            radius: 12px;
+            shown: root.ring;
+        }
+    }
+
+    // Polite live text for the keyboard-selected column (D-UM-30).
+    Text {
+        x: 0;
+        y: 0;
+        width: 1px;
+        height: 1px;
+        text: "";
+        color: transparent;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.kb-mode && root.active >= 0 && root.active < root.n ? root.bars[root.active].accessible : "";
+        accessible-live-region: AccessibleLiveness.polite;
+    }
+
+    if root.shown >= 0 && root.shown < root.n: ChartTip {
+        property <length> cx: (root.shown + 0.5) * root.pitch;
+        property <length> off: root.bar-w / 2 + 10px;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        x: self.cx + self.off + self.width <= root.width ? self.cx + self.off : max(0px, self.cx - self.off - self.width);
+        y: 0px;
+        title: root.bars[root.shown].tooltip-title;
+        value: root.bars[root.shown].tooltip-value;
+        sub: root.bars[root.shown].tooltip-sub;
+    }
+}
+
+component DailySection inherits VerticalLayout {
+    in property <AnalyticsData> data;
+    callback plot-width-changed(float);
+    // Bring (y, height) (window coordinates) into view.
+    callback reveal(length, length);
+
+    spacing: 16px;
+
+    SectionHead {
+        text: "Daily listening";
+        if root.data.daily-avg != "": MetaText {
+            text: root.data.daily-avg;
+            accessible-label: root.data.daily-avg-accessible;
+        }
+        if root.data.daily-peak != "": MetaText {
+            text: root.data.daily-peak;
+            accessible-label: root.data.daily-peak-accessible;
+        }
+    }
+    DailyChart {
+        bars: root.data.daily;
+        empty-note: root.data.daily-empty;
+        summary: root.data.daily-summary;
+        plot-width-changed(w) => { root.plot-width-changed(w); }
+        revealed => { root.reveal(root.absolute-position.y, root.height); }
+    }
+}
+
+// ───────────────────────────── heatmap ─────────────────────────────
+
+component Heatmap {
+    in property <[HeatCellData]> cells;
+    in property <[string]> day-labels;
+    in property <[string]> hour-labels;
+    in property <string> summary;
+
+    // Keyboard focus or a keyboard move: the section should be scrolled into view.
+    callback revealed();
+
+    property <length> label-w: Geo.heat-label-w;
+    property <length> axis-h: 22px;
+    property <length> legend-h: 40px;
+    property <length> pitch: max(8px, min(Geo.heat-max-pitch, (root.width - root.label-w) / 24));
+    property <length> gap: max(2px, root.pitch * 0.16);
+    property <length> cell: root.pitch - root.gap;
+    property <length> cell-r: root.cell * 0.3;
+    property <length> grid-w: 24 * root.pitch;
+    property <length> grid-h: 7 * root.pitch;
+    // Labels + grid, centred when the chart is wider than its largest grid (the page sizes it to fit exactly).
+    property <length> off: max(0px, (root.width - root.label-w - root.grid-w) / 2);
+    property <length> grid-x: root.off + root.label-w;
+    property <bool> every3: 3 * root.pitch >= 34px;
+    property <int> count: root.cells.length;
+    property <int> active: -1;
+    property <bool> kb-mode;
+    property <bool> saved-kb;
+    property <int> saved-active: -1;
+    // Noted by the cells as they are created / changed; always re-checked against `cells` before use (a model swap
+    // destroys cells without a changed event, so an index can go stale).
+    property <int> peak-index: -1;
+    property <int> now-index: -1;
+    property <bool> peak-ok: root.peak-index >= 0 && root.peak-index < root.count && root.cells[root.peak-index].peak;
+    property <bool> now-ok: root.now-index >= 0 && root.now-index < root.count && root.cells[root.now-index].now;
+    property <int> shown: AnalyticsPreview.heat-active >= 0 && AnalyticsPreview.heat-active < root.count
+        ? AnalyticsPreview.heat-active : root.active;
+    property <bool> ring: (fs.has-focus && root.kb-mode) || (AnalyticsPreview.show-focus && AnalyticsPreview.heat-active >= 0);
+    property <int> today-row: root.now-ok ? floor(root.now-index / 24) : -1;
+
+    pure function alpha(level: float) -> float {
+        if (level <= 0) { return 0; }
+        if (level <= 0.2) { return 0.16; }
+        if (level <= 0.4) { return 0.3; }
+        if (level <= 0.6) { return 0.48; }
+        if (level <= 0.8) { return 0.7; }
+        return 1;
+    }
+    pure function cell-x(i: int) -> length {
+        root.grid-x + mod(i, 24) * root.pitch + (root.pitch - root.cell) / 2
+    }
+    pure function cell-y(i: int) -> length {
+        root.axis-h + floor(i / 24) * root.pitch + (root.pitch - root.cell) / 2
+    }
+    function select(i: int) {
+        root.kb-mode = true;
+        root.active = max(0, min(root.count - 1, i));
+        root.revealed();
+    }
+    function note-now(i: int, on: bool) {
+        if (on) {
+            root.now-index = i;
+        } else if (root.now-index == i) {
+            root.now-index = -1;
+        }
+    }
+    function note-peak(i: int, on: bool) {
+        if (on) {
+            root.peak-index = i;
+        } else if (root.peak-index == i) {
+            root.peak-index = -1;
+        }
+    }
+
+    horizontal-stretch: 1;
+    min-width: root.label-w + 24 * 8px;
+    preferred-width: root.label-w + 24 * Geo.heat-max-pitch;
+    height: root.axis-h + root.grid-h + root.legend-h;
+
+    // Hour labels (every 3rd or 6th).
+    for i in 24: AxisText {
+        visible: root.every3 ? mod(i, 3) == 0 : mod(i, 6) == 0;
+        x: root.grid-x + i * root.pitch + root.pitch / 2 - 15px;
+        y: 0;
+        width: 30px;
+        height: root.axis-h - 6px;
+        horizontal-alignment: center;
+        text: i < root.hour-labels.length ? root.hour-labels[i] : "";
+    }
+
+    // Weekday labels; today's is emphasised.
+    for d[i] in root.day-labels: AxisText {
+        x: root.off;
+        y: root.axis-h + i * root.pitch;
+        width: root.label-w - 8px;
+        height: root.pitch;
+        text: d;
+        overflow: elide;
+        color: i == root.today-row ? Theme.text : Theme.text-muted;
+        font-weight: i == root.today-row ? Theme.weight-semibold : Theme.weight-medium;
+    }
+
+    for c[i] in root.cells: Rectangle {
+        property <bool> is-now: c.now;
+        property <bool> is-peak: c.peak;
+        x: root.grid-x + c.hour * root.pitch + (root.pitch - root.cell) / 2;
+        y: root.axis-h + c.day * root.pitch + (root.pitch - root.cell) / 2;
+        width: root.cell;
+        height: root.cell;
+        border-radius: root.cell-r;
+        background: c.level > 0 ? Theme.text.with-alpha(root.alpha(c.level)) : Theme.chip;
+        init => {
+            if (c.now) { root.note-now(i, true); }
+            if (c.peak) { root.note-peak(i, true); }
+        }
+        changed is-now => { root.note-now(i, self.is-now); }
+        changed is-peak => { root.note-peak(i, self.is-peak); }
+    }
+
+    // "Now" ring.
+    if root.now-ok && root.now-index != root.shown: Rectangle {
+        x: root.cell-x(root.now-index) - 3px;
+        y: root.cell-y(root.now-index) - 3px;
+        width: root.cell + 6px;
+        height: root.cell + 6px;
+        border-radius: root.cell-r + 3px;
+        border-width: 1.5px;
+        border-color: Theme.text-secondary;
+    }
+
+    // Active ring (hover / keyboard).
+    if root.shown >= 0 && root.shown < root.count: Rectangle {
+        x: root.cell-x(root.shown) - 3px;
+        y: root.cell-y(root.shown) - 3px;
+        width: root.cell + 6px;
+        height: root.cell + 6px;
+        border-radius: root.cell-r + 3px;
+        border-width: 2px;
+        border-color: Theme.text;
+    }
+
+    // Legend: Less ▢▢▢▢▢ More · ◯ Now (decorative), ending at the grid's right edge.
+    legend := HorizontalLayout {
+        width: self.preferred-width;
+        height: 16px;
+        x: max(root.off, root.grid-x + root.grid-w - self.preferred-width);
+        y: root.axis-h + root.grid-h + 16px;
+        spacing: 5px;
+        accessible-role: none;
+
+        AxisText { text: "Less"; }
+        Rectangle { width: 4px; }
+        for l in [0, 0.15, 0.35, 0.55, 0.75, 1.0]: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 11px;
+                height: 11px;
+                border-radius: 3.5px;
+                background: l > 0 ? Theme.text.with-alpha(root.alpha(l)) : Theme.chip;
+            }
+        }
+        Rectangle { width: 4px; }
+        AxisText { text: "More"; }
+        Rectangle { width: 18px; }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 13px;
+                height: 13px;
+                border-radius: 4.5px;
+                border-width: 1.5px;
+                border-color: Theme.text-secondary;
+            }
+        }
+        AxisText { text: "Now"; }
+    }
+
+    fs := FocusScope {
+        x: root.grid-x;
+        y: root.axis-h;
+        width: root.grid-w;
+        height: root.grid-h;
+        accessible-role: image;
+        accessible-label: root.summary;
+        accessible-description: "Use the arrow keys to move between hours and days";
+
+        TouchArea {
+            mouse-cursor: default;
+            // The area takes every press, so focus the chart here (programmatic: no keyboard mode until a key).
+            clicked => { fs.focus(); }
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.move && root.count >= 168) {
+                    let h = floor(self.mouse-x / root.pitch);
+                    let d = floor(self.mouse-y / root.pitch);
+                    if (h >= 0 && h < 24 && d >= 0 && d < 7) {
+                        root.active = d * 24 + h;
+                    } else if (!root.kb-mode) {
+                        root.active = -1;
+                    }
+                }
+            }
+            changed has-hover => {
+                if (!self.has-hover && !root.kb-mode) {
+                    root.active = -1;
+                }
+            }
+        }
+
+        focus-gained(reason) => {
+            if (reason == FocusReason.window-activation) {
+                if (root.saved-kb && root.count > 0) {
+                    root.kb-mode = true;
+                    root.active = max(0, min(root.count - 1, root.saved-active));
+                }
+            } else if (reason == FocusReason.tab-navigation && root.count > 0) {
+                root.kb-mode = true;
+                if (root.active < 0 || root.active >= root.count) {
+                    root.active = root.peak-ok ? root.peak-index : root.now-ok ? root.now-index : 0;
+                }
+                root.revealed();
+            } else if (reason == FocusReason.tab-navigation) {
+                root.revealed();
+            }
+        }
+        focus-lost(reason) => {
+            root.saved-kb = reason == FocusReason.window-activation && root.kb-mode;
+            root.saved-active = root.active;
+            root.kb-mode = false;
+            root.active = -1;
+        }
+        key-pressed(event) => {
+            if (root.count < 168) {
+                return reject;
+            }
+            let start = root.active >= 0 && root.active < root.count ? root.active : root.now-ok ? root.now-index : 0;
+            let h = mod(start, 24);
+            let d = floor(start / 24);
+            if (event.text == Key.LeftArrow) { root.select(d * 24 + max(0, h - 1)); return accept; }
+            if (event.text == Key.RightArrow) { root.select(d * 24 + min(23, h + 1)); return accept; }
+            if (event.text == Key.UpArrow) { root.select(max(0, d - 1) * 24 + h); return accept; }
+            if (event.text == Key.DownArrow) { root.select(min(6, d + 1) * 24 + h); return accept; }
+            if (event.text == Key.Home) { root.select(d * 24); return accept; }
+            if (event.text == Key.End) { root.select(d * 24 + 23); return accept; }
+            if (event.text == Key.Escape && root.active >= 0) {
+                root.active = -1;
+                return accept;
+            }
+            reject
+        }
+    }
+
+    Rectangle {
+        x: root.grid-x - 8px;
+        y: root.axis-h - 8px;
+        width: root.grid-w + 16px;
+        height: root.grid-h + 16px;
+        FocusRing {
+            radius: 10px;
+            shown: root.ring;
+        }
+    }
+
+    Text {
+        x: 0;
+        y: 0;
+        width: 1px;
+        height: 1px;
+        text: "";
+        color: transparent;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.kb-mode && root.active >= 0 && root.active < root.count ? root.cells[root.active].accessible : "";
+        accessible-live-region: AccessibleLiveness.polite;
+    }
+
+    if root.shown >= 0 && root.shown < root.count: ChartTip {
+        property <length> cx: root.cell-x(root.shown) + root.cell / 2;
+        property <length> cy: root.cell-y(root.shown) + root.cell / 2;
+        property <bool> below: floor(root.shown / 24) < 3;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        x: min(max(4px, self.cx - self.width / 2), max(4px, root.width - self.width - 4px));
+        y: self.below ? self.cy + root.cell / 2 + 8px : self.cy - root.cell / 2 - 8px - self.height;
+        title: root.cells[root.shown].tooltip-title;
+        value: root.cells[root.shown].tooltip-value;
+        sub: root.cells[root.shown].peak ? "Busiest hour" : "";
+    }
+}
+
+component HeatSection inherits VerticalLayout {
+    in property <AnalyticsData> data;
+    // Bring (y, height) (window coordinates) into view.
+    callback reveal(length, length);
+
+    spacing: 14px;
+
+    SectionHead {
+        text: "When you listen";
+        if root.data.heat-peak != "": MetaText { text: root.data.heat-peak; }
+    }
+    Heatmap {
+        cells: root.data.heat;
+        day-labels: root.data.heat-day-labels;
+        hour-labels: root.data.heat-hour-labels;
+        summary: root.data.heat-summary;
+        revealed => { root.reveal(root.absolute-position.y, root.height); }
+    }
+}
+
+// ───────────────────────────── shares ─────────────────────────────
+
+// An empty list in the list's own shape: a quiet row (muted glyph, the message, an empty meter) and `ghosts` faint
+// rows below it, so the column keeps its height and rhythm next to a filled one.
+component EmptyRows inherits VerticalLayout {
+    in property <string> icon;
+    in property <string> text;
+    in property <length> tile: 32px;
+    in property <length> row-gap: 16px;
+    in property <int> ghosts: 2;
+    // Room for a rank column before the tile (top lists).
+    in property <length> lead: 0px;
+
+    spacing: root.row-gap;
+
+    HorizontalLayout {
+        spacing: 14px;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+        if root.lead > 0: Rectangle { width: root.lead; }
+        VerticalLayout {
+            alignment: center;
+            GlyphTile {
+                icon: root.icon;
+                side: root.tile;
+                muted: true;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 8px;
+            Text {
+                height: 18px;
+                text: root.text;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            LineMeter {
+                value: 0;
+                thickness: 3px;
+            }
+        }
+    }
+    for g in root.ghosts: HorizontalLayout {
+        spacing: 14px;
+        opacity: g == 0 ? 0.55 : 0.3;
+        accessible-role: none;
+        if root.lead > 0: Rectangle { width: root.lead; }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.tile;
+                height: root.tile;
+                border-radius: root.tile * 0.3;
+                border-width: 1px;
+                border-color: Theme.field-border;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 10px;
+            HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    width: g == 0 ? 96px : 72px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: Theme.track;
+                }
+            }
+            LineMeter {
+                value: 0;
+                thickness: 3px;
+            }
+        }
+    }
+}
+
+component SourceRow inherits HorizontalLayout {
+    in property <ShareRow> item;
+
+    spacing: 14px;
+    accessible-role: list-item;
+    accessible-label: root.item.accessible;
+
+    VerticalLayout {
+        alignment: center;
+        GlyphTile { icon: root.item.icon; }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 10px;
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 18px;
+                name := Text {
+                    width: 100%;
+                    height: 100%;
+                    text: root.item.label;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-label;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                Tip {
+                    text: root.item.label;
+                    enabled: name.preferred-width > name.width + 0.5px;
+                }
+            }
+            Text {
+                text: root.item.value;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-muted;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+            Text {
+                min-width: 34px;
+                text: root.item.percent;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: root.item.first ? Theme.text : Theme.text-secondary;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+        LineMeter {
+            value: root.item.fraction;
+            thickness: 3px;
+            fill: root.item.first ? Theme.primary : Theme.text-muted;
+        }
+    }
+}
+
+component SourcesSection inherits VerticalLayout {
+    in property <AnalyticsData> data;
+
+    spacing: 14px;
+    alignment: start;
+
+    SectionHead { text: "How you start reads"; }
+    if root.data.sources.length == 0: EmptyRows {
+        padding-top: 4px;
+        icon: "mouse-pointer-click";
+        text: root.data.sources-empty;
+    }
+    if root.data.sources.length > 0: VerticalLayout {
+        spacing: 16px;
+        padding-top: 4px;
+        accessible-role: list;
+        accessible-label: root.data.sources-summary;
+        for r in root.data.sources: SourceRow { item: r; }
+    }
+}
+
+component TopRow inherits HorizontalLayout {
+    in property <ShareRow> item;
+
+    spacing: 14px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    accessible-role: list-item;
+    accessible-label: root.item.accessible;
+
+    Text {
+        width: 18px;
+        text: root.item.rank;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text-muted;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    VerticalLayout {
+        alignment: center;
+        if root.item.art.width > 0 || root.item.icon == "": ArtThumb {
+            width: 40px;
+            height: 40px;
+            source: root.item.art;
+        }
+        if root.item.art.width == 0 && root.item.icon != "": GlyphTile {
+            icon: root.item.icon;
+            side: 40px;
+        }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        spacing: 9px;
+        HorizontalLayout {
+            spacing: 12px;
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 18px;
+                name := Text {
+                    width: 100%;
+                    height: 100%;
+                    text: root.item.label;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                Tip {
+                    text: root.item.label;
+                    enabled: name.preferred-width > name.width + 0.5px;
+                }
+            }
+            Text {
+                text: root.item.value;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                LineMeter {
+                    value: root.item.fraction;
+                    thickness: 3px;
+                    fill: root.item.first ? Theme.primary : Theme.text-muted;
+                }
+            }
+            Text {
+                min-width: 76px;
+                text: root.item.sub;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-muted;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+}
+
+component TopList inherits VerticalLayout {
+    in property <string> title;
+    in property <[ShareRow]> rows;
+    in property <string> empty-icon;
+    in property <string> empty-text;
+    in property <string> summary;
+
+    spacing: 10px;
+    alignment: start;
+    // Even split with the neighbouring list, whatever the content.
+    horizontal-stretch: 1;
+    min-width: 0px;
+    preferred-width: 0px;
+
+    SectionHead { text: root.title; }
+    if root.rows.length == 0: EmptyRows {
+        padding-top: 6px;
+        icon: root.empty-icon;
+        text: root.empty-text;
+        tile: 40px;
+        row-gap: 12px;
+        lead: 18px;
+    }
+    if root.rows.length > 0: VerticalLayout {
+        spacing: 2px;
+        accessible-role: list;
+        accessible-label: root.summary;
+        for r in root.rows: TopRow { item: r; }
+    }
+}
+
+// ───────────────────────────── page states ─────────────────────────────
+
+component EmptyBanner inherits Rectangle {
+    in property <string> title;
+    in property <string> body;
+
+    border-radius: Theme.radius-card;
+    border-width: 1px;
+    border-color: Theme.divider;
+    background: Theme.field;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.title + ". " + root.body;
+
+    lay := HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 24px;
+        padding-top: 16px;
+        padding-bottom: 16px;
+        spacing: 16px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                background: Theme.chip;
+                border-width: 1px;
+                border-color: Theme.field-border;
+                Icon {
+                    width: 100%;
+                    height: 100%;
+                    source: Icons.chart-column;
+                    size: 18px;
+                    color: Theme.text;
+                }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 3px;
+            Text {
+                text: root.title;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+            Text {
+                text: root.body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+                accessible-role: none;
+            }
+        }
+    }
+}
+
+// First-load failure: the same panel as History's error state (64-px glyph circle, 26-px glyph, 15 / 600 title,
+// body, a plain primary "Try again" pill that spins while retrying).
+component LoadError inherits VerticalLayout {
+    in property <string> message;
+    in property <bool> retrying;
+    callback retry();
+
+    alignment: center;
+    padding: Theme.space-8;
+    padding-bottom: Theme.space-10 + Theme.space-6;
+    spacing: 0px;
+
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: 64px;
+            height: 64px;
+            border-radius: 32px;
+            background: Theme.chip;
+            border-width: Theme.hairline;
+            border-color: Theme.field-border;
+            Icon {
+                width: 100%;
+                height: 100%;
+                source: Icons.circle-alert;
+                size: 26px;
+                color: Theme.danger;
+            }
+        }
+    }
+    Rectangle { height: Theme.space-5; }
+    Text {
+        text: "Couldn’t load analytics";
+        horizontal-alignment: center;
+        wrap: word-wrap;
+        font-family: Theme.font-text;
+        font-size: Theme.size-title;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        accessible-role: AccessibleRole.text;
+        accessible-label: self.text;
+    }
+    Rectangle { height: Theme.space-2; }
+    HorizontalLayout {
+        alignment: center;
+        Text {
+            max-width: 380px;
+            text: root.message;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            accessible-role: AccessibleRole.text;
+            accessible-label: self.text;
+        }
+    }
+    Rectangle { height: Theme.space-6; }
+    HorizontalLayout {
+        alignment: center;
+        Button {
+            text: "Try again";
+            kind: ButtonKind.primary;
+            loading: root.retrying;
+            clicked => { root.retry(); }
+        }
+    }
+}
+
+// A skeleton bar `w` wide (0 = the full width), left-aligned, that does not narrow its layout column.
+component SkBar inherits Rectangle {
+    in property <length> w: 0px;
+    in property <length> h: 10px;
+    in property <length> r: root.h < 20px ? root.h / 2 : 10px;
+
+    height: root.h;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+
+    Skeleton {
+        x: 0;
+        y: 0;
+        width: root.w > 0 ? min(root.w, root.width) : root.width;
+        height: root.h;
+        radius: root.r;
+    }
+}
+
+// First load: the dashboard's shape (hero | credits, KPIs, the daily chart, the heatmap | sources), on the same
+// column geometry.
+component LoadingSkeleton inherits VerticalLayout {
+    in property <length> main-w;
+    in property <length> aside-w;
+
+    spacing: 32px;
+    alignment: start;
+    accessible-role: progress-indicator;
+    accessible-label: "Loading analytics";
+
+    HorizontalLayout {
+        spacing: Geo.rule-gap;
+        height: 176px;
+        // The hero's 2 × 2: label, number | Today on top; aside | Days active + meter on the bottom line.
+        Rectangle {
+            property <length> stats-x: 156px + 48px;
+            property <length> stats-w: max(0px, min(200px, root.main-w - self.stats-x));
+            width: root.main-w;
+            Skeleton { x: 0; y: 9px; width: 96px; height: 10px; }
+            Skeleton { x: 0; y: 38px; width: 156px; height: 42px; radius: 10px; }
+            Skeleton { x: 0; y: 166px; width: 150px; height: 10px; }
+            Skeleton { x: parent.stats-x; y: 69px; width: parent.stats-w; height: 10px; }
+            Skeleton { x: parent.stats-x; y: 149px; width: parent.stats-w; height: 10px; }
+            Skeleton { x: parent.stats-x; y: 172px; width: parent.stats-w; height: 4px; }
+        }
+        Divider { vertical: true; }
+        VerticalLayout {
+            width: root.aside-w;
+            spacing: 16px;
+            padding-top: 9px;
+            alignment: start;
+            SkBar { w: 56px; }
+            SkBar { w: 80px; h: 30px; }
+            SkBar { h: 4px; }
+            SkBar { w: 150px; }
+            SkBar { w: 104px; }
+        }
+    }
+    Divider { }
+    HorizontalLayout {
+        spacing: Geo.kpi-gap;
+        for i in 4: VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 16px;
+            SkBar { w: 92px; }
+            SkBar { w: 72px; h: 30px; }
+            SkBar { w: 128px; }
+        }
+    }
+    Divider { }
+    VerticalLayout {
+        spacing: 22px;
+        SkBar { w: 112px; }
+        SkBar { h: 176px; r: 14px; }
+    }
+    Divider { }
+    HorizontalLayout {
+        spacing: Geo.rule-gap;
+        VerticalLayout {
+            width: root.main-w;
+            spacing: 22px;
+            SkBar { w: 108px; }
+            SkBar { h: 168px; r: 14px; }
+        }
+        Divider { vertical: true; }
+        VerticalLayout {
+            width: root.aside-w;
+            spacing: 22px;
+            alignment: start;
+            SkBar { w: 132px; }
+            for i in 4: SkBar { h: 28px; r: 10px; }
+        }
+    }
+}
+
+// ───────────────────────────── dashboard ─────────────────────────────
+
+// The ready / empty dashboard: a scroll area with the page's own scroll keys and scroll-into-view for focus.
+component Dashboard inherits FocusScope {
+    in property <AnalyticsData> data;
+
+    callback daily-width-changed(float);
+    callback refresh-credits();
+    callback add-key();
+
+    property <length> col-w: max(0px, min(Geo.content-max, root.width - 2 * Geo.gutter));
+    property <length> main-w: Geo.main-width(root.col-w);
+    property <length> aside-w: Geo.aside-width(root.col-w);
+    property <length> max-scroll: max(0px, scroll.content-height - scroll.visible-height);
+    property <length> tween-target;
+    property <bool> tweening;
+
+    // Scroll so the content offset `y` (≥ 0, from the top) is at the top of the viewport.
+    function scroll-to(y: length, smooth: bool) {
+        let target = -max(0px, min(root.max-scroll, y));
+        if (smooth && !Motion.reduce) {
+            root.tween-target = target;
+            root.tweening = true;
+            tween.running = true;
+        } else {
+            root.tweening = false;
+            tween.running = false;
+            scroll.content-y = target;
+        }
+    }
+    function scroll-by(dy: length, smooth: bool) {
+        root.scroll-to((root.tweening ? -root.tween-target : -scroll.content-y) + dy, smooth);
+    }
+    // Make the block at window y `abs-y`, `h` tall, visible with a 24-px margin (its top wins when it is taller
+    // than the viewport).
+    function bring-into-view(abs-y: length, h: length) {
+        let margin = 24px;
+        let top = abs-y - scroll.absolute-position.y - scroll.content-y;
+        let current = root.tweening ? -root.tween-target : -scroll.content-y;
+        if (top - margin < current) {
+            root.scroll-to(top - margin, true);
+        } else if (top + h + margin > current + scroll.visible-height) {
+            root.scroll-to(min(top - margin, top + h + margin - scroll.visible-height), true);
+        }
+    }
+
+    focus-on-click: true;
+    focus-on-tab-navigation: false;
+    accessible-role: none;
+
+    // Keys that bubble up (no chart or button used them) scroll the page.
+    key-pressed(event) => {
+        if (event.modifiers.control || event.modifiers.alt || event.modifiers.meta) {
+            return reject;
+        }
+        if (event.text == Key.DownArrow) { root.scroll-by(48px, false); return accept; }
+        if (event.text == Key.UpArrow) { root.scroll-by(-48px, false); return accept; }
+        if (event.text == Key.PageDown || (event.text == Key.Space && !event.modifiers.shift)) {
+            root.scroll-by(scroll.visible-height * 0.9, true);
+            return accept;
+        }
+        if (event.text == Key.PageUp || (event.text == Key.Space && event.modifiers.shift)) {
+            root.scroll-by(-scroll.visible-height * 0.9, true);
+            return accept;
+        }
+        if (event.text == Key.Home) { root.scroll-to(0px, true); return accept; }
+        if (event.text == Key.End) { root.scroll-to(root.max-scroll, true); return accept; }
+        reject
+    }
+
+    scroll := ScrollArea {
+        edge-fade: true;
+        // The column has an explicit width (wrapped text needs it), so the content size is given, not derived.
+        content-width: self.visible-width;
+        content-height: column.preferred-height;
+        scrolled => {
+            root.tweening = false;
+            tween.running = false;
+        }
+
+        // A refresh keeps the old numbers on screen; dim them only if it takes a moment (refreshes during playback
+        // answer within ~300 ms and must not flash), and come back at once.
+        states [
+            dimmed when root.data.dimmed: {
+                opacity: 0.7;
+                in {
+                    animate opacity { delay: 300ms; duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+                }
+            }
+        ]
+
+        column := VerticalLayout {
+            x: Geo.gutter;
+            y: 0;
+            width: root.col-w;
+            height: self.preferred-height;
+            padding-top: 28px;
+            padding-bottom: Theme.space-10;
+            spacing: 32px;
+            alignment: start;
+
+            if root.data.empty: EmptyBanner {
+                title: root.data.empty-title;
+                body: root.data.empty-body;
+            }
+
+            // Hero | Credits
+            HorizontalLayout {
+                spacing: Geo.rule-gap;
+                Hero {
+                    width: root.main-w;
+                    data: root.data;
+                }
+                Divider { vertical: true; }
+                CreditsBlock {
+                    width: root.aside-w;
+                    credits: root.data.credits;
+                    range-label: root.data.range-label;
+                    billed: root.data.billed;
+                    refresh => { root.refresh-credits(); }
+                    add-key => { root.add-key(); }
+                    reveal(y, h) => { root.bring-into-view(y, h); }
+                }
+            }
+
+            Divider { }
+            KpiStrip { kpis: root.data.kpis; }
+            Divider { }
+
+            DailySection {
+                data: root.data;
+                plot-width-changed(w) => { root.daily-width-changed(w); }
+                reveal(y, h) => { root.bring-into-view(y, h); }
+            }
+
+            Divider { }
+
+            // When you listen | How you start reads (the rule lines up with the one beside Credits)
+            HorizontalLayout {
+                spacing: Geo.rule-gap;
+                HeatSection {
+                    width: root.main-w;
+                    data: root.data;
+                    reveal(y, h) => { root.bring-into-view(y, h); }
+                }
+                Divider { vertical: true; }
+                SourcesSection {
+                    width: root.aside-w;
+                    data: root.data;
+                }
+            }
+
+            Divider { }
+
+            // Top apps | Top voices, split evenly.
+            HorizontalLayout {
+                spacing: Geo.rule-gap;
+                TopList {
+                    title: "Top apps";
+                    rows: root.data.top-apps;
+                    empty-icon: "globe";
+                    empty-text: "No apps in this range yet";
+                    summary: root.data.top-apps-summary;
+                }
+                Divider { vertical: true; }
+                TopList {
+                    title: "Top voices";
+                    rows: root.data.top-voices;
+                    empty-icon: "audio-lines";
+                    empty-text: "No voices in this range yet";
+                    summary: root.data.top-voices-summary;
+                }
+            }
+        }
+    }
+
+    // Smooth scroll: ease out towards the target, one step per frame.
+    tween := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => {
+            let d = root.tween-target - scroll.content-y;
+            if (!root.tweening || (d < 1px && d > -1px)) {
+                if (root.tweening) {
+                    scroll.content-y = root.tween-target;
+                }
+                root.tweening = false;
+                self.running = false;
+            } else {
+                scroll.content-y = scroll.content-y + d * 0.24;
+            }
+        }
+    }
+}
+
+// ───────────────────────────── page ─────────────────────────────
+
+export component AnalyticsPage inherits Rectangle {
+    in property <AnalyticsData> data;
+
+    // The daily plot's width in logical px, on creation and whenever it changes.
+    callback daily-width-changed(float);
+    callback retry();
+    // Credits block: "Refresh balance" / "Retry" (forced refresh).
+    callback refresh-credits();
+    // Credits block: "Add API key" → Settings → Account.
+    callback add-key();
+
+    property <bool> dashboard: root.data.state == LoadState.ready || root.data.state == LoadState.empty;
+    property <length> col-w: max(0px, min(Geo.content-max, root.width - 2 * Geo.gutter));
+
+    background: transparent;
+
+    if root.data.state == LoadState.loading: LoadingSkeleton {
+        x: Geo.gutter;
+        y: 28px;
+        width: root.col-w;
+        height: self.preferred-height;
+        main-w: Geo.main-width(root.col-w);
+        aside-w: Geo.aside-width(root.col-w);
+    }
+
+    if root.data.state == LoadState.error: LoadError {
+        message: root.data.error;
+        retrying: root.data.retrying;
+        retry => { root.retry(); }
+    }
+
+    if root.dashboard: Dashboard {
+        data: root.data;
+        daily-width-changed(w) => { root.daily-width-changed(w); }
+        refresh-credits => { root.refresh-credits(); }
+        add-key => { root.add-key(); }
+    }
+}

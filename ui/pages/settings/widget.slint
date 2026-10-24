@@ -1,0 +1,224 @@
+// Settings → Widget (ui-settings-widget.md §2.6): show / hide the floating player, its position (segmented, never
+// disabled, with a small decorative screen diagram), and the compact / highlight / auto-hide toggles (disabled while
+// the player is off). Stateful controls are re-asserted from `data` in `changed data` and by the page on `revision`
+// (`reassert()`).
+import { Theme, Icons, Icon, Divider } from "../../design/index.slint";
+import { WidgetSettingsData, Motion } from "../../models.slint";
+import { SectionHead, ToggleRow, WrapText, ChoiceSegmented } from "parts.slint";
+
+// Where the player sits: a screen with a taskbar and a few lines of a document. Decorative (mouse users only see it;
+// the segmented control below carries the meaning). The player is drawn as it really looks — always dark (D-USW-20),
+// the same surface the Appearance tiles use — with its art dot and a progress line.
+component ScreenDiagram inherits Rectangle {
+    // The position value: "bottom-right" | "top-right" | "bottom-center" | "near-cursor" | "remember".
+    in property <string> position;
+
+    property <length> pad: 7px;
+    property <length> bar: 9px;
+    property <length> card-w: 38px;
+    property <length> card-h: 14px;
+    // The floating player is always dark: the dark look's surface and ink in both themes.
+    property <brush> player: Theme.dark ? Theme.panel : Theme.primary;
+    property <color> player-ink: Theme.dark ? Theme.text : Theme.on-primary;
+
+    width: 136px;
+    height: 88px;
+    border-radius: 10px;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: Theme.field-border;
+    clip: true;
+    accessible-role: none;
+
+    // Document lines.
+    for i in 4: Rectangle {
+        x: 14px;
+        y: 14px + i * 9px;
+        width: i == 3 ? 40px : (i == 1 ? 74px : 88px);
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.chip;
+    }
+    // Selected words (near the cursor).
+    Rectangle {
+        visible: root.position == "near-cursor";
+        x: 30px;
+        y: 22px;
+        width: 34px;
+        height: 6px;
+        border-radius: 2px;
+        background: Theme.text-muted;
+    }
+    // Taskbar.
+    Rectangle {
+        x: 0;
+        y: root.height - root.bar;
+        width: root.width;
+        height: root.bar;
+        background: Theme.chip;
+        Rectangle {
+            x: parent.width - 18px;
+            y: 3px;
+            width: 12px;
+            height: 3px;
+            border-radius: 1.5px;
+            background: Theme.text-muted;
+        }
+    }
+    // The player.
+    card := Rectangle {
+        width: root.card-w;
+        height: root.card-h;
+        x: root.position == "top-right" || root.position == "bottom-right" ? root.width - root.pad - self.width
+            : root.position == "bottom-center" ? (root.width - self.width) / 2
+            : root.position == "near-cursor" ? 52px : 20px;
+        y: root.position == "top-right" ? root.pad
+            : root.position == "near-cursor" ? 34px
+            : root.position == "remember" ? 50px : root.height - root.bar - root.pad + 2px - self.height;
+        border-radius: self.height / 2;
+        background: root.player;
+        border-width: Theme.hairline;
+        border-color: root.player-ink.with-alpha(0.28);
+        animate x, y { duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+
+        // Art dot and progress line.
+        Rectangle {
+            x: 4px;
+            y: (parent.height - self.height) / 2;
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.player-ink.with-alpha(0.75);
+        }
+        Rectangle {
+            x: 14px;
+            y: (parent.height - self.height) / 2;
+            width: parent.width - 20px;
+            height: 2px;
+            border-radius: 1px;
+            background: root.player-ink.with-alpha(0.4);
+        }
+    }
+    if root.position == "near-cursor": Icon {
+        x: card.x - 10px;
+        y: card.y - 12px;
+        source: Icons.mouse-pointer-click;
+        size: 12px;
+        color: Theme.text;
+    }
+    if root.position == "remember": Icon {
+        x: card.x + card.width + 3px;
+        y: card.y;
+        source: Icons.move;
+        size: 14px;
+        color: Theme.text-secondary;
+    }
+}
+
+export component WidgetSection inherits Rectangle {
+    in property <WidgetSettingsData> data;
+
+    // key = "widget.enabled" | "widget.compact" | "widget.highlightWords" | "widget.autoHide".
+    callback set-bool(string, bool);
+    // key = "widget.position"; value = "bottom-right" | "top-right" | "bottom-center" | "near-cursor" | "remember".
+    callback set-choice(string, string);
+
+    public function reassert() {
+        enabled.checked = root.data.enabled;
+        position.current-index = root.data.position-index;
+        compact.checked = root.data.compact;
+        highlight.checked = root.data.highlight-words;
+        auto-hide.checked = root.data.auto-hide;
+    }
+    changed data => { root.reassert(); }
+
+    // The value the segmented control shows (it moves before Rust answers).
+    property <string> shown-position: position.current-index >= 0
+        && position.current-index < root.data.position-options.length
+        ? root.data.position-options[position.current-index].value : "";
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Widget";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Widget";
+            intro: "The floating player that shows what’s being read. Audio keeps playing even when it’s hidden.";
+        }
+        Rectangle { height: Theme.space-2; }
+
+        enabled := ToggleRow {
+            divider: false;
+            title: "Show floating player";
+            description: "Turn off to listen without anything on screen — use shortcuts or media keys to control it.";
+            checked: root.data.enabled;
+            toggled(c) => { root.set-bool("widget.enabled", c); }
+        }
+
+        // Position: never disabled (the player can be placed while it is off). The title and hint start at the row's
+        // top like every other row; the diagram sits beside them and the segmented control spans the row below.
+        Divider { }
+        VerticalLayout {
+            padding-top: Theme.space-4;
+            padding-bottom: Theme.space-4;
+            spacing: Theme.space-4;
+
+            HorizontalLayout {
+                spacing: Theme.space-6;
+                VerticalLayout {
+                    min-width: 0px;
+                    preferred-width: 0px;
+                    max-width: 100000px;
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    spacing: Theme.space-1;
+                    Text {
+                        text: "Position";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                    WrapText { text: root.data.position-hint; }
+                }
+                ScreenDiagram {
+                    position: root.shown-position;
+                }
+            }
+            position := ChoiceSegmented {
+                horizontal-stretch: 1;
+                model: root.data.position-options;
+                current-index: root.data.position-index;
+                label: "Widget position";
+                selected(i, v) => { root.set-choice("widget.position", v); }
+            }
+        }
+
+        compact := ToggleRow {
+            title: "Compact pill";
+            description: "A slim one-line player instead of the full card.";
+            enabled: root.data.enabled;
+            checked: root.data.compact;
+            toggled(c) => { root.set-bool("widget.compact", c); }
+        }
+        highlight := ToggleRow {
+            title: "Highlight words";
+            description: "Follow along as each word is spoken.";
+            enabled: root.data.enabled;
+            checked: root.data.highlight-words;
+            toggled(c) => { root.set-bool("widget.highlightWords", c); }
+        }
+        auto-hide := ToggleRow {
+            title: "Hide when finished";
+            description: "Tucks the player away a few seconds after the reading ends.";
+            enabled: root.data.enabled;
+            checked: root.data.auto-hide;
+            toggled(c) => { root.set-bool("widget.autoHide", c); }
+        }
+    }
+}

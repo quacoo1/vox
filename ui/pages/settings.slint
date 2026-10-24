@@ -1,0 +1,640 @@
+// Settings (ui-settings-widget.md §2; DESIGN.md "Screens → Settings"): a second-level section list on the left and
+// a scrolling column of sections on the right. Section components live in ui/pages/settings/*.slint; this page
+// forwards their callbacks.
+//
+// Width: the page is at least 811 px wide in the real window (1100 px window with the full sidebar; the 940 px minimum
+// window with the rail sidebar gives 839 px), so the section list always shows labels. Below 780 px — a safety net no
+// current window reaches — the list collapses to an icon rail (labels and the save status become tooltips).
+//
+// Scroll spy (a documented exception to "no logic in .slint", ARCHITECTURE.md §7.4): `active-section` is computed
+// here, not by Rust. Initialised from `scroll-to` when valid, else "account". While `!data.loading`, it is the last
+// section whose top is at or above `0.28 × window height` in the ScrollArea (from each section's y and `content-y`),
+// or the last section when the content is scrolled to within 4 px of the bottom; computed at most once per frame.
+// (The window height is taken as the page's bottom edge plus the panel inset: pages do not see the Window.)
+// A nav click or a deep link scrolls (instantly on the first scroll after mount, smoothly after; instantly under
+// `Motion.reduce`), **pins** the section and, once the scroll has landed, moves keyboard focus to the section's anchor
+// (a zero-height focus stop at its top, already on screen, so focusing it never scrolls; Tab then continues into the
+// section). The pin is released by any scroll the page did not make itself — wheel, touchpad, a scrollbar drag or a
+// gutter click (seen as `ScrollArea.scrolled()` or a `content-y` the page did not write) — and by the keys Up / Down /
+// PageUp / PageDown / Home / End / Space when they reach the column unhandled. (Slint offers no pointer-press capture,
+// so a plain click on a control does not release it.) A smooth scroll interrupted by the user does not take focus.
+// `section-selected` only informs Rust.
+//
+// Stateful controls (ARCHITECTURE.md §7.1): every section re-asserts its toggles / selects / sliders from its own data
+// in a `changed data` handler, and this page re-asserts all of them (each section's public `reassert()`) whenever
+// `data.revision` changes — Rust bumps it when it overrides the user while a section's own sub-struct may be unchanged
+// (an optimistic revert, Reset, the retention guard's Cancel). Text fields are bound to the in-out drafts below (Rust
+// writes them only to reset). Slider labels while dragging come from `format-number(key, value)`.
+import { Theme, Icons, Icon, NavItem, ScrollArea, Divider, Skeleton, Spinner, Tip } from "../design/index.slint";
+import { SettingsData, Motion } from "../models.slint";
+import { AccountSection } from "settings/account.slint";
+import { VoiceModelSection } from "settings/voice-model.slint";
+import { PlaybackSection } from "settings/playback.slint";
+import { TriggersSection } from "settings/triggers.slint";
+import { WidgetSection } from "settings/widget.slint";
+import { AppearanceSection } from "settings/appearance.slint";
+import { LibrarySection } from "settings/library.slint";
+import { IntegrationsSection } from "settings/integrations.slint";
+import { AboutSection } from "settings/about.slint";
+
+// A loading placeholder shaped like a real section, so nothing jumps when the data arrives: the section head (a
+// 32-px title line and an intro line), then unboxed rows split by hairlines with the real 16-px row padding, a
+// title + help line pair on the left and a control-sized block on the right (`controls`: 0 toggle, 1 select).
+component SkeletonSection inherits VerticalLayout {
+    in property <[int]> controls: [0, 1, 0];
+    in property <percent> intro-width: 72%;
+
+    spacing: 0px;
+    vertical-stretch: 0;
+
+    // Section head: title (Display 17 in a 32-px line) and the intro (13 px in a 17-px line).
+    HorizontalLayout {
+        height: 32px;
+        VerticalLayout {
+            alignment: center;
+            Skeleton { width: 136px; height: 14px; }
+        }
+    }
+    Rectangle { height: Theme.space-2; }
+    HorizontalLayout {
+        height: 17px;
+        VerticalLayout {
+            alignment: center;
+            Skeleton { width: root.intro-width; height: 10px; }
+        }
+    }
+    Rectangle { height: Theme.space-2; }
+
+    for c[i] in root.controls: VerticalLayout {
+        if i > 0: Divider { }
+        HorizontalLayout {
+            padding-top: Theme.space-4;
+            padding-bottom: Theme.space-4;
+            spacing: Theme.space-6;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: Theme.space-1;
+                HorizontalLayout {
+                    height: 19px;
+                    VerticalLayout {
+                        alignment: center;
+                        Skeleton { width: i == 1 ? 30% : 22%; height: 11px; }
+                    }
+                }
+                HorizontalLayout {
+                    height: 17px;
+                    VerticalLayout {
+                        alignment: center;
+                        Skeleton { width: i == 2 ? 46% : 64%; height: 9px; }
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                if c == 0: Skeleton { width: 40px; height: 24px; radius: 12px; }
+                if c == 1: Skeleton { width: 200px; height: 40px; radius: 20px; }
+            }
+        }
+    }
+}
+
+// A zero-height focus stop at the top of a section: nav clicks and deep links move focus here once the scroll has
+// landed, so Tab continues into the section. Not a Tab stop itself; keys it does not handle (all of them) bubble up
+// to the column, which scrolls.
+component SectionAnchor inherits FocusScope {
+    in property <string> label;
+
+    height: 0px;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: groupbox;
+    accessible-label: root.label;
+}
+
+export component SettingsPage inherits Rectangle {
+    in property <SettingsData> data;
+    // Deep link: scroll to this section id (instantly on the first scroll after mount, smoothly after).
+    in property <string> scroll-to;
+    // Bumped by Rust to re-announce the same section (a toast action clicked twice).
+    in property <int> scroll-nonce;
+    // The scroll-spy section (computed here; see the header).
+    in-out property <string> active-section: "account";
+    // Text-field drafts (in-out; MainWindow forwards them to Rust).
+    in-out property <string> key-draft;
+    in-out property <string> exclude-draft;
+    in-out property <string> port-draft;
+
+    // A slider's live label: (dotted key, value) → text ("80%", "1.15×", "500 MB").
+    pure callback format-number(string, float) -> string;
+
+    // Section nav click (the page scrolls itself; Rust only records it).
+    callback section-selected(string);
+    // Generic setting writes (dotted settings key path).
+    callback set-bool(string, bool);
+    callback set-number(string, float);
+    callback set-choice(string, string);
+    // Account
+    callback save-key(string);
+    callback key-edited();
+    callback open-key-form();
+    callback cancel-key-form();
+    callback remove-key();
+    callback get-key();
+    callback credits-retry();
+    // Voice & model
+    callback test-voice();
+    callback browse-voices();
+    callback reset-voice-settings();
+    // Triggers
+    callback hotkey-start(string);
+    callback hotkey-stop();
+    callback hotkey-clear(string);
+    callback add-excluded(string);
+    callback remove-excluded(string);
+    callback excluded-edited();
+    // Library & privacy
+    callback clear-cache();
+    callback export-history();
+    callback clear-history();
+    // Integrations
+    callback port-edited(string);
+    callback commit-port(string);
+    callback revert-port();
+    callback copy-text(string);
+    callback show-extension-folder();
+    // About
+    callback open-data-folder();
+    callback open-link(string);
+
+    // ── Layout ──
+    property <bool> narrow: root.width < 780px;
+    property <length> nav-width: root.narrow ? 68px : 216px;
+    property <length> gutter: root.narrow ? Theme.space-8 : Theme.space-10;
+    property <length> column-max: 680px;
+
+    // ── Re-assert on revision (see the header) ──
+    property <int> revision: root.data.revision;
+    changed revision => {
+        s-voice.reassert();
+        s-playback.reassert();
+        s-triggers.reassert();
+        s-widget.reassert();
+        s-appearance.reassert();
+        s-library.reassert();
+        s-integrations.reassert();
+    }
+
+    // ── Scroll spy ──
+    property <bool> ready: !root.data.loading;
+    property <length> cy: scroll.content-y;
+    property <length> max-scroll: max(0px, scroll.content-height - scroll.visible-height);
+    // The spy line in viewport coordinates (the viewport starts at the page's top).
+    property <length> spy-line: 0.28 * (root.absolute-position.y + root.height + Theme.panel-inset) - root.absolute-position.y;
+    property <bool> at-bottom: root.max-scroll > 0px && root.cy < 0px && -root.cy >= root.max-scroll - 4px;
+    property <string> spied: root.at-bottom ? "about"
+        : w-about.y + root.cy <= root.spy-line ? "about"
+        : w-integrations.y + root.cy <= root.spy-line ? "integrations"
+        : w-library.y + root.cy <= root.spy-line ? "library"
+        : w-appearance.y + root.cy <= root.spy-line ? "appearance"
+        : w-widget.y + root.cy <= root.spy-line ? "widget"
+        : w-triggers.y + root.cy <= root.spy-line ? "triggers"
+        : w-playback.y + root.cy <= root.spy-line ? "playback"
+        : w-voice.y + root.cy <= root.spy-line ? "voice"
+        : "account";
+    // A clicked / deep-linked section stays highlighted until the user scrolls by hand.
+    property <string> pinned;
+    // Deep link waiting for the layout (and for `data` to load).
+    property <string> pending;
+    property <bool> scrolled-once: false;
+    // Programmatic scrolling: the target, and the value we last wrote (anything else is the user).
+    property <length> tween-target;
+    property <bool> tweening: false;
+    property <length> wrote-y: 0px;
+    // The section whose anchor takes focus when the smooth scroll lands.
+    property <string> focus-after;
+
+    pure function valid(id: string) -> bool {
+        id == "account" || id == "voice" || id == "playback" || id == "triggers" || id == "widget"
+            || id == "appearance" || id == "library" || id == "integrations" || id == "about"
+    }
+    pure function section-y(id: string) -> length {
+        if (id == "account") { return w-account.y; }
+        if (id == "voice") { return w-voice.y; }
+        if (id == "playback") { return w-playback.y; }
+        if (id == "triggers") { return w-triggers.y; }
+        if (id == "widget") { return w-widget.y; }
+        if (id == "appearance") { return w-appearance.y; }
+        if (id == "library") { return w-library.y; }
+        if (id == "integrations") { return w-integrations.y; }
+        if (id == "about") { return w-about.y; }
+        -1px
+    }
+    pure function icon-for(id: string) -> image {
+        if (id == "account") { return Icons.user; }
+        if (id == "voice") { return Icons.mic; }
+        if (id == "playback") { return Icons.play; }
+        if (id == "triggers") { return Icons.mouse-pointer-click; }
+        if (id == "widget") { return Icons.picture-in-picture-2; }
+        if (id == "appearance") { return Icons.sun-moon; }
+        if (id == "library") { return Icons.library; }
+        if (id == "integrations") { return Icons.puzzle; }
+        if (id == "about") { return Icons.info; }
+        Icons.settings
+    }
+
+    function update-active() {
+        if (root.ready) {
+            root.active-section = root.pinned != "" ? root.pinned : root.spied;
+        }
+    }
+    function set-scroll(y: length) {
+        root.wrote-y = y;
+        scroll.content-y = y;
+    }
+    // Focus the section's anchor (on screen by now, so this never scrolls).
+    function focus-section(id: string) {
+        if (id == "account") { a-account.focus(); }
+        if (id == "voice") { a-voice.focus(); }
+        if (id == "playback") { a-playback.focus(); }
+        if (id == "triggers") { a-triggers.focus(); }
+        if (id == "widget") { a-widget.focus(); }
+        if (id == "appearance") { a-appearance.focus(); }
+        if (id == "library") { a-library.focus(); }
+        if (id == "integrations") { a-integrations.focus(); }
+        if (id == "about") { a-about.focus(); }
+    }
+    function go-to(id: string, smooth: bool) {
+        if (!root.valid(id) || root.section-y(id) < 0px) {
+            return;
+        }
+        // The section's top lands where the first section sits at rest (the column's top padding below the edge).
+        let target = -max(0px, min(root.max-scroll, root.section-y(id) - Theme.space-8));
+        root.pinned = id;
+        root.update-active();
+        if (smooth && !Motion.reduce) {
+            root.tween-target = target;
+            root.tweening = true;
+            root.focus-after = id;
+            tween.running = true;
+        } else {
+            root.tweening = false;
+            tween.running = false;
+            root.focus-after = "";
+            root.set-scroll(target);
+            root.focus-section(id);
+        }
+    }
+    function request(id: string) {
+        if (root.valid(id)) {
+            root.pending = id;
+            if (root.ready) {
+                deep-link.running = true;
+            }
+        }
+    }
+    function unpin() {
+        root.tweening = false;
+        tween.running = false;
+        root.focus-after = "";
+        if (root.pinned != "") {
+            root.pinned = "";
+            root.update-active();
+        }
+    }
+    function scroll-by(dy: length) {
+        root.unpin();
+        root.set-scroll(max(-root.max-scroll, min(0px, scroll.content-y - dy)));
+    }
+
+    init => {
+        if (root.valid(root.scroll-to)) {
+            root.active-section = root.scroll-to;
+            root.request(root.scroll-to);
+        }
+    }
+    changed scroll-to => { root.request(root.scroll-to); }
+    changed scroll-nonce => { root.request(root.scroll-to); }
+    changed ready => {
+        if (root.ready && root.pending != "") {
+            deep-link.running = true;
+        }
+        root.update-active();
+    }
+    changed spied => { root.update-active(); }
+    changed cy => {
+        // Any scroll we did not make (wheel, thumb, touch) clears the pin.
+        if (!root.tweening && (root.cy - root.wrote-y > 0.5px || root.wrote-y - root.cy > 0.5px)) {
+            root.unpin();
+        }
+    }
+
+    // Deep links wait one tick so the sections are laid out at the final width.
+    deep-link := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if (root.ready && root.pending != "") {
+                let id = root.pending;
+                root.pending = "";
+                root.go-to(id, root.scrolled-once);
+                root.scrolled-once = true;
+            }
+        }
+    }
+    // Smooth scroll: ease out towards the target, one step per frame; focus the section when it lands.
+    tween := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => {
+            let d = root.tween-target - scroll.content-y;
+            if (!root.tweening || (d < 1px && d > -1px)) {
+                if (root.tweening) {
+                    root.set-scroll(root.tween-target);
+                    if (root.focus-after != "") {
+                        root.focus-section(root.focus-after);
+                    }
+                }
+                root.tweening = false;
+                root.focus-after = "";
+                self.running = false;
+            } else {
+                root.set-scroll(scroll.content-y + d * 0.24);
+            }
+        }
+    }
+
+    background: transparent;
+    accessible-role: none;
+
+    // The two columns are placed by hand (not in a layout): `narrow` follows the page width, so the page's own layout
+    // constraints must not depend on it (a collapsed NavItem changes its min-width).
+
+    // ── Section index ──
+    VerticalLayout {
+        x: 0;
+        y: 0;
+        width: root.nav-width;
+        height: root.height;
+        padding-left: Theme.space-4;
+        padding-right: Theme.space-4;
+        padding-top: Theme.space-6;
+        padding-bottom: Theme.space-4;
+        spacing: 2px;
+        accessible-role: tab-list;
+        accessible-label: "Settings sections";
+
+        for s in root.data.sections: NavItem {
+            small: true;
+            collapsed: root.narrow;
+            icon: root.icon-for(s.value);
+            text: s.label;
+            selected: root.active-section == s.value;
+            enabled: root.ready;
+            clicked => {
+                root.go-to(s.value, true);
+                root.scrolled-once = true;
+                root.section-selected(s.value);
+            }
+            if root.narrow: Tip { text: s.label; }
+        }
+        // Before the first load: placeholder entries.
+        if root.data.sections.length == 0: VerticalLayout {
+            spacing: 2px;
+            for i in 9: HorizontalLayout {
+                height: 36px;
+                padding-left: root.narrow ? 10px : 14px;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    Skeleton { width: 16px; height: 16px; radius: 5px; }
+                }
+                if !root.narrow: VerticalLayout {
+                    alignment: center;
+                    Skeleton { width: i == 1 || i == 6 ? 96px : 64px; height: 10px; }
+                }
+            }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        // Save status ("Saving" / "Saved automatically"), a polite live region. In the rail it is a glyph with a
+        // tooltip.
+        if root.data.status != "": Rectangle {
+            height: 32px;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.data.status;
+            accessible-live-region: polite;
+
+            HorizontalLayout {
+                padding-left: root.narrow ? 0px : 14px;
+                spacing: Theme.space-2;
+                alignment: root.narrow ? LayoutAlignment.center : LayoutAlignment.start;
+
+                if root.data.saving: Spinner {
+                    size: 14px;
+                    label: root.data.status;
+                }
+                if !root.data.saving: VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.circle-check;
+                        size: 14px;
+                        color: Theme.text-muted;
+                    }
+                }
+                if !root.narrow: Text {
+                    text: root.data.status;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-caption;
+                    font-weight: Theme.weight-medium;
+                    color: root.data.saving ? Theme.text-secondary : Theme.text-muted;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+            }
+            if root.narrow: Tip { text: root.data.status; }
+        }
+    }
+
+    Divider {
+        vertical: true;
+        x: root.nav-width;
+        y: 0;
+        width: 1px;
+        height: root.height;
+    }
+
+    // ── Sections ──
+    Rectangle {
+        x: root.nav-width + 1px;
+        y: 0;
+        width: root.width - root.nav-width - 1px;
+        height: root.height;
+
+        // Keys that bubble up from the column (nothing focused handled them) scroll the page and clear the pin.
+        FocusScope {
+            focus-on-click: true;
+            focus-on-tab-navigation: false;
+            key-pressed(event) => {
+                if (event.modifiers.control || event.modifiers.alt || event.modifiers.meta) {
+                    return reject;
+                }
+                if (event.text == Key.DownArrow) { root.scroll-by(48px); return accept; }
+                if (event.text == Key.UpArrow) { root.scroll-by(-48px); return accept; }
+                if (event.text == Key.PageDown || (event.text == Key.Space && !event.modifiers.shift)) {
+                    root.scroll-by(scroll.visible-height * 0.9);
+                    return accept;
+                }
+                if (event.text == Key.PageUp || (event.text == Key.Space && event.modifiers.shift)) {
+                    root.scroll-by(-scroll.visible-height * 0.9);
+                    return accept;
+                }
+                if (event.text == Key.Home) { root.scroll-by(-root.max-scroll - 1000px); return accept; }
+                if (event.text == Key.End) { root.scroll-by(root.max-scroll + 1000px); return accept; }
+                reject
+            }
+
+            // Loading: three skeleton sections ("Loading settings"), shaped like the first three real sections.
+            if !root.ready: Rectangle {
+                accessible-role: progress-indicator;
+                accessible-label: "Loading settings";
+
+                VerticalLayout {
+                    x: root.gutter;
+                    y: 0;
+                    width: min(root.column-max, parent.width - 2 * root.gutter);
+                    height: self.preferred-height;
+                    padding-top: Theme.space-8;
+                    spacing: 64px;
+                    SkeletonSection { controls: [0, 0, 1]; }
+                    SkeletonSection { controls: [1, 1, 1]; intro-width: 48%; }
+                    SkeletonSection { controls: [1, 0, 0]; intro-width: 60%; }
+                }
+            }
+
+            scroll := ScrollArea {
+                visible: root.ready;
+                edge-fade: true;
+                // The column has an explicit width (wrapped text needs it), so the content size is given, not derived.
+                content-width: self.visible-width;
+                content-height: column.preferred-height;
+                scrolled => { root.unpin(); }
+
+                column := VerticalLayout {
+                    x: root.gutter;
+                    y: 0;
+                    // Rows read best at a measure of about 680 px; wider windows keep the column left-aligned.
+                    width: min(root.column-max, scroll.visible-width - 2 * root.gutter);
+                    height: self.preferred-height;
+                    padding-top: Theme.space-8;
+                    padding-bottom: Theme.space-10;
+                    spacing: 64px;
+
+                    // Each section: its focus anchor, then the section (the wrapper's y is the section's top).
+                    w-account := VerticalLayout {
+                        a-account := SectionAnchor { label: "Account"; }
+                        s-account := AccountSection {
+                            data: root.data.account;
+                            key-draft <=> root.key-draft;
+                            save-key(k) => { root.save-key(k); }
+                            key-edited => { root.key-edited(); }
+                            open-form => { root.open-key-form(); }
+                            cancel-form => { root.cancel-key-form(); }
+                            remove-key => { root.remove-key(); }
+                            get-key => { root.get-key(); }
+                            credits-retry => { root.credits-retry(); }
+                        }
+                    }
+                    w-voice := VerticalLayout {
+                        a-voice := SectionAnchor { label: "Voice & model"; }
+                        s-voice := VoiceModelSection {
+                            data: root.data.voice;
+                            format-number(k, v) => { root.format-number(k, v) }
+                            set-choice(k, v) => { root.set-choice(k, v); }
+                            set-number(k, v) => { root.set-number(k, v); }
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                            test-voice => { root.test-voice(); }
+                            browse-voices => { root.browse-voices(); }
+                            reset-voice-settings => { root.reset-voice-settings(); }
+                        }
+                    }
+                    w-playback := VerticalLayout {
+                        a-playback := SectionAnchor { label: "Playback"; }
+                        s-playback := PlaybackSection {
+                            data: root.data.playback;
+                            format-number(k, v) => { root.format-number(k, v) }
+                            set-choice(k, v) => { root.set-choice(k, v); }
+                            set-number(k, v) => { root.set-number(k, v); }
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                        }
+                    }
+                    w-triggers := VerticalLayout {
+                        a-triggers := SectionAnchor { label: "Triggers"; }
+                        s-triggers := TriggersSection {
+                            data: root.data.triggers;
+                            exclude-draft <=> root.exclude-draft;
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                            hotkey-start(a) => { root.hotkey-start(a); }
+                            hotkey-stop => { root.hotkey-stop(); }
+                            hotkey-clear(a) => { root.hotkey-clear(a); }
+                            add-excluded(n) => { root.add-excluded(n); }
+                            remove-excluded(n) => { root.remove-excluded(n); }
+                            excluded-edited => { root.excluded-edited(); }
+                        }
+                    }
+                    w-widget := VerticalLayout {
+                        a-widget := SectionAnchor { label: "Widget"; }
+                        s-widget := WidgetSection {
+                            data: root.data.widget;
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                            set-choice(k, v) => { root.set-choice(k, v); }
+                        }
+                    }
+                    w-appearance := VerticalLayout {
+                        a-appearance := SectionAnchor { label: "Appearance"; }
+                        s-appearance := AppearanceSection {
+                            data: root.data.appearance;
+                            set-choice(k, v) => { root.set-choice(k, v); }
+                        }
+                    }
+                    w-library := VerticalLayout {
+                        a-library := SectionAnchor { label: "Library & privacy"; }
+                        s-library := LibrarySection {
+                            data: root.data.library;
+                            format-number(k, v) => { root.format-number(k, v) }
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                            set-choice(k, v) => { root.set-choice(k, v); }
+                            set-number(k, v) => { root.set-number(k, v); }
+                            clear-cache => { root.clear-cache(); }
+                            export-history => { root.export-history(); }
+                            clear-history => { root.clear-history(); }
+                        }
+                    }
+                    w-integrations := VerticalLayout {
+                        a-integrations := SectionAnchor { label: "Integrations"; }
+                        s-integrations := IntegrationsSection {
+                            data: root.data.integrations;
+                            port-draft <=> root.port-draft;
+                            set-bool(k, v) => { root.set-bool(k, v); }
+                            port-edited(t) => { root.port-edited(t); }
+                            commit-port(t) => { root.commit-port(t); }
+                            revert-port => { root.revert-port(); }
+                            copy-text(t) => { root.copy-text(t); }
+                            show-extension-folder => { root.show-extension-folder(); }
+                        }
+                    }
+                    w-about := VerticalLayout {
+                        a-about := SectionAnchor { label: "About"; }
+                        s-about := AboutSection {
+                            data: root.data.about;
+                            open-data-folder => { root.open-data-folder(); }
+                            open-link(l) => { root.open-link(l); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

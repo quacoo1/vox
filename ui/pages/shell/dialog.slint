@@ -1,0 +1,133 @@
+// The confirmation dialog (ui-settings-widget.md §1.6; DESIGN.md `Dialog`): scrim, 64-px header with title and close
+// glyph, body, right-aligned Cancel (initial focus) + confirm pill (danger tone). Esc, a press+release on the scrim
+// and the close glyph call `cancel` (Rust ignores it while `busy`). Ids: history-clear, remove-key, retention,
+// library-clear-history.
+//
+// Look: the design `Dialog` at the small size (400 w) over the `scrim`, with the trash glyph before the title (danger
+// tone for destructive dialogs) and the body in `text-secondary`. A title too long for the small header (the
+// retention dialog's "Delete 12,345 reads older than 30 days?") uses the medium width (520) instead of eliding.
+// It fades in and out over 180 ms; clicks during the exit fade are ignored (`data.open` is already false). While
+// `busy` the confirm pill spins and ignores clicks.
+// Text latch (ui-settings-widget.md §2.8): the title, body, labels and tone are copied from `data` while it is open
+// and kept while it animates out, so Rust may clear the strings together with `open = false`.
+// Accessibility: the frame is a group named by the title; the body is announced through its own text node (the design
+// Dialog has no description slot).
+// Focus: Cancel when the dialog opens; Tab / Shift+Tab stay inside (two sentinels hand focus back to Cancel). The
+// window gives focus back to its root scope when the dialog closes.
+import { Theme, Icons, Dialog, DialogSize, BodyText } from "../../design/index.slint";
+import { DialogData } from "../../models.slint";
+
+export component ConfirmDialog inherits Rectangle {
+    in property <DialogData> data;
+
+    callback confirm(string);
+    callback cancel(string);
+
+    property <bool> is-open: root.data.open;
+    // The latched copy (see the header).
+    property <string> shown-title;
+    property <string> shown-body;
+    property <string> shown-confirm;
+    property <string> shown-cancel;
+    property <bool> shown-danger;
+    // Room for the title in the small header: 400 − 24 − 18 (glyph) − 12 − 12 − 36 (close) − 16.
+    property <length> sm-title-room: 400px - Theme.space-6 - 18px - 2 * Theme.space-3 - 36px - Theme.space-4;
+    property <bool> wide: title-probe.preferred-width > root.sm-title-room;
+
+    function latch() {
+        if (root.data.open) {
+            root.shown-title = root.data.title;
+            root.shown-body = root.data.body;
+            root.shown-confirm = root.data.confirm-label;
+            root.shown-cancel = root.data.cancel-label;
+            root.shown-danger = root.data.danger;
+        }
+    }
+
+    changed data => {
+        root.latch();
+    }
+    changed is-open => {
+        if (root.is-open) {
+            root.latch();
+            dlg.focus-initial();
+        }
+    }
+    init => {
+        root.latch();
+        if (root.is-open) {
+            dlg.focus-initial();
+        }
+    }
+
+    background: transparent;
+
+    // Measures the title in the dialog's title font (never drawn).
+    title-probe := Text {
+        x: 0px;
+        y: 0px;
+        width: 0px;
+        height: 0px;
+        visible: false;
+        text: root.shown-title;
+        font-family: Theme.font-text;
+        font-size: Theme.size-title;
+        font-weight: Theme.weight-semibold;
+        accessible-role: none;
+    }
+
+    // Shift+Tab from the first control lands here: back to Cancel.
+    FocusScope {
+        x: 0px;
+        y: 0px;
+        width: 0px;
+        height: 0px;
+        enabled: root.is-open;
+        focus-on-click: false;
+        focus-gained(reason) => { dlg.focus-initial(); }
+    }
+
+    dlg := Dialog {
+        open: root.is-open;
+        title: root.shown-title;
+        icon: Icons.trash-2;
+        size: root.wide ? DialogSize.md : DialogSize.sm;
+        danger: root.shown-danger;
+        busy: root.data.busy;
+        primary-text: root.shown-confirm;
+        secondary-text: root.shown-cancel;
+        primary-clicked => {
+            if (root.is-open && !root.data.busy) {
+                root.confirm(root.data.id);
+            }
+        }
+        secondary-clicked => {
+            if (root.is-open) {
+                root.cancel(root.data.id);
+            }
+        }
+        close-requested => {
+            if (root.is-open) {
+                root.cancel(root.data.id);
+            }
+        }
+
+        BodyText {
+            text: root.shown-body;
+            wrap: word-wrap;
+            accessible-role: text;
+            accessible-label: root.shown-body;
+        }
+    }
+
+    // Tab from the last control lands here: back to Cancel.
+    FocusScope {
+        x: 0px;
+        y: 0px;
+        width: 0px;
+        height: 0px;
+        enabled: root.is-open;
+        focus-on-click: false;
+        focus-gained(reason) => { dlg.focus-initial(); }
+    }
+}

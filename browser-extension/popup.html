@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Read with Vox</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="stack">
+      <section class="card hero" aria-labelledby="title">
+        <header class="row between">
+          <span class="label">Vox bridge</span>
+          <span class="status" id="status" data-state="checking" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text">Checking</span>
+          </span>
+        </header>
+
+        <h1 class="title" id="title">Read with Vox</h1>
+        <p class="sub" id="sub">Right-click any text and choose <b>Read with Vox</b>.</p>
+
+        <div class="meter" id="meter" aria-hidden="true"></div>
+
+        <div class="row actions">
+          <button class="btn btn-primary" id="read-selection" type="button">Read selection</button>
+          <button class="btn" id="read-page" type="button">Read page</button>
+        </div>
+
+        <div class="row between transport">
+          <span class="label" id="playback-label">Player idle</span>
+          <div class="row gap-8">
+            <button class="icon-btn" id="toggle" type="button" aria-label="Pause" title="Pause / resume" disabled>
+              <svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.2" height="14" rx="1.2" /><rect x="13.8" y="5" width="3.2" height="14" rx="1.2" /></svg>
+              <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8c0 .8.9 1.3 1.6.9l10.2-6.4c.6-.4.6-1.3 0-1.7L9.6 4.7C8.9 4.3 8 4.8 8 5.6z" /></svg>
+            </button>
+            <button class="icon-btn" id="stop" type="button" aria-label="Stop" title="Stop" disabled>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="notice" id="notice" hidden>
+          <span class="notice-dot" aria-hidden="true"></span>
+          <p class="notice-text" id="notice-text"></p>
+          <button class="notice-close" id="notice-close" type="button" aria-label="Dismiss message">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="card small">
+        <div class="row between">
+          <label class="label" for="port">Port</label>
+          <input class="port" id="port" type="text" inputmode="numeric" maxlength="5" autocomplete="off" spellcheck="false" aria-describedby="port-hint" />
+        </div>
+        <p class="hint" id="port-hint">Must match <b>Settings → Triggers → Browser extension</b> in the Vox app.</p>
+      </section>
+
+      <section class="card small" aria-labelledby="howto-title">
+        <span class="label" id="howto-title">How it works</span>
+        <ol class="steps">
+          <li><span class="num">1</span><span>Select text, right-click → <b>Read with Vox</b>.</span></li>
+          <li>
+            <span class="num">2</span>
+            <span>Press <span id="shortcut" class="keys"></span> to read the selection. <a href="#" id="shortcut-link">Change</a></span>
+          </li>
+          <li><span class="num">3</span><span>Right-click the page → <b>Read page with Vox</b>.</span></li>
+        </ol>
+        <p class="privacy">Text goes only to the Vox app on this computer.</p>
+      </section>
+    </main>
+    <script src="bridge.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

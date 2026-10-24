@@ -1,0 +1,38 @@
+// Home page preview: HomePage standalone on the panel, the size of the main window's content area.
+//   vox-shot ui/previews/home.slint --component HomePreview --data ui/previews/home-<state>.json --size 892x700
+//   892 = the default window's content area (1180 − 28 − 260); --size 812xH = the smallest real content area
+//   (1100 − 28 − 260; the rail below 1100 gives 940 − 28 − 72 = 840); --size 1600xH = a maximised 1920 window.
+//   --set Theme.dark=false for Paper.
+// Fixtures: ui/previews/home-<state>.json
+//   loading · error · error-retrying · error-long (R-Home inline error under "Recent", long title / body)
+//   no-key (credits no-key, empty Recent, all-zero week) · idle (Replay last) · playing (long voice name in the pill)
+//   paused (Resume on the Recent row) · preparing (spinner, estimated time, credits restricted; the one fixture with
+//   a word count and the busy Read spinner: the Quick read text is page-local, so its box renders empty)
+//   finished (goal reached, credits error, extension off) · out-of-credits (player error, credits 0 % low, hotkeys
+//   off) · busy (spinner showcase: Replay last, Read clipboard, credits Retry while refreshing, a Recent row
+//   starting) · no-hotkey (no read-selection hotkey: idle copy without keycaps, "Not set" in Hotkeys)
+//   long (estimated "~-1:02:03", long sentence / names / numbers, a Failed row) · long-error (two-line player error)
+// Renders: shots/ui/home/<state>-{dark,light}.png (892x700), <state>-full-*.png (892 wide, whole page),
+// <state>-narrow-*.png (812 wide, whole page), playing-wide-*.png (1600 wide).
+
+import { Theme } from "../design/theme.slint";
+import { HomeData } from "../models.slint";
+import { HomePage } from "../pages/home.slint";
+
+export { Theme }
+
+export component HomePreview inherits Window {
+    in property <HomeData> data;
+
+    title: "Home";
+    preferred-width: 892px;
+    preferred-height: 700px;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    HomePage {
+        width: 100%;
+        height: 100%;
+        data: root.data;
+    }
+}

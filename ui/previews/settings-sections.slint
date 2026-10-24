@@ -1,0 +1,85 @@
+// One Settings section at full length (no scrolling), at the column width the page gives it: `page-width` 675 →
+// 595-px column (the page in a 1180-wide window: 892 - section index 217 - gutters 80), 594 → 514-px column (the
+// narrowest real page, 811 wide). The window's height follows the section. Use it to review a whole section,
+// including rows the page preview would need to scroll to. Run it without --size:
+//   vox-shot ui/previews/settings-sections.slint --data ui/previews/settings-section-triggers.json \
+//            --out shots/ui/settings/section-triggers-dark.png
+// Fixture keys: `section` ("account" | "voice" | ... | "about"), `page-width`, plus the same `data` / drafts as
+// settings.slint. All fixtures and renders: tools/previews/settings_fixtures.py.
+import { Theme } from "../design/theme.slint";
+import { SettingsData } from "../models.slint";
+import { AccountSection } from "../pages/settings/account.slint";
+import { VoiceModelSection } from "../pages/settings/voice-model.slint";
+import { PlaybackSection } from "../pages/settings/playback.slint";
+import { TriggersSection } from "../pages/settings/triggers.slint";
+import { WidgetSection } from "../pages/settings/widget.slint";
+import { AppearanceSection } from "../pages/settings/appearance.slint";
+import { LibrarySection } from "../pages/settings/library.slint";
+import { IntegrationsSection } from "../pages/settings/integrations.slint";
+import { AboutSection } from "../pages/settings/about.slint";
+
+export { Theme }
+
+export component SettingsSectionPreview inherits Window {
+    in property <SettingsData> data;
+    in property <string> section: "account";
+    in property <length> page-width: 675px;
+    in-out property <string> key-draft;
+    in-out property <string> exclude-draft;
+    in-out property <string> port-draft;
+
+    title: "Settings section";
+    preferred-width: root.page-width;
+    preferred-height: lay.preferred-height;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    lay := VerticalLayout {
+        x: Theme.space-10;
+        y: 0;
+        width: root.width - 2 * Theme.space-10;
+        height: self.preferred-height;
+        padding-top: Theme.space-8;
+        padding-bottom: Theme.space-8;
+
+        if root.section == "account": AccountSection {
+            width: parent.width;
+            data: root.data.account;
+            key-draft <=> root.key-draft;
+        }
+        if root.section == "voice": VoiceModelSection {
+            width: parent.width;
+            data: root.data.voice;
+        }
+        if root.section == "playback": PlaybackSection {
+            width: parent.width;
+            data: root.data.playback;
+        }
+        if root.section == "triggers": TriggersSection {
+            width: parent.width;
+            data: root.data.triggers;
+            exclude-draft <=> root.exclude-draft;
+        }
+        if root.section == "widget": WidgetSection {
+            width: parent.width;
+            data: root.data.widget;
+        }
+        if root.section == "appearance": AppearanceSection {
+            width: parent.width;
+            data: root.data.appearance;
+        }
+        if root.section == "library": LibrarySection {
+            width: parent.width;
+            data: root.data.library;
+        }
+        if root.section == "integrations": IntegrationsSection {
+            width: parent.width;
+            data: root.data.integrations;
+            port-draft <=> root.port-draft;
+        }
+        if root.section == "about": AboutSection {
+            width: parent.width;
+            data: root.data.about;
+        }
+    }
+}

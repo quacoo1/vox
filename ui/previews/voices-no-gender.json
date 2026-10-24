@@ -1,0 +1,140 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: Studio narrator",
+    "count": "5 voices",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      },
+      {
+        "value": "irish",
+        "label": "Irish",
+        "accessible-label": "Irish"
+      }
+    ],
+    "category-options": [
+      {
+        "value": "",
+        "label": "All types",
+        "accessible-label": "All types"
+      },
+      {
+        "value": "cloned",
+        "label": "Cloned",
+        "accessible-label": "Cloned"
+      },
+      {
+        "value": "generated",
+        "label": "Designed",
+        "accessible-label": "Designed"
+      },
+      {
+        "value": "professional",
+        "label": "Professional",
+        "accessible-label": "Professional"
+      }
+    ],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "clone-02",
+        "name": "Interview voice (podcast)",
+        "art": {
+          "$image": "art/thumb-will.png"
+        },
+        "subtitle": "Cloned · American · Podcast",
+        "description": "Cloned from the March episodes.",
+        "tags": [],
+        "caption": "Cloned · Podcast",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-03",
+        "name": "Grandad’s stories",
+        "art": {
+          "$image": "art/thumb-bill.png"
+        },
+        "subtitle": "Cloned · British · Storytelling",
+        "description": "Cloned from old cassette recordings.",
+        "tags": [],
+        "caption": "Cloned · Storytelling",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-01",
+        "name": "My reading voice",
+        "art": {
+          "$image": "art/thumb-river.png"
+        },
+        "subtitle": "Cloned",
+        "description": "No description.",
+        "tags": [],
+        "caption": "Cloned",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.none"
+        }
+      },
+      {
+        "id": "pro-01",
+        "name": "Studio narrator",
+        "art": {
+          "$image": "art/thumb-roger.png"
+        },
+        "subtitle": "Professional · Irish · Audiobook",
+        "description": "Recorded in a treated booth for long-form reading.",
+        "tags": [],
+        "caption": "Professional · Audiobook",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "gen-01",
+        "name": "Night reader",
+        "art": {
+          "$image": "art/thumb-sarah.png"
+        },
+        "subtitle": "Designed · British · Meditation",
+        "description": "Soft, low and slow, for reading before bed.",
+        "tags": [],
+        "caption": "Designed · Meditation",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

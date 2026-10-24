@@ -1,0 +1,245 @@
+// Composition: a believable Vox main window built only from the design system (1280 x 800): the Voices page,
+// the screen closest to the reference (large art rows with pills).
+//   vox-shot ui/previews/composition.slint --component Composition --data ui/previews/composition.json --size 1280x800
+//   ... --set Theme.dark=false
+// Art and the backdrop come in as image properties; when missing, ArtThumb shows its placeholder and the backdrop
+// falls back to a soft gradient.
+
+import {
+    Theme, Icons, HeaderTitle, RowTitle, RowSubtitle, CaptionText, Button, ButtonKind, ButtonSize, IconButton,
+    IconButtonKind, IconButtonSize, SearchField, NavItem, SectionLabel, ListRow, Badge, BadgeKind, BadgeSize,
+    FilterChip, ProgressLine, ArtThumb, ScrollArea, Divider
+} from "../design/index.slint";
+
+export { Theme }
+
+struct Voice {
+    name: string,
+    meta: string,
+    art: image,
+}
+
+export component Composition inherits Window {
+    in property <image> backdrop-dark;
+    in property <image> backdrop-light;
+    property <image> backdrop: Theme.dark ? root.backdrop-dark : root.backdrop-light;
+    in property <image> art-george;
+    in property <image> art-charlotte;
+    in property <image> art-brian;
+    in property <image> art-lily;
+    in property <image> art-daniel;
+    in property <image> art-aria;
+    in property <image> now-art;
+
+    in property <[Voice]> recommended: [
+        { name: "Charlotte", meta: "Female · Swedish · Conversational", art: root.art-charlotte },
+        { name: "Brian", meta: "Male · American · Narration", art: root.art-brian },
+        { name: "Lily", meta: "Female · British · Audiobooks", art: root.art-lily },
+        { name: "Daniel", meta: "Male · British · News", art: root.art-daniel },
+    ];
+
+    title: "Vox";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    background: Theme.backdrop;
+    default-font-family: Theme.font-text;
+
+    // ---- Backdrop ----
+    if root.backdrop.width == 0: Rectangle {
+        // Placeholder "silk": two soft out-of-focus highlights on the deep backdrop.
+        Rectangle {
+            x: parent.width * 0.55;
+            y: -parent.height * 0.45;
+            width: parent.width * 0.9;
+            height: parent.height * 1.1;
+            background: @radial-gradient(circle, Theme.art-sheen 0%, Theme.art-sheen.with-alpha(0) 65%);
+        }
+        Rectangle {
+            x: -parent.width * 0.3;
+            y: parent.height * 0.35;
+            width: parent.width * 0.7;
+            height: parent.height;
+            background: @radial-gradient(circle, Theme.art-sheen.with-alpha(0.06) 0%, Theme.art-sheen.with-alpha(0) 70%);
+        }
+    }
+    if root.backdrop.width > 0: Image {
+        width: 100%;
+        height: 100%;
+        source: root.backdrop;
+        image-fit: cover;
+    }
+
+    // ---- Panel ----
+    panel := Rectangle {
+        x: Theme.panel-inset;
+        y: Theme.panel-inset;
+        width: root.width - 2 * Theme.panel-inset;
+        height: root.height - 2 * Theme.panel-inset;
+        border-radius: Theme.radius-panel;
+        background: Theme.panel;
+        drop-shadow-blur: 40px;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-color: Theme.shadow;
+
+        Rectangle {
+            border-radius: Theme.radius-panel;
+            clip: true;
+
+            VerticalLayout {
+                // Header
+                HorizontalLayout {
+                    height: Theme.header-height;
+                    padding-left: Theme.space-6;
+                    padding-right: Theme.space-5;
+                    spacing: Theme.space-2;
+                    HeaderTitle { text: "Voices"; horizontal-stretch: 1; }
+                    VerticalLayout {
+                        alignment: center;
+                        Button { text: "Read clipboard"; size: ButtonSize.sm; icon: Icons.clipboard-paste; kind: ButtonKind.ghost; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton { icon: Icons.more-horizontal; label: "More"; size: IconButtonSize.md; }
+                    }
+                }
+                Divider { }
+
+                HorizontalLayout {
+                    // ---- Sidebar ----
+                    VerticalLayout {
+                        width: Theme.sidebar-width;
+
+                        VerticalLayout {
+                            padding: Theme.space-4;
+                            SearchField { placeholder: "Search history"; keys: ["Ctrl", "K"]; }
+                        }
+                        Divider { }
+                        VerticalLayout {
+                            padding: Theme.space-4;
+                            padding-top: Theme.space-5;
+                            padding-bottom: Theme.space-5;
+                            spacing: Theme.space-1;
+                            NavItem { icon: Icons.house; text: "Home"; }
+                            NavItem { icon: Icons.history; text: "History"; }
+                            NavItem { icon: Icons.chart-column; text: "Analytics"; }
+                            NavItem { icon: Icons.audio-lines; text: "Voices"; selected: true; }
+                        }
+                        Divider { }
+                        VerticalLayout {
+                            padding: Theme.space-4;
+                            padding-top: Theme.space-6;
+                            spacing: Theme.space-3;
+                            HorizontalLayout {
+                                padding-left: 18px;
+                                SectionLabel { text: "Preferences"; }
+                            }
+                            NavItem { icon: Icons.settings; text: "Settings"; }
+                        }
+
+                        Rectangle { vertical-stretch: 1; }
+
+                        // Now playing
+                        VerticalLayout {
+                            padding: Theme.space-4;
+                            padding-bottom: Theme.space-4;
+                            spacing: Theme.space-3;
+
+                            Rectangle {
+                                border-radius: Theme.radius-card;
+                                background: Theme.field;
+                                border-width: Theme.hairline;
+                                border-color: Theme.divider;
+
+                                VerticalLayout {
+                                    padding: Theme.space-3;
+                                    padding-bottom: Theme.space-2;
+                                    spacing: Theme.space-1;
+                                    HorizontalLayout {
+                                        spacing: Theme.space-3;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            ArtThumb { width: 40px; height: 40px; source: root.now-art; label: "George"; }
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            spacing: 2px;
+                                            RowTitle { text: "The quiet revolution in personal computing"; font-size: Theme.size-label; }
+                                            RowSubtitle { text: "George · 1:12 left"; font-size: Theme.size-caption; }
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            IconButton { icon: Icons.pause-fill; label: "Pause"; kind: IconButtonKind.primary; size: IconButtonSize.md; }
+                                        }
+                                    }
+                                    ProgressLine { value: 0.38; buffered: 0.64; interactive: false; }
+                                }
+                            }
+                            HorizontalLayout {
+                                padding-left: Theme.space-1;
+                                padding-right: Theme.space-1;
+                                CaptionText { text: "12,480 credits left"; horizontal-stretch: 1; }
+                                CaptionText { text: "Starter"; }
+                            }
+                        }
+                    }
+                    Divider { vertical: true; }
+
+                    // ---- Content ----
+                    ScrollArea {
+                        edge-fade: true;
+                        VerticalLayout {
+                            padding-left: Theme.space-10;
+                            padding-right: Theme.space-10;
+                            padding-top: Theme.space-6;
+                            padding-bottom: Theme.space-8;
+                            spacing: 0px;
+                            alignment: start;
+
+                            // Filters
+                            HorizontalLayout {
+                                spacing: Theme.space-2;
+                                FilterChip { text: "All"; count: "24"; selected: true; }
+                                FilterChip { text: "Female"; }
+                                FilterChip { text: "Male"; }
+                                FilterChip { text: "Narration"; }
+                                FilterChip { text: "Cloned"; icon: Icons.sparkles; }
+                                Rectangle { horizontal-stretch: 1; }
+                                SearchField { width: 240px; small: true; placeholder: "Filter voices"; }
+                            }
+
+                            Rectangle { height: Theme.space-8; }
+                            SectionLabel { text: "Voice in use"; }
+                            Rectangle { height: Theme.space-2; }
+                            ListRow {
+                                art: root.art-george;
+                                title: "George";
+                                subtitle: "Male · British · Narration";
+                                Button { text: "Preview"; icon: Icons.play; }
+                                // Same width as "Use voice" below, so the Preview pills line up down the list.
+                                Badge { width: 108px; text: "In use"; kind: BadgeKind.outline; size: BadgeSize.lg; icon: Icons.check; }
+                            }
+
+                            Rectangle { height: Theme.space-6; }
+                            SectionLabel { text: "Recommended for you"; link-text: "Voice library"; }
+                            Rectangle { height: Theme.space-2; }
+                            for v in root.recommended: ListRow {
+                                art: v.art;
+                                title: v.name;
+                                subtitle: v.meta;
+                                Button { text: "Preview"; icon: Icons.play; }
+                                Button { width: 108px; text: "Use voice"; kind: ButtonKind.primary; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Outer hairline drawn last so it sits above the clipped content.
+        Rectangle {
+            border-radius: Theme.radius-panel;
+            border-width: Theme.hairline;
+            border-color: Theme.panel-border;
+        }
+    }
+}

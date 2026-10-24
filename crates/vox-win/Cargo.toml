@@ -1,0 +1,52 @@
+[package]
+name = "vox-win"
+description = "Vox Windows integration: input hooks + selection gestures + clipboard capture, foreground app, hotkeys, SMTC media keys, registry (Explorer verb, autostart, theme), single instance, system events, window and shell helpers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+winreg.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde_json.workspace = true
+# Unicode categories for the hotkey recorder's AltGr rule (`\p{C}`, `\p{L}`); already in the graph through vox-core.
+regex.workspace = true
+
+[dependencies.windows]
+workspace = true
+features = [
+    "Data_Xml_Dom",
+    "Foundation",
+    "Media",
+    "UI_Notifications",
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_Pipes",
+    "Win32_System_Power",
+    "Win32_System_Threading",
+    "Win32_System_WinRT",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_TextServices",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[dev-dependencies]

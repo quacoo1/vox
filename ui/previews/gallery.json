@@ -1,0 +1,15 @@
+{
+  "art-1": { "$image": "art/thumb-george.png" },
+  "art-2": { "$image": "art/thumb-charlotte.png" },
+  "art-3": { "$image": "art/thumb-aria.png" },
+  "art-4": { "$image": "art/thumb-river.png" },
+  "small-1": { "$image": "art/small-george.png" },
+  "small-2": { "$image": "art/small-charlotte.png" },
+  "small-3": { "$image": "art/small-brian.png" },
+  "small-4": { "$image": "art/small-lily.png" },
+  "small-5": { "$image": "art/small-daniel.png" },
+  "small-6": { "$image": "art/small-aria.png" },
+  "small-7": { "$image": "art/small-callum.png" },
+  "backdrop-dark": { "$image": "art/backdrop-dark.png" },
+  "backdrop-light": { "$image": "art/backdrop-light.png" }
+}

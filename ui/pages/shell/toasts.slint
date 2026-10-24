@@ -1,0 +1,199 @@
+// The app window's toast stack (ui-main.md §1.7, ui-settings-widget.md §1.5): bottom-right (bottom-centre during
+// onboarding), max 4, newest last. Timing lives in Rust; the stack reports hover so Rust can pause the countdown.
+// Rows whose `leaving` is true play the 180 ms exit (fade + slide; instant under Motion.reduce) and ignore clicks; a
+// new `key` replays the enter animation.
+//
+// Look: the design `Toast` (popup surface, hairline, soft shadow; 52-h pill for one line, radius 14 when taller),
+// 8 px apart in one column whose width is the widest toast's (clamped to 280–440 px), so every toast in the stack
+// shares both edges. The column is the polite live region "Notifications" (each error toast is itself assertive).
+// Placement:
+// - shell: 24 px in from the panel's bottom-right corner (panel inset + 24 from the window edges);
+// - onboarding (`centered`): bottom-centre, 16 px above the window edge, as long as the stack stays below the
+//   onboarding card's footer pills (Back / Continue end 16 px above the card's bottom edge; the card's documented
+//   geometry is 624 px tall at most, 16-px margins, lifted 16 px above centre). A one-line toast fits from a 700-px
+//   window up; at the default 1180 × 780 it clears the card by 26 px. When the stack would cover the footer pills
+//   (the 640-px minimum height, or several toasts in a short window) it moves to top-centre, over the card's header
+//   row instead: a deliberate deviation from "bottom-centre" that keeps Continue usable while an error toast stays
+//   up for 6.5 s or more. It goes away if onboarding leaves 52 + 2 × 16 px under the card at the minimum height.
+//
+// Pause reporting (ui-main.md §1.7: one flag, the last event wins): pointer enter → hover(id, true), pointer leave
+// → hover(id, false), focus entering the toast → hover(id, true), focus leaving it → hover(id, false). So moving the
+// pointer away resumes the countdown even while focus is still inside. A same-id replacement is a new card that
+// starts unpaused and sends nothing until the pointer or focus moves: **Rust resets the pause flag on a same-id
+// push.**
+// Focus: when the toast holding keyboard focus starts leaving, or disappears (cap, replacement), focus moves to a
+// sink inside the stack so the window's shortcuts keep working (a vanished focus item leaves Slint with none).
+import { Theme, Toast, ToastKind } from "../../design/index.slint";
+import { ToastData, ToastTone, Motion } from "../../models.slint";
+
+// One toast with its enter / exit motion. Re-created whenever its `key` changes (see the `for k in [..]` below), so
+// `init` replays the enter animation for a same-id replacement. It stretches to the column width.
+component ToastCard inherits Rectangle {
+    in property <ToastData> toast;
+
+    callback action(string);
+    callback dismiss(string);
+    callback hover(string, bool);
+    // Keyboard focus entered (true) or left (false) this card.
+    callback focus-changed(int, bool);
+    // This card holds focus and has started leaving: the stack takes the focus.
+    callback release-focus();
+
+    property <float> entered: 0;
+    property <float> shown: root.toast.leaving ? 0 : root.entered;
+    // Pointer anywhere over the card, its buttons included (the area is the card's parent, so it keeps its hover
+    // while a child button takes the pointer).
+    property <bool> hov: area.has-hover;
+    property <bool> foc: card.has-focus;
+    property <bool> leaving: root.toast.leaving;
+
+    init => { root.entered = 1; }
+    changed hov => { root.hover(root.toast.id, self.hov); }
+    changed foc => {
+        root.hover(root.toast.id, self.foc);
+        root.focus-changed(root.toast.key, self.foc);
+    }
+    changed leaving => {
+        if (self.leaving && self.foc) {
+            root.release-focus();
+        }
+    }
+
+    animate shown { duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+
+    min-width: card.min-width;
+    preferred-width: card.preferred-width;
+    max-width: card.max-width;
+    min-height: card.min-height;
+    preferred-height: card.preferred-height;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    background: transparent;
+
+    area := TouchArea {
+        x: 0px;
+        y: (1 - root.shown) * 10px;
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: MouseCursor.default;
+
+        card := Toast {
+            width: parent.width;
+            height: parent.height;
+            opacity: root.shown;
+            kind: root.toast.tone == ToastTone.error ? ToastKind.error
+                : root.toast.tone == ToastTone.success ? ToastKind.success
+                : ToastKind.info;
+            title: root.toast.title;
+            message: root.toast.message;
+            action-text: root.toast.action-label;
+            action => {
+                if (!root.toast.leaving) {
+                    root.action(root.toast.id);
+                }
+            }
+            dismissed => {
+                if (!root.toast.leaving) {
+                    root.dismiss(root.toast.id);
+                }
+            }
+        }
+    }
+
+    // A leaving toast ignores the pointer.
+    if root.toast.leaving: TouchArea { }
+}
+
+export component ToastStack inherits Rectangle {
+    in property <[ToastData]> toasts;
+    in property <bool> centered;
+
+    callback action(string);
+    callback dismiss(string);
+    // Pointer or keyboard focus inside a toast (pauses its timer; see the header for the edge rules).
+    callback hover(string, bool);
+
+    // Shell: the panel inset plus the panel's 24 px content gutter, from the right and bottom window edges.
+    property <length> shell-margin: Theme.panel-inset + Theme.space-6;
+    // Onboarding: 16 px from the window edge.
+    property <length> centred-margin: Theme.space-4;
+    // The onboarding card's documented geometry (ui/pages/onboarding.slint header) → the free height under it.
+    property <length> card-height: min(624px, root.height - 2 * Theme.space-4);
+    property <length> card-top: max(Theme.space-4, (root.height - root.card-height) / 2 - Theme.space-4);
+    property <length> room-below: root.height - root.card-top - root.card-height;
+    // The stack's top (16 px above the window edge) stays at or below the footer pills' bottom (16 px above the
+    // card's bottom edge): stack height ≤ room under the card.
+    property <bool> centred-below: column.preferred-height <= root.room-below;
+    // The column width: the widest toast's preferred width (each toast clamps itself to 280–440), within the window.
+    property <length> column-width: min(root.width - 2 * (root.centered ? root.centred-margin : root.shell-margin),
+        column.preferred-width);
+    // The key of the toast holding keyboard focus (-1 = none).
+    property <int> focus-key: -1;
+    // Is that toast still in the stack? (≤ 4 rows: checked one by one.)
+    property <bool> focus-present: root.focus-key < 0
+        || (root.toasts.length > 0 && root.toasts[0].key == root.focus-key)
+        || (root.toasts.length > 1 && root.toasts[1].key == root.focus-key)
+        || (root.toasts.length > 2 && root.toasts[2].key == root.focus-key)
+        || (root.toasts.length > 3 && root.toasts[3].key == root.focus-key)
+        || (root.toasts.length > 4 && root.toasts[4].key == root.focus-key);
+
+    changed focus-present => {
+        if (!self.focus-present) {
+            root.focus-key = -1;
+            sink.focus();
+        }
+    }
+
+    background: transparent;
+
+    // Takes keyboard focus from a toast that goes away; it sits inside the window's root FocusScope, so the global
+    // shortcuts keep working. Never reached by Tab.
+    sink := FocusScope {
+        x: 0px;
+        y: 0px;
+        width: 0px;
+        height: 0px;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        accessible-role: none;
+    }
+
+    region := Rectangle {
+        width: root.column-width;
+        height: column.preferred-height;
+        x: root.centered ? (root.width - self.width) / 2 : root.width - self.width - root.shell-margin;
+        y: !root.centered ? root.height - self.height - root.shell-margin
+            : root.centred-below ? root.height - self.height - root.centred-margin
+            : root.card-top + (Theme.header-height - 52px) / 2;
+        visible: root.toasts.length > 0;
+        accessible-role: groupbox;
+        accessible-label: "Notifications";
+        accessible-live-region: AccessibleLiveness.polite;
+        animate width { duration: Motion.reduce ? 0ms : Theme.medium; easing: ease-out; }
+
+        column := VerticalLayout {
+            alignment: end;
+            spacing: Theme.space-2;
+
+            for t in root.toasts: HorizontalLayout {
+                for k in [t.key]: ToastCard {
+                    toast: t;
+                    action(id) => { root.action(id); }
+                    dismiss(id) => { root.dismiss(id); }
+                    hover(id, h) => { root.hover(id, h); }
+                    focus-changed(key, f) => {
+                        if (f) {
+                            root.focus-key = key;
+                        } else if (root.focus-key == key) {
+                            root.focus-key = -1;
+                        }
+                    }
+                    release-focus => {
+                        root.focus-key = -1;
+                        sink.focus();
+                    }
+                }
+            }
+        }
+    }
+}

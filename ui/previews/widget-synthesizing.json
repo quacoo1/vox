@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.full"
+    },
+    "body": {
+      "$enum": "WidgetBody.sentence"
+    },
+    "art": {
+      "$image": "art/small-george.png"
+    },
+    "source": "Chrome",
+    "voice": "George",
+    "phase": {
+      "$enum": "PlayerPhase.loading"
+    },
+    "status": "Synthesizing",
+    "status-loading": true,
+    "rate": "1×",
+    "show-rate": true,
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.",
+    "spoken": "",
+    "current": "",
+    "upcoming": "The quiet revolution in personal computing was never about faster chips.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "≈0:41",
+    "time-estimate": true,
+    "time-accessible": "about 0:41 left",
+    "progress": 0.0,
+    "buffered": 0.0,
+    "progress-accessible": "0:00 of about 0:41",
+    "seekable": false,
+    "previous-enabled": false,
+    "next-enabled": false,
+    "previous-label": "Previous sentence",
+    "next-label": "Next sentence",
+    "main-action": {
+      "$enum": "MainAction.pause"
+    },
+    "compact-loading": false,
+    "warning-visible": false,
+    "warning-lead": "",
+    "warning-reason": "",
+    "warning-link": false,
+    "warning-tooltip": "",
+    "warning-dot-tooltip": "",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "",
+      "tone": {
+        "$enum": "ToastTone.info"
+      },
+      "title": "",
+      "message": "",
+      "action-label": "",
+      "leaving": false,
+      "key": 0
+    },
+    "toast-visible": false
+  }
+}

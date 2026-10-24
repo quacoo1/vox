@@ -1,0 +1,1543 @@
+// History (ui-main.md §4; DESIGN.md "Screens → History").
+import {
+    Theme, Icons, Icon, Pressable, FocusRing, Button, ButtonKind, ButtonSize, IconButtonSize, SearchField, Keycap,
+    SectionLabel, Badge, BadgeDot, ArtThumb, Tip, ScrollArea, Divider, FilterChip, MenuButton, Skeleton
+} from "../design/index.slint";
+import { HistoryData, HistoryRow, HistoryRowKind, HistoryState, ChoiceItem, Motion } from "../models.slint";
+
+// The header actions (count eyebrow, Export, Clear all) are rendered by MainWindow's header row from `data`
+// (ARCHITECTURE.md §7.4). The search field's text is `search-text` (in-out; Rust writes it only to reset it);
+// `focus-search-nonce` changes → focus the search field and select its text (Ctrl+F / `/`). The nothing-yet body is
+// `state-body` + `state-keys` (keycaps) + `state-body-after` (the keycaps and the after-text share a centred second
+// line: a wrapped Text cannot flow around inline elements). Stateful controls (favorites segmented, source
+// select) re-assert from `data` in a `changed data` handler (`data.revision`).
+//
+// How the page reads `data` (what the Rust filler should send):
+// - Toolbar (hidden in `nothing-yet`): search pill (a fixed 380 px, shrinking toward 160 px when the row is tight, so
+//   it never moves while typing), "All" / "Favorites" filter pills (one radio group: arrows move and select,
+//   wrapping), and the source picker over `source-options` (value "" = "All sources" first, then the SOURCE_ORDER
+//   entries). The picker shows the label of the option whose `value == source`; a chosen source (value != "") gets
+//   the brighter label and border (the same picker as Voices' filters).
+// - `state-icon` and `HistoryRow.source-icon` are Lucide names from ui/icons (vox_core ReadSource::icon, plus
+//   "history", "search", "star", "circle-alert"); unknown names fall back to `info`.
+// - Rows (`state == list`): flat list; a `header` row shows `header-label` + `header-meta`; a `read` row is the
+//   toggle (art, 2-line `title` (1 line while expanded), source glyph + `meta` (tooltip `time-tooltip`; it keeps at
+//   least ~120 px before it elides), a filled star when `favorite` (wide only), `badges` ("Failed" gets a danger dot,
+//   "Playing" / "Paused" a glyph), the listened meter
+//   (`progress`, `percent`, brighter when `complete`), a "Replay" pill (`replay-label`, tooltip `replay-tooltip`,
+//   focusable but inert and dimmed when `!can-replay`) and a ⋯ menu: Copy text / Add to (Remove from) favorites /
+//   Delete from history.
+// - Expanded (`expanded`): an inset block (16 px insets) with `full-text` (scrolls past 260 px), `notes` (one line
+//   each), `facts` as a stat strip (Chars, Words, Credits, Heard), `details` as label / value lines (Source, Window,
+//   Voice, Audio, Read; two columns when wide, filled column by column) and, when `url-label` is set, a "Page" line
+//   whose link calls `open-url(id)`. Opening a row scrolls its details into view.
+// - `dimmed` fades the list while a refresh with new filters runs. Footer: `footer` ("Showing 50 of 214") with
+//   "Load more" (`can-load-more`, spinner while `loading-more`), else "End of history" when `end-of-history`.
+// - Narrow (page < 760 px wide): smaller art (88x66) and sm pills, the meter moves under the text, no star in the
+//   meta line, details stack in one column.
+// - Loading: four placeholder rows built like the real rows (same art, meter and pill columns), so nothing jumps
+//   when the rows arrive.
+// - The empty / error / no-matches states take `state-icon`, `state-title`, `state-body` (+ keys), `state-button`;
+//   the button calls `retry` (error), `paste-and-read` (nothing yet) or `clear-filters` (no matches).
+// Keyboard: Tab order search → filter pills → source picker → rows (toggle, Replay, ⋯) → Load more; Ctrl+F / `/`
+// (MainWindow) bump `focus-search-nonce` → the search field takes focus. On a row toggle
+// Up / Down move to the previous / next read, Home / End to the first / last, Enter / Space expand. Deleting a row
+// moves focus to the next read (or the previous one) once the ⋯ menu has closed. Focus is kept by read id, not by
+// index, so it survives Rust removing or replacing rows: a row created while it is the focused id (a new rows model)
+// takes focus back. Rust should still update `rows` in place (set_row_data / remove on one VecModel) so rows are not
+// rebuilt. The list scrolls to keep the focused row (or Load more) and a just-opened row in view.
+
+// Lucide names (strings from Rust) → icons.
+global HistoryGlyphs {
+    public pure function by-name(name: string) -> image {
+        if (name == "mouse-pointer-click") { return Icons.mouse-pointer-click; }
+        if (name == "keyboard") { return Icons.keyboard; }
+        if (name == "text-select") { return Icons.text-select; }
+        if (name == "text-cursor-input") { return Icons.text-cursor-input; }
+        if (name == "globe") { return Icons.globe; }
+        if (name == "folder-open") { return Icons.folder-open; }
+        if (name == "clipboard") { return Icons.clipboard; }
+        if (name == "clipboard-paste") { return Icons.clipboard-paste; }
+        if (name == "type") { return Icons.type; }
+        if (name == "repeat") { return Icons.repeat; }
+        if (name == "rotate-ccw") { return Icons.rotate-ccw; }
+        if (name == "terminal") { return Icons.terminal; }
+        if (name == "history") { return Icons.history; }
+        if (name == "search") { return Icons.search; }
+        if (name == "star") { return Icons.star; }
+        if (name == "circle-alert") { return Icons.circle-alert; }
+        if (name == "triangle-alert") { return Icons.triangle-alert; }
+        if (name == "list-filter") { return Icons.list-filter; }
+        if (name == "filter") { return Icons.filter; }
+        if (name == "app-window") { return Icons.app-window; }
+        if (name == "file-text") { return Icons.file-text; }
+        return Icons.info;
+    }
+}
+
+// A filled star (the Lucide star with a fill): the favourite mark in a row's meta line.
+component StarMark {
+    in property <length> size: 13px;
+    in property <brush> color: Theme.text;
+
+    width: root.size;
+    height: root.size;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "Favorite";
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z";
+        fill: root.color;
+        stroke: root.color;
+        stroke-width: 1px;
+        accessible-role: none;
+    }
+}
+
+// The source filter: a small Select-style pill over `[ChoiceItem]` (the design Select takes `[string]`). The same
+// look and keys as Voices' filter pickers: it always stays a secondary pill; a chosen source (value != "") shows a
+// brighter label and border, "All sources" a quieter label.
+component SourcePicker {
+    in property <[ChoiceItem]> options;
+    in property <string> value;
+    in property <bool> enabled: true;
+    in property <string> label: "Filter by source";
+    out property <bool> has-focus: press.has-focus;
+    out property <bool> is-open: popup.is-open;
+
+    callback picked(value: string);
+
+    // Index of the option whose value is `value`: each option checks itself (any number of options).
+    property <int> current: -1;
+    property <bool> found: root.current >= 0 && root.current < root.options.length
+        && root.options[root.current].value == root.value;
+    property <string> current-label: root.found ? root.options[root.current].label : "";
+    property <bool> active: root.value != "";
+    property <int> highlight: -1;
+    property <length> row-h: 36px;
+    property <int> rows: min(10, root.options.length);
+
+    public function open() {
+        if (root.enabled && root.options.length > 0) {
+            root.highlight = root.found ? root.current : 0;
+            popup.show();
+        }
+    }
+
+    function choose(i: int) {
+        if (i >= 0 && i < root.options.length && root.options[i].value != root.value) {
+            root.picked(root.options[i].value);
+        }
+    }
+
+    height: 32px;
+    min-width: 120px;
+    preferred-width: max(150px, row.preferred-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.current-label;
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-expand => { root.open(); }
+    accessible-action-default => { root.open(); }
+
+    for opt[i] in root.options: Rectangle {
+        width: 0;
+        height: 0;
+        property <bool> hit: opt.value == root.value;
+        init => {
+            if (self.hit) {
+                root.current = i;
+            }
+        }
+        changed hit => {
+            if (self.hit) {
+                root.current = i;
+            }
+        }
+    }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+        border-width: Theme.hairline;
+        border-color: (root.active || press.has-hover || popup.is-open) ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible;
+    }
+
+    row := HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 10px;
+        spacing: 6px;
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.current-label != "" ? root.current-label : root.label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: root.active && root.found ? Theme.text : Theme.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Icon {
+            source: Icons.chevron-down;
+            size: 16px;
+            color: Theme.text-secondary;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.open(); }
+        key(event) => {
+            if (event.text == Key.DownArrow && event.modifiers.alt) {
+                root.open();
+                return accept;
+            }
+            if (event.text == Key.DownArrow) {
+                root.choose(root.found ? min(root.options.length - 1, root.current + 1) : 0);
+                return accept;
+            }
+            if (event.text == Key.UpArrow) {
+                root.choose(root.found ? max(0, root.current - 1) : 0);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    popup := PopupWindow {
+        x: root.width - self.width;
+        y: root.height + 6px;
+        width: max(root.width, 200px);
+        height: root.rows * root.row-h + 12px;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-keys;
+
+        popup-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    popup.close();
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.highlight = min(root.options.length - 1, root.highlight + 1);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.highlight = max(0, root.highlight - 1);
+                    return accept;
+                }
+                if (event.text == Key.Home) {
+                    root.highlight = 0;
+                    return accept;
+                }
+                if (event.text == Key.End) {
+                    root.highlight = root.options.length - 1;
+                    return accept;
+                }
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.choose(root.highlight);
+                    popup.close();
+                    return accept;
+                }
+                reject
+            }
+
+            Rectangle {
+                border-radius: Theme.radius-popup;
+                background: Theme.popup;
+                border-width: Theme.hairline;
+                border-color: Theme.popup-border;
+                drop-shadow-blur: 24px;
+                drop-shadow-offset-y: 8px;
+                drop-shadow-color: Theme.popup-shadow;
+            }
+
+            list := Flickable {
+                x: 6px;
+                y: 6px;
+                width: parent.width - 12px;
+                height: parent.height - 12px;
+                content-height: root.options.length * root.row-h;
+                interactive: root.options.length > root.rows;
+                content-y: root.highlight < 0 ? 0px
+                    : -max(0px, min((root.options.length - root.rows) * root.row-h,
+                        (root.highlight - root.rows + 1) * root.row-h));
+
+                for o[i] in root.options: Rectangle {
+                    y: i * root.row-h;
+                    width: list.width;
+                    height: root.row-h;
+                    border-radius: 10px;
+                    background: opt-touch.pressed ? Theme.pressed
+                        : (opt-touch.has-hover || i == root.highlight) ? Theme.hover : transparent;
+                    accessible-role: list-item;
+                    accessible-label: o.accessible-label != "" ? o.accessible-label : o.label;
+                    accessible-item-selectable: true;
+                    accessible-item-selected: o.value == root.value;
+                    accessible-item-index: i;
+                    accessible-item-count: root.options.length;
+                    accessible-action-default => {
+                        root.choose(i);
+                        popup.close();
+                    }
+                    animate background { duration: Theme.fast; easing: ease-out; }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        Text {
+                            horizontal-stretch: 1;
+                            text: o.label;
+                            font-family: Theme.font-text;
+                            font-size: Theme.size-body;
+                            font-weight: o.value == root.value ? Theme.weight-semibold : Theme.weight-medium;
+                            color: Theme.text;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            accessible-role: none;
+                        }
+                        if o.value == root.value: Icon {
+                            source: Icons.check;
+                            size: 16px;
+                            color: Theme.text;
+                        }
+                    }
+
+                    opt-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.choose(i);
+                            popup.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// One label / value line of the expanded details.
+component DetailLine {
+    in property <string> label;
+    in property <string> value;
+    in property <string> tooltip;
+    in property <length> label-width: 64px;
+
+    min-height: 26px;
+    preferred-height: 26px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.label + ": " + root.value;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+        Text {
+            width: root.label-width;
+            text: root.label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.value;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+
+    Tip { text: root.tooltip; }
+}
+
+// The "Page" line: a link to the read's source page.
+component PageLink {
+    in property <string> url-label;
+    in property <length> label-width: 64px;
+
+    callback open();
+
+    min-height: 26px;
+    preferred-height: 26px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+        Text {
+            width: root.label-width;
+            text: "Page";
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            alignment: start;
+            link := Rectangle {
+                horizontal-stretch: 1;
+                max-width: link-row.preferred-width;
+                accessible-role: button;
+                accessible-label: "Open " + root.url-label;
+                accessible-action-default => { root.open(); }
+
+                FocusRing {
+                    radius: 6px;
+                    shown: link-press.focus-visible;
+                }
+
+                link-row := HorizontalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: root.url-label;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-semibold;
+                        color: link-press.pressed ? Theme.text-muted : link-press.has-hover ? Theme.text-secondary : Theme.text;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        accessible-role: none;
+                        animate color { duration: Theme.fast; easing: ease-out; }
+                    }
+                    Icon {
+                        source: Icons.external-link;
+                        size: 13px;
+                        color: Theme.text-secondary;
+                    }
+                }
+
+                link-press := Pressable {
+                    activated => { root.open(); }
+                }
+            }
+        }
+    }
+}
+
+// The listened meter: a thin line plus the percentage ("62%", brighter at 100 %). Stacked (percent over the line,
+// right-aligned) in the wide row's meter column; inline (line, then percent) under the text when narrow.
+component Meter {
+    in property <float> value;
+    in property <string> percent;
+    in property <bool> complete;
+    in property <bool> inline;
+    in property <length> line-width: 56px;
+
+    property <length> text-w: 34px;
+    property <brush> fill-color: root.complete ? Theme.primary : Theme.text-secondary;
+
+    width: root.inline ? root.line-width + Theme.space-2 + root.text-w : root.line-width;
+    height: root.inline ? 16px : 26px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: progress-indicator;
+    accessible-label: "Listened";
+    accessible-value: root.percent;
+
+    track := Rectangle {
+        x: 0;
+        y: root.inline ? (root.height - self.height) / 2 : root.height - self.height;
+        width: root.line-width;
+        height: 3px;
+        border-radius: 1.5px;
+        background: Theme.track;
+        Rectangle {
+            x: 0;
+            width: parent.width * max(0, min(1, root.value));
+            border-radius: 1.5px;
+            background: root.fill-color;
+        }
+    }
+    Text {
+        x: root.inline ? root.line-width + Theme.space-2 : 0;
+        y: 0;
+        width: root.inline ? root.text-w : root.width;
+        height: 16px;
+        text: root.percent;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: root.complete ? Theme.weight-semibold : Theme.weight-medium;
+        color: root.complete ? Theme.text : Theme.text-muted;
+        horizontal-alignment: root.inline ? left : right;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+// One read: the collapsed row (a toggle) and, when expanded, its details in an inset block.
+component ReadRow {
+    in property <HistoryRow> item;
+    in property <bool> narrow;
+    // Focus requests by read id (they survive Rust removing or replacing rows): the toggle takes focus when
+    // `focus-id-nonce` changes while `focus-id` names this row, and when this row is created while it is the focused
+    // id (Rust pushed a new rows model, which recreates every row). `focus-ring`: take it with the keyboard ring.
+    in property <string> focus-id;
+    in property <int> focus-id-nonce;
+    in property <bool> focus-ring: true;
+    // Focus is on the toggle, Replay or ⋯ (the page records this row as the focused one and scrolls it into view).
+    out property <bool> focus-within: press.has-focus || replay-btn.has-focus || more-btn.has-focus;
+    // The toggle shows its keyboard focus ring.
+    out property <bool> toggle-ring: press.focus-visible;
+
+    callback toggle();
+    callback replay();
+    callback copy-text();
+    callback toggle-favorite();
+    callback delete();
+    callback open-url();
+    // Keyboard navigation between rows: -1 previous, 1 next, -2 first, 2 last.
+    callback step(delta: int);
+    // The row just opened: the page scrolls its details into view.
+    callback opened();
+
+    function take-focus() {
+        if (root.focus-ring) {
+            press.focus();
+        } else {
+            press.focus-quietly();
+        }
+    }
+
+    init => {
+        if (root.focus-id != "" && root.item.id == root.focus-id) {
+            root.take-focus();
+        }
+    }
+    changed focus-id-nonce => {
+        if (root.focus-id != "" && root.item.id == root.focus-id) {
+            root.take-focus();
+        }
+    }
+    changed open => {
+        if (root.open) {
+            root.opened();
+        }
+    }
+
+    property <bool> open: root.item.expanded;
+    // The open block is inset 16 px on every side (left / right: it bleeds past the row by that much) and keeps 8 px
+    // from its neighbours; a closed row's hover fill bleeds 12 px.
+    property <length> bleed: root.open ? Theme.space-4 : 12px;
+    property <length> gap-y: root.open ? Theme.space-2 : 0px;
+    property <length> art-gap: root.narrow ? Theme.space-5 : Theme.space-6;
+    property <length> art-w: root.narrow ? 88px : 110px;
+    // One pill width down the list ("Replay" and "Replay (free)") so the pills line up; LoadingRow uses the same.
+    property <length> replay-w: root.narrow ? 128px : 152px;
+
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+
+    block := Rectangle {
+        x: -root.bleed;
+        y: root.gap-y;
+        width: root.width + 2 * root.bleed;
+        height: root.height - 2 * root.gap-y;
+        border-radius: root.open ? Theme.radius-card : Theme.radius-row;
+        background: root.open ? Theme.field
+            : press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : transparent;
+        border-width: root.open ? Theme.hairline : 0px;
+        border-color: Theme.divider;
+        animate background { duration: Theme.fast; easing: ease-out; }
+    }
+
+    lay := VerticalLayout {
+        padding-top: root.gap-y;
+        padding-bottom: root.gap-y;
+
+        head := Rectangle {
+            min-height: head-row.min-height;
+            preferred-height: head-row.preferred-height;
+
+            hit := Rectangle {
+                x: -root.bleed;
+                width: parent.width + 2 * root.bleed;
+                height: parent.height;
+                border-radius: root.open ? Theme.radius-card : Theme.radius-row;
+                background: root.open && press.has-hover ? Theme.hover : transparent;
+                animate background { duration: Theme.fast; easing: ease-out; }
+
+                FocusRing {
+                    radius: parent.border-radius;
+                    gap: 0px;
+                    shown: press.focus-visible;
+                }
+
+                press := Pressable {
+                    accessible-role: button;
+                    accessible-label: root.item.title + ". " + root.item.meta;
+                    accessible-expandable: true;
+                    accessible-expanded: root.open;
+                    accessible-action-default => { root.toggle(); }
+                    accessible-action-expand => { root.toggle(); }
+                    activated => { root.toggle(); }
+                    key(event) => {
+                        if (event.text == Key.DownArrow) {
+                            root.step(1);
+                            return accept;
+                        }
+                        if (event.text == Key.UpArrow) {
+                            root.step(-1);
+                            return accept;
+                        }
+                        if (event.text == Key.Home) {
+                            root.step(-2);
+                            return accept;
+                        }
+                        if (event.text == Key.End) {
+                            root.step(2);
+                            return accept;
+                        }
+                        reject
+                    }
+                }
+            }
+
+            head-row := HorizontalLayout {
+                padding-top: root.open ? Theme.space-4 : 12px;
+                padding-bottom: 12px;
+                spacing: root.art-gap;
+
+                VerticalLayout {
+                    alignment: center;
+                    ArtThumb {
+                        width: root.art-w;
+                        height: root.narrow ? 66px : 82px;
+                        source: root.item.art;
+                    }
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 6px;
+
+                    Text {
+                        text: root.item.title;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                        max-lines: root.open ? 1 : 2;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 14px;
+                                height: 14px;
+                                Icon {
+                                    width: 100%;
+                                    height: 100%;
+                                    source: HistoryGlyphs.by-name(root.item.source-icon);
+                                    size: 14px;
+                                    color: Theme.text-muted;
+                                }
+                                Tip { text: root.item.source-label; }
+                            }
+                        }
+                        // The meta keeps at least ~120 px ("Outlook · George") before the star and badges, which
+                        // never shrink, so the useful part survives a tight row.
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            min-width: min(120px, meta-text.preferred-width);
+                            preferred-width: meta-text.preferred-width;
+                            min-height: meta-text.preferred-height;
+                            meta-text := Text {
+                                width: 100%;
+                                height: 100%;
+                                text: root.item.meta;
+                                font-family: Theme.font-text;
+                                font-size: Theme.size-label;
+                                font-weight: Theme.weight-medium;
+                                color: Theme.text-secondary;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                accessible-role: none;
+                            }
+                            Tip { text: root.item.time-tooltip; }
+                        }
+                        if root.item.favorite && !root.narrow: VerticalLayout {
+                            alignment: center;
+                            StarMark { size: 13px; }
+                        }
+                        for b in root.item.badges: VerticalLayout {
+                            alignment: center;
+                            Badge {
+                                text: b;
+                                dot: b == "Failed" ? BadgeDot.danger : BadgeDot.none;
+                                icon: b == "Playing" ? Icons.audio-lines : b == "Paused" ? Icons.pause : @image-url("");
+                            }
+                        }
+                    }
+
+                    // (In a spacer row so its fixed width does not cap the text column's width.)
+                    if root.narrow: HorizontalLayout {
+                        padding-top: 2px;
+                        Meter {
+                            inline: true;
+                            line-width: 72px;
+                            value: root.item.progress;
+                            percent: root.item.percent;
+                            complete: root.item.complete;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
+                }
+
+                // Centred on the row like the pills (a fixed-height child of a HorizontalLayout is top-aligned).
+                if !root.narrow: VerticalLayout {
+                    alignment: center;
+                    Meter {
+                        value: root.item.progress;
+                        percent: root.item.percent;
+                        complete: root.item.complete;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+                        replay-btn := Button {
+                            text: root.item.replay-label;
+                            icon: Icons.rotate-ccw;
+                            size: root.narrow ? ButtonSize.sm : ButtonSize.md;
+                            width: max(root.replay-w, self.preferred-width);
+                            opacity: root.item.can-replay ? 1 : 0.4;
+                            accessible-text: root.item.can-replay ? root.item.replay-label
+                                : root.item.replay-label + ". " + root.item.replay-tooltip;
+                            clicked => {
+                                if (root.item.can-replay) {
+                                    root.replay();
+                                }
+                            }
+                            Tip { text: root.item.replay-tooltip; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            more-btn := MenuButton {
+                                size: root.narrow ? IconButtonSize.sm : IconButtonSize.md;
+                                label: "More actions";
+                                menu-width: 220px;
+                                entries: [
+                                    { text: "Copy text", icon: Icons.copy },
+                                    { text: root.item.favorite ? "Remove from favorites" : "Add to favorites", icon: Icons.star },
+                                    { text: "Delete from history", icon: Icons.trash-2, danger: true, separator-before: true },
+                                ];
+                                activated(i) => {
+                                    if (i == 0) {
+                                        root.copy-text();
+                                    } else if (i == 1) {
+                                        root.toggle-favorite();
+                                    } else if (i == 2) {
+                                        root.delete();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.open: VerticalLayout {
+            padding-left: root.narrow ? 0px : root.art-w + root.art-gap;
+            padding-top: 4px;
+            padding-bottom: Theme.space-4;
+            spacing: Theme.space-4;
+            accessible-role: groupbox;
+            accessible-label: "Read details";
+
+            full := ScrollArea {
+                // Reserve the scrollbar's gutter only when the text scrolls (measured at the full width, so the
+                // gutter never feeds back into the decision).
+                property <bool> tall: measure.preferred-height > 260px;
+                height: min(260px, full-text.preferred-height);
+                vertical-stretch: 0;
+                fade-color: Theme.field;
+                edge-fade: true;
+                accessible-role: AccessibleRole.text;
+                accessible-label: "Full text";
+
+                full-text := Text {
+                    x: 0;
+                    y: 0;
+                    width: full.visible-width - (full.tall ? Theme.space-4 : 0px);
+                    text: root.item.full-text;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-regular;
+                    color: Theme.text;
+                    wrap: word-wrap;
+                    accessible-role: none;
+                }
+                measure := Text {
+                    x: 0;
+                    y: 0;
+                    width: full.visible-width;
+                    visible: false;
+                    text: root.item.full-text;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-regular;
+                    wrap: word-wrap;
+                    accessible-role: none;
+                }
+            }
+
+            if root.item.notes.length > 0: VerticalLayout {
+                spacing: Theme.space-1;
+                for n in root.item.notes: HorizontalLayout {
+                    spacing: Theme.space-2;
+                    VerticalLayout {
+                        alignment: start;
+                        padding-top: 2px;
+                        Icon {
+                            source: Icons.info;
+                            size: 14px;
+                            color: Theme.text-muted;
+                        }
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: n;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: n;
+                    }
+                }
+            }
+
+            if root.item.facts.length > 0: HorizontalLayout {
+                spacing: root.narrow ? Theme.space-6 : Theme.space-8;
+                alignment: start;
+                for f in root.item.facts: Rectangle {
+                    min-width: fact.min-width;
+                    preferred-width: fact.preferred-width;
+                    min-height: fact.min-height;
+                    preferred-height: fact.preferred-height;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: f.label + ": " + f.value;
+                    fact := VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: f.label;
+                            font-family: Theme.font-text;
+                            font-size: Theme.size-caption;
+                            font-weight: Theme.weight-medium;
+                            color: Theme.text-muted;
+                            accessible-role: none;
+                        }
+                        Text {
+                            text: f.value;
+                            font-family: Theme.font-text;
+                            font-size: Theme.size-body;
+                            font-weight: Theme.weight-semibold;
+                            color: Theme.text;
+                            accessible-role: none;
+                        }
+                    }
+                    Tip { text: f.tooltip; }
+                }
+            }
+
+            if root.item.details.length > 0 || root.item.url-label != "": dl := VerticalLayout {
+                // Lines in reading order (details, then Page); two columns when wide, filled column by column.
+                property <int> total: root.item.details.length + (root.item.url-label != "" ? 1 : 0);
+                property <int> half: root.narrow ? self.total : floor((self.total + 1) / 2);
+
+                Divider { }
+                Rectangle { height: Theme.space-2; }
+
+                HorizontalLayout {
+                    spacing: Theme.space-6;
+                    // First column (everything when narrow).
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        preferred-width: 0px;
+                        alignment: start;
+                        for d[i] in root.item.details: VerticalLayout {
+                            if i < dl.half: DetailLine {
+                                label: d.label;
+                                value: d.value;
+                                tooltip: d.tooltip;
+                            }
+                        }
+                        if root.item.url-label != "" && dl.half >= dl.total: PageLink {
+                            url-label: root.item.url-label;
+                            open => { root.open-url(); }
+                        }
+                    }
+                    // Second column (wide only).
+                    if !root.narrow: VerticalLayout {
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        preferred-width: 0px;
+                        alignment: start;
+                        for d[i] in root.item.details: VerticalLayout {
+                            if i >= dl.half: DetailLine {
+                                label: d.label;
+                                value: d.value;
+                                tooltip: d.tooltip;
+                            }
+                        }
+                        if root.item.url-label != "" && dl.half < dl.total: PageLink {
+                            url-label: root.item.url-label;
+                            open => { root.open-url(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A placeholder read row built like ReadRow (same paddings, art size, meter column and pill column with the same
+// widths), so nothing moves when the rows arrive. Two title bars, the meta bar and, when narrow, the meter line.
+component LoadingRow inherits HorizontalLayout {
+    in property <bool> narrow;
+    in property <percent> title-width;
+    in property <percent> subtitle-width;
+
+    padding-top: 12px;
+    padding-bottom: 12px;
+    spacing: root.narrow ? Theme.space-5 : Theme.space-6;
+    vertical-stretch: 0;
+
+    VerticalLayout {
+        alignment: center;
+        Skeleton {
+            width: root.narrow ? 88px : 110px;
+            height: root.narrow ? 66px : 82px;
+            radius: root.narrow ? Theme.radius-thumb : Theme.radius-thumb-large;
+        }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        spacing: 6px;
+        // The two title lines (14 / 600 text, about 19 px a line).
+        Rectangle {
+            height: 38px;
+            Skeleton { x: 0; y: 4px; width: parent.width * root.title-width; height: 11px; }
+            Skeleton { x: 0; y: 23px; width: parent.width * root.title-width * 0.6; height: 11px; }
+        }
+        // The meta line (badge height).
+        Rectangle {
+            height: 22px;
+            Skeleton { x: 0; y: 6px; width: parent.width * root.subtitle-width; height: 10px; }
+        }
+        // The inline meter under the text (narrow).
+        if root.narrow: Rectangle {
+            height: 18px;
+            Skeleton { x: 0; y: 8px; width: 72px; height: 3px; }
+        }
+    }
+    // The meter column: its line sits where the real meter's line does (the bottom of a 26 px box).
+    if !root.narrow: VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 56px;
+            height: 26px;
+            Skeleton { x: 0; y: parent.height - 3px; width: parent.width; height: 3px; }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            Skeleton {
+                width: root.narrow ? 128px : 152px;
+                height: root.narrow ? 32px : 40px;
+                radius: self.height / 2;
+            }
+            Rectangle { width: root.narrow ? 28px : 36px; }
+        }
+    }
+}
+
+// Error / nothing yet / no matches: the state glyph on a quiet disc, a title, the body (keycaps on their own line) and a
+// pill (primary; secondary for "Clear filters").
+component StatePanel inherits VerticalLayout {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> body;
+    in property <[string]> keys;
+    in property <string> body-after;
+    in property <string> button;
+    in property <bool> secondary-button;
+    // Error state: the glyph in `danger` (never a red fill).
+    in property <bool> danger;
+
+    callback action();
+
+    // Balanced wrapping for a body without keycaps, as on Voices: as many lines as 380 px needs, each about equally
+    // long, so no line ends with a lone word. `slack` covers the longest word a greedy wrap may push down: generous
+    // for text that varies (error messages, the search echo), tight for the fixed nothing-yet sentence so it breaks
+    // before "Read with …" instead of inside it.
+    in property <length> slack: 56px;
+    property <string> plain-body: root.body + root.body-after;
+    property <length> body-max: 380px;
+    property <length> body-single: body-measure.preferred-width;
+    property <int> body-lines: max(1, ceil(root.body-single / root.body-max));
+    property <length> body-width: root.body-lines <= 1 ? root.body-single
+        : min(root.body-max, root.body-single / root.body-lines + root.slack);
+
+    alignment: center;
+    padding: Theme.space-8;
+    spacing: 0px;
+
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: 64px;
+            height: 64px;
+            border-radius: 32px;
+            background: Theme.chip;
+            border-width: Theme.hairline;
+            border-color: Theme.field-border;
+            Icon {
+                width: 100%;
+                height: 100%;
+                source: root.icon;
+                size: 26px;
+                color: root.danger ? Theme.danger : Theme.text;
+            }
+            // Measures the body on one line (never shown; the disc has a fixed size, so it takes no room).
+            body-measure := Text {
+                visible: false;
+                text: root.plain-body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                accessible-role: none;
+            }
+        }
+    }
+    Rectangle { height: Theme.space-5; }
+    Text {
+        text: root.title;
+        font-family: Theme.font-text;
+        font-size: Theme.size-title;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.title;
+    }
+    Rectangle { height: Theme.space-2; }
+    if root.keys.length == 0: HorizontalLayout {
+        alignment: center;
+        Text {
+            width: root.body-width;
+            text: root.plain-body;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: self.text;
+        }
+    }
+    // With keycaps: the body, then the keys and the rest of the sentence on their own centred line
+    // ("… — or press" / [Ctrl] [Alt] [R]. Every read lands here.).
+    if root.keys.length > 0: HorizontalLayout {
+        alignment: center;
+        Text {
+            max-width: 460px;
+            text: root.body;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.body;
+        }
+    }
+    if root.keys.length > 0: Rectangle { height: Theme.space-2; }
+    if root.keys.length > 0: HorizontalLayout {
+        alignment: center;
+        spacing: 3px;
+        HorizontalLayout {
+            spacing: Theme.space-1;
+            for k in root.keys: Keycap { text: k; }
+        }
+        Text {
+            text: root.body-after;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            vertical-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.body-after;
+        }
+    }
+    if root.button != "": Rectangle { height: Theme.space-6; }
+    if root.button != "": HorizontalLayout {
+        alignment: center;
+        Button {
+            text: root.button;
+            kind: root.secondary-button ? ButtonKind.secondary : ButtonKind.primary;
+            clicked => { root.action(); }
+        }
+    }
+}
+
+export component HistoryPage inherits Rectangle {
+    in property <HistoryData> data;
+    in-out property <string> search-text;
+    in property <int> focus-search-nonce;
+
+    // Raw search text on every edit (Rust debounces 220 ms; empty applies at once). Escape clears.
+    callback search-edited(string);
+    // Segmented "All | Favorites".
+    callback set-favorites-only(bool);
+    // Source filter value ("" = all sources).
+    callback set-source(string);
+    callback clear-filters();
+    // Row toggle (expand/collapse) and row actions, by read id.
+    callback toggle-row(string);
+    callback replay(string);
+    callback copy-text(string);
+    callback toggle-favorite(string);
+    callback delete(string);
+    callback open-url(string);
+    callback load-more();
+    // Error state "Try again".
+    callback retry();
+    // Nothing-yet "Paste & read" → Home.
+    callback paste-and-read();
+
+    background: transparent;
+    // The page fills the area MainWindow gives it; its own layout (which depends on its width: narrow) never feeds
+    // back into that size.
+    min-width: 0px;
+    min-height: 0px;
+    max-width: 100000px;
+    max-height: 100000px;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    preferred-width: 892px;
+    preferred-height: 700px;
+
+    property <bool> narrow: root.width < 760px;
+    property <length> side: Theme.space-10;
+    // Local copies of the stateful filters: flipped at once on interaction, re-asserted from data.
+    property <bool> fav-only: root.data.favorites-only;
+    property <string> source-value: root.data.source;
+    // Row focus, by read id: the row that has focus (or should take it), whether it takes the keyboard ring, and a
+    // nonce that asks the row named by `focus-id` to take focus now (keyboard navigation).
+    property <string> focus-id;
+    property <bool> focus-ring: true;
+    property <int> focus-id-nonce: 0;
+    // After a delete: the read that takes focus once the ⋯ menu has closed (closing a popup puts focus back on the
+    // button that opened it, so the request waits for the next turn of the event loop).
+    property <string> pending-focus;
+    property <bool> refocus: false;
+
+    refocus-timer := Timer {
+        interval: 1ms;
+        running: root.refocus;
+        triggered => {
+            root.refocus = false;
+            root.focus-id = root.pending-focus;
+            root.focus-ring = true;
+            root.focus-id-nonce += 1;
+        }
+    }
+
+    changed data => {
+        root.fav-only = root.data.favorites-only;
+        root.source-value = root.data.source;
+    }
+
+    function set-fav(on: bool) {
+        if (root.fav-only != on) {
+            root.fav-only = on;
+            root.set-favorites-only(on);
+        }
+    }
+
+    pure function next-read(i: int) -> int {
+        if (i + 1 < root.data.rows.length && root.data.rows[i + 1].kind == HistoryRowKind.read) { return i + 1; }
+        if (i + 2 < root.data.rows.length && root.data.rows[i + 2].kind == HistoryRowKind.read) { return i + 2; }
+        return -1;
+    }
+    pure function prev-read(i: int) -> int {
+        if (i - 1 >= 0 && root.data.rows[i - 1].kind == HistoryRowKind.read) { return i - 1; }
+        if (i - 2 >= 0 && root.data.rows[i - 2].kind == HistoryRowKind.read) { return i - 2; }
+        return -1;
+    }
+    function focus-row(i: int) {
+        if (i >= 0 && i < root.data.rows.length && root.data.rows[i].kind == HistoryRowKind.read) {
+            root.focus-id = root.data.rows[i].id;
+            root.focus-ring = true;
+            root.focus-id-nonce += 1;
+        }
+    }
+    function step(i: int, delta: int) {
+        if (delta == 1) {
+            root.focus-row(root.next-read(i));
+        } else if (delta == -1) {
+            root.focus-row(root.prev-read(i));
+        } else if (delta == -2) {
+            root.focus-row(root.data.rows.length > 0 && root.data.rows[0].kind == HistoryRowKind.read ? 0 : 1);
+        } else if (delta == 2) {
+            root.focus-row(root.data.rows.length - 1);
+        }
+    }
+
+    VerticalLayout {
+        // ── Toolbar ──
+        if root.data.state != HistoryState.nothing-yet: VerticalLayout {
+            padding-left: root.side;
+            padding-right: root.side;
+            padding-top: Theme.space-6;
+            padding-bottom: Theme.space-3;
+            accessible-role: AccessibleRole.search;
+            accessible-label: "Filter history";
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+
+                Rectangle {
+                    // A size that does not depend on the query (the SearchField's own preferred width is its text's),
+                    // so the pill never moves while typing; a tight toolbar shrinks it toward 160 px.
+                    min-width: 160px;
+                    preferred-width: 380px;
+                    max-width: 380px;
+                    horizontal-stretch: 1;
+                    height: 32px;
+                    // Known defect of the design SearchField: a single-line TextInput's min width is its text width
+                    // and it reaches the pill's inner layout, so a very long query pushes the clear button past the
+                    // pill's right edge. Clip at the pill so it never runs over the filters (design fix pending:
+                    // min-width 0 on its inner clip Rectangle).
+                    border-radius: 16px;
+                    clip: true;
+
+                    search := SearchField {
+                        property <int> nonce: root.focus-search-nonce;
+                        changed nonce => { self.focus-input(); }
+
+                        width: 100%;
+                        height: 100%;
+                        small: true;
+                        placeholder: "Search text, apps, voices…";
+                        accessible-label: "Search history";
+                        text <=> root.search-text;
+                        edited(text) => { root.search-edited(text); }
+                    }
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                }
+
+                FocusScope {
+                    focus-on-click: false;
+                    focus-on-tab-navigation: false;
+                    accessible-role: radio-group;
+                    accessible-label: "Show";
+                    key-pressed(event) => {
+                        if (event.text == Key.RightArrow || event.text == Key.DownArrow
+                            || event.text == Key.LeftArrow || event.text == Key.UpArrow) {
+                            root.set-fav(!root.fav-only);
+                            if (root.fav-only) { fav-chip.focus(); } else { all-chip.focus(); }
+                            return accept;
+                        }
+                        if (event.text == Key.Home) {
+                            root.set-fav(false);
+                            all-chip.focus();
+                            return accept;
+                        }
+                        if (event.text == Key.End) {
+                            root.set-fav(true);
+                            fav-chip.focus();
+                            return accept;
+                        }
+                        reject
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+                        all-chip := FilterChip {
+                            text: "All";
+                            selected: !root.fav-only;
+                            accessible-role: radio-button;
+                            clicked => { root.set-fav(false); }
+                        }
+                        fav-chip := FilterChip {
+                            text: "Favorites";
+                            icon: Icons.star;
+                            selected: root.fav-only;
+                            accessible-role: radio-button;
+                            clicked => { root.set-fav(true); }
+                        }
+                    }
+                }
+
+                SourcePicker {
+                    options: root.data.source-options;
+                    value: root.source-value;
+                    picked(value) => {
+                        root.source-value = value;
+                        root.set-source(value);
+                    }
+                }
+            }
+        }
+
+        // ── Loading: placeholder rows ──
+        if root.data.state == HistoryState.loading: VerticalLayout {
+            padding-left: root.side;
+            padding-right: root.side;
+            padding-top: Theme.space-3;
+            alignment: start;
+            accessible-role: progress-indicator;
+            accessible-label: "Loading history";
+
+            // The day header (SectionLabel line + its 4 px gap, as in the list).
+            Rectangle {
+                height: header-measure.preferred-height + Theme.space-1;
+                // Measures one SectionLabel line (never shown).
+                header-measure := SectionLabel {
+                    visible: false;
+                    text: " ";
+                }
+                Skeleton {
+                    x: 0;
+                    y: (header-measure.preferred-height - self.height) / 2;
+                    width: 72px;
+                    height: 10px;
+                }
+            }
+            LoadingRow { narrow: root.narrow; title-width: 78%; subtitle-width: 46%; }
+            LoadingRow { narrow: root.narrow; title-width: 64%; subtitle-width: 38%; }
+            LoadingRow { narrow: root.narrow; title-width: 72%; subtitle-width: 42%; }
+            LoadingRow { narrow: root.narrow; title-width: 56%; subtitle-width: 34%; }
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        // ── Error / nothing yet / no matches ──
+        if root.data.state == HistoryState.error || root.data.state == HistoryState.nothing-yet
+            || root.data.state == HistoryState.no-matches: StatePanel {
+            vertical-stretch: 1;
+            padding-bottom: Theme.space-10 + Theme.space-6;
+            icon: HistoryGlyphs.by-name(root.data.state-icon);
+            title: root.data.state-title;
+            body: root.data.state-body;
+            keys: root.data.state-keys;
+            body-after: root.data.state-body-after;
+            button: root.data.state-button;
+            secondary-button: root.data.state == HistoryState.no-matches;
+            danger: root.data.state == HistoryState.error;
+            slack: root.data.state == HistoryState.nothing-yet ? Theme.space-6 : 56px;
+            action => {
+                if (root.data.state == HistoryState.error) {
+                    root.retry();
+                } else if (root.data.state == HistoryState.nothing-yet) {
+                    root.paste-and-read();
+                } else {
+                    root.clear-filters();
+                }
+            }
+        }
+
+        // ── The grouped list ──
+        if root.data.state == HistoryState.list: list := ScrollArea {
+            edge-fade: true;
+            opacity: root.data.dimmed ? 0.45 : 1;
+            animate opacity {
+                duration: Motion.reduce ? 0ms : Theme.medium;
+                easing: ease-out;
+            }
+
+            // Scroll so the span [top, top + h] (relative to the viewport's top) is in view, clear of the edge fades.
+            // (Slint's Flickable does not follow keyboard focus.)
+            function reveal(top: length, h: length) {
+                let lo = Theme.space-4;
+                let hi = list.visible-height - Theme.space-6;
+                let up = top + h > hi ? hi - (top + h) : 0px;
+                let d = top + up < lo ? lo - top : up;
+                list.content-y = max(-max(0px, list.content-height - list.visible-height), min(0px, list.content-y + d));
+            }
+
+            VerticalLayout {
+                padding-left: root.side;
+                padding-right: root.side;
+                padding-top: Theme.space-3;
+                padding-bottom: Theme.space-10 + Theme.space-8;
+                alignment: start;
+                accessible-role: AccessibleRole.list;
+                accessible-label: "History";
+
+                for r[i] in root.data.rows: VerticalLayout {
+                    if r.kind == HistoryRowKind.header: VerticalLayout {
+                        padding-top: i == 0 ? 0px : Theme.space-8;
+                        padding-bottom: Theme.space-1;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: r.header-label + ", " + r.header-meta;
+                        SectionLabel {
+                            text: r.header-label;
+                            trailing-text: r.header-meta;
+                        }
+                    }
+                    if r.kind == HistoryRowKind.read: ReadRow {
+                        item: r;
+                        narrow: root.narrow;
+                        focus-id: root.focus-id;
+                        focus-id-nonce: root.focus-id-nonce;
+                        focus-ring: root.focus-ring;
+                        // Remember the focused read (so a rebuilt row takes focus back) and keep it in view; forget it
+                        // when focus leaves the row for somewhere else.
+                        changed focus-within => {
+                            if (self.focus-within) {
+                                root.focus-id = r.id;
+                                root.focus-ring = self.toggle-ring;
+                                list.reveal(self.absolute-position.y - list.absolute-position.y,
+                                    min(self.height, list.visible-height));
+                            } else if (root.focus-id == r.id) {
+                                root.focus-id = "";
+                            }
+                        }
+                        changed toggle-ring => {
+                            if (self.toggle-ring && root.focus-id == r.id) {
+                                root.focus-ring = true;
+                            }
+                        }
+                        opened => {
+                            list.reveal(self.absolute-position.y - list.absolute-position.y,
+                                min(self.height, list.visible-height));
+                        }
+                        toggle => { root.toggle-row(r.id); }
+                        replay => { root.replay(r.id); }
+                        copy-text => { root.copy-text(r.id); }
+                        toggle-favorite => { root.toggle-favorite(r.id); }
+                        open-url => { root.open-url(r.id); }
+                        step(delta) => { root.step(i, delta); }
+                        delete => {
+                            // Keep focus in the list (spec §4.10): the next read, else the previous one; nowhere for
+                            // the only row. By id (Rust removes this row, which shifts every index below it), and only
+                            // after the ⋯ menu has closed and handed focus back to its button.
+                            let next = root.next-read(i);
+                            let target = next >= 0 ? next : root.prev-read(i);
+                            root.pending-focus = target >= 0 ? root.data.rows[target].id : "";
+                            root.refocus = target >= 0;
+                            root.delete(r.id);
+                        }
+                    }
+                }
+
+                // Footer
+                if root.data.footer != "" || root.data.can-load-more: HorizontalLayout {
+                    padding-top: Theme.space-8;
+                    spacing: Theme.space-4;
+                    alignment: center;
+                    Text {
+                        text: root.data.footer;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        vertical-alignment: center;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: self.text;
+                    }
+                    Button {
+                        text: "Load more";
+                        size: ButtonSize.sm;
+                        enabled: root.data.can-load-more || root.data.loading-more;
+                        loading: root.data.loading-more;
+                        clicked => { root.load-more(); }
+                        // Tabbing past the last row: bring the footer (and the list's end) into view.
+                        changed has-focus => {
+                            if (self.has-focus) {
+                                list.reveal(self.absolute-position.y - list.absolute-position.y,
+                                    min(self.height + Theme.space-8, list.visible-height));
+                            }
+                        }
+                    }
+                }
+                if root.data.footer == "" && !root.data.can-load-more && root.data.end-of-history: HorizontalLayout {
+                    padding-top: Theme.space-10;
+                    spacing: Theme.space-4;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Divider { }
+                    }
+                    Text {
+                        text: "End of history";
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        vertical-alignment: center;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: self.text;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Divider { }
+                    }
+                }
+            }
+        }
+    }
+}

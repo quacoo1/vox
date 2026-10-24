@@ -1,0 +1,17 @@
+[package]
+name = "vox-text"
+description = "Vox text processing: clean-up, sentence segmentation, chunking, reader text helpers, word highlighting, file text extraction"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+regex.workspace = true
+icu_segmenter.workspace = true
+encoding_rs.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

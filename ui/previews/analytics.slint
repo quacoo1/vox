@@ -1,0 +1,40 @@
+// Analytics page previews: AnalyticsPage on the panel colour, optionally scrolled down by `scroll` px (the page is
+// made taller by the same amount and shifted up, so a lower part of the dashboard shows in the frame).
+//   vox-shot ui/previews/analytics.slint --data ui/previews/analytics-30d.json --size 892x700 \
+//            --out shots/ui/analytics/30d-top-dark.png
+//   ... --set Theme.dark=false            (Paper)
+//   ... --set scroll=700                  (scrolled lower)
+// Page widths worth rendering (the window minus the panel inset, sidebar / rail and its rule):
+//   811 (1100-px window, the smallest with the sidebar) · 839 (940-px window with the rail) · 892 (reference)
+//   · 1300 · 1631 (a maximised 1920-px window). The dashboard column caps at 1120 px from a 1200-px page on.
+// The daily chart's bars are bucketed by Rust for the plot width, so each width has its own fixture:
+//   analytics-narrow (811), -narrow-839, -narrow-90d (811), -long-narrow (811), -wide / -wide-1y (≥ 1200); the rest
+//   are for 892. Fixtures: ui/previews/analytics-<state>.json (`data`: AnalyticsData; tooltip fixtures pin a chart
+//   mark through the AnalyticsPreview global). analytics-dimmed needs `--wait 1000` (the dim starts after 300 ms).
+
+import { Theme } from "../design/theme.slint";
+import { AnalyticsData } from "../models.slint";
+import { AnalyticsPage, AnalyticsPreview } from "../pages/analytics.slint";
+
+export { Theme, AnalyticsPreview }
+
+export component AnalyticsPreviewWindow inherits Window {
+    in property <AnalyticsData> data;
+    in property <length> scroll: 0px;
+
+    preferred-width: 892px;
+    preferred-height: 700px;
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    Rectangle {
+        clip: true;
+        AnalyticsPage {
+            x: 0;
+            y: -root.scroll;
+            width: root.width;
+            height: root.height + root.scroll;
+            data: root.data;
+        }
+    }
+}

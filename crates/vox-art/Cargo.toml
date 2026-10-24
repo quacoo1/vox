@@ -1,0 +1,13 @@
+[package]
+name = "vox-art"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Procedural silk art for Vox: seeded thumbnails and the window backdrop, rendered with tiny-skia"
+
+[dependencies]
+tiny-skia = { workspace = true }
+
+[[bin]]
+name = "vox-art"
+path = "src/bin/vox-art.rs"

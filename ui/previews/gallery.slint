@@ -1,0 +1,510 @@
+// Gallery: every design-system component in its states. Render dark and light:
+//   vox-shot ui/previews/gallery.slint --component Gallery --data ui/previews/gallery.json --size 1400x1900
+//   ... --set Theme.dark=false
+// Art comes in as image properties (gallery.json); missing art shows the placeholder gradient.
+
+import {
+    Theme, Icons, Icon, HeaderTitle, HeroText, NumberText, RowTitle, RowSubtitle, BodyText, CaptionText, LabelText,
+    Button, ButtonKind, ButtonSize, IconButton, IconButtonKind, IconButtonSize, SearchField, Keycap, KeyCombo,
+    NavItem, SectionLabel, ListRow, ListRowSize, Card, CardKind, Toggle, Segmented, Slider, TextField, FormField,
+    TextArea, Select, SelectMenu, Badge, BadgeKind, BadgeDot, BadgeSize, Toast, ToastKind, Dialog, DialogFrame, DialogSize,
+    EmptyState, ProgressLine, Skeleton, SkeletonRow, SkeletonRowSize, ArtThumb, TooltipBubble, ScrollArea, Divider,
+    Spinner, FilterChip, MenuList, MenuButton, MenuEntry
+} from "../design/index.slint";
+
+export { Theme }
+
+// A titled block in the gallery.
+component Section inherits VerticalLayout {
+    in property <string> title;
+    in property <string> note;
+    spacing: 16px;
+    vertical-stretch: 0;
+    HorizontalLayout {
+        spacing: 12px;
+        HeaderTitle { text: root.title; horizontal-stretch: 0; }
+        CaptionText { text: root.note; vertical-alignment: center; horizontal-stretch: 1; }
+    }
+    @children
+}
+
+export component Gallery inherits Window {
+    in property <image> art-1;
+    in property <image> art-2;
+    in property <image> art-3;
+    in property <image> art-4;
+    in property <image> small-1;
+    in property <image> small-2;
+    in property <image> small-3;
+    in property <image> small-4;
+    in property <image> small-5;
+    in property <image> small-6;
+    in property <image> small-7;
+    in property <image> backdrop-dark;
+    in property <image> backdrop-light;
+
+    property <image> backdrop: Theme.dark ? root.backdrop-dark : root.backdrop-light;
+
+    title: "Vox design system";
+    background: Theme.panel;
+    default-font-family: Theme.font-text;
+
+    VerticalLayout {
+        padding: 40px;
+        padding-top: 32px;
+        spacing: 24px;
+        alignment: start;
+
+        // Title row
+        HorizontalLayout {
+            spacing: 16px;
+            HeroText { text: "Vox design system"; vertical-alignment: center; }
+            BodyText { horizontal-stretch: 1; text: "Quiet charcoal, hairlines, pills. Colour lives only in the art."; vertical-alignment: center; wrap: no-wrap; }
+            VerticalLayout {
+                alignment: center;
+                Badge { text: Theme.dark ? "Night" : "Paper"; kind: BadgeKind.outline; dot: BadgeDot.success; }
+            }
+        }
+        Divider { }
+
+        HorizontalLayout {
+            spacing: 48px;
+            alignment: start;
+
+            // ---------------- Left column ----------------
+            VerticalLayout {
+                width: 636px;
+                spacing: 30px;
+                alignment: start;
+
+                Section {
+                    title: "Buttons";
+                    note: "primary · secondary · ghost · danger";
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+                        Button { text: "Use voice"; kind: ButtonKind.primary; }
+                        Button { text: "Preview"; icon: Icons.play; }
+                        Button { text: "Export"; kind: ButtonKind.ghost; icon: Icons.download; }
+                        Button { text: "Delete"; kind: ButtonKind.danger; icon: Icons.trash-2; }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+                        Button { text: "Publish"; kind: ButtonKind.primary; show-focus: true; }
+                        Button { text: "Focused"; show-focus: true; }
+                        Button { text: "Saving"; kind: ButtonKind.primary; loading: true; }
+                        Button { text: "Disabled"; kind: ButtonKind.primary; enabled: false; }
+                        Button { text: "Disabled"; enabled: false; }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+                        Button { text: "Read"; kind: ButtonKind.primary; size: ButtonSize.sm; }
+                        Button { text: "Replay"; size: ButtonSize.sm; icon: Icons.rotate-ccw; }
+                        Button { text: "Read clipboard"; size: ButtonSize.sm; kind: ButtonKind.ghost; }
+                        Button { text: "Remove"; size: ButtonSize.sm; kind: ButtonKind.danger; }
+                        Button { text: "Voices"; size: ButtonSize.sm; trailing-icon: Icons.arrow-right; }
+                    }
+                }
+
+                Section {
+                    title: "Icon buttons and tooltips";
+                    HorizontalLayout {
+                        spacing: 14px;
+                        alignment: start;
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.x; label: "Close"; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.more-horizontal; label: "More"; kind: IconButtonKind.secondary; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.star; label: "Star"; checked: true; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.skip-back; label: "Back"; size: IconButtonSize.sm; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.play-fill; label: "Play"; kind: IconButtonKind.primary; size: IconButtonSize.lg; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.pause-fill; label: "Pause"; kind: IconButtonKind.primary; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.copy; label: "Copy"; show-focus: true; } }
+                        VerticalLayout { alignment: center; IconButton { icon: Icons.trash-2; label: "Delete"; enabled: false; } }
+                        VerticalLayout { alignment: center; TooltipBubble { text: "Copy text"; } }
+                        VerticalLayout { alignment: center; TooltipBubble { text: "Search"; keys: ["Ctrl", "K"]; } }
+                    }
+                }
+
+                Section {
+                    title: "Search, filters, keycaps";
+                    HorizontalLayout {
+                        spacing: 12px;
+                        SearchField { placeholder: "Search history"; keys: ["Ctrl", "K"]; }
+                        SearchField { placeholder: "Search"; text: "george"; show-focus: true; }
+                    }
+                    HorizontalLayout {
+                        spacing: 18px;
+                        alignment: start;
+                        SearchField { width: 220px; small: true; placeholder: "Filter voices"; }
+                        KeyCombo { keys: ["Ctrl", "Alt", "R"]; }
+                        KeyCombo { keys: ["Shift", "F2"]; small: true; }
+                        KeyCombo { keys: []; }
+                        VerticalLayout { alignment: center; Keycap { text: "Esc"; } }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        FilterChip { text: "All"; selected: true; count: "128"; }
+                        FilterChip { text: "Outlook"; art: root.small-1; }
+                        FilterChip { text: "Chrome"; art: root.small-2; show-focus: true; }
+                        FilterChip { text: "Starred"; icon: Icons.star; }
+                        FilterChip { text: "Cloned"; enabled: false; }
+                        VerticalLayout { alignment: center; MenuButton { label: "More actions"; size: IconButtonSize.sm; entries: [{ text: "Copy" }]; } }
+                    }
+                }
+
+                Section {
+                    title: "Fields";
+                    note: "default · filled · focused · error · disabled";
+                    HorizontalLayout {
+                        spacing: 16px;
+                        FormField {
+                            label: "Display name";
+                            hint: "Shown on the Home greeting.";
+                            TextField { placeholder: "Your name"; }
+                        }
+                        FormField {
+                            label: "API key";
+                            hint: "Stored in Windows Credential Manager.";
+                            TextField { text: "sk_4f8a2c19"; password: true; show-focus: true; }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 16px;
+                        FormField {
+                            label: "Words per minute";
+                            error: "Enter a number between 80 and 400.";
+                            TextField { text: "1200"; has-error: true; icon: Icons.gauge; }
+                        }
+                        FormField {
+                            label: "Folder";
+                            hint: "Read-only while syncing.";
+                            TextField { text: "C:\\Users\\Kwaku\\Music"; enabled: false; icon: Icons.folder-open; }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 16px;
+                        TextArea { height: 96px; placeholder: "Paste or type something to read aloud"; }
+                        TextArea {
+                            height: 96px;
+                            show-focus: true;
+                            text: "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen.";
+                        }
+                    }
+                }
+
+                Section {
+                    title: "Select and menus";
+                    note: "closed states · open list · overflow menu";
+                    HorizontalLayout {
+                        spacing: 16px;
+                        alignment: start;
+                        VerticalLayout {
+                            spacing: 12px;
+                            alignment: start;
+                            Select { width: 180px; model: ["Multilingual v2", "Flash v2.5", "Turbo v2.5"]; current-index: 0; label: "Model"; }
+                            Select { width: 180px; model: ["Paper", "Night", "System"]; placeholder: "Choose a theme"; label: "Theme"; show-focus: true; }
+                            Select { width: 180px; model: ["Speakers"]; current-index: 0; enabled: false; label: "Output"; }
+                            Select { width: 120px; small: true; model: ["1×", "1.25×", "1.5×"]; current-index: 1; label: "Speed"; }
+                        }
+                        SelectMenu {
+                            width: 200px;
+                            model: ["Multilingual v2", "Flash v2.5", "Turbo v2.5"];
+                            current-index: 0;
+                            highlighted-index: 1;
+                        }
+                        MenuList {
+                            width: 200px;
+                            highlighted-index: 0;
+                            entries: [
+                                { text: "Copy text", icon: Icons.copy },
+                                { text: "Star", icon: Icons.star },
+                                { text: "Open source app", icon: Icons.external-link, disabled: true },
+                                { text: "Delete", icon: Icons.trash-2, danger: true, separator-before: true },
+                            ];
+                        }
+                    }
+                }
+
+
+                Section {
+                    title: "Toggle, segmented, slider, progress";
+                    note: "progress: played + buffered · hovered · focused · static";
+                    HorizontalLayout {
+                        spacing: 18px;
+                        alignment: start;
+                        VerticalLayout { alignment: center; Toggle { checked: true; label: "On"; } }
+                        VerticalLayout { alignment: center; Toggle { checked: false; label: "Off"; } }
+                        VerticalLayout { alignment: center; Toggle { checked: true; show-focus: true; label: "Focused"; } }
+                        VerticalLayout { alignment: center; Toggle { checked: true; enabled: false; label: "Disabled"; } }
+                        VerticalLayout { alignment: center; Toggle { checked: false; enabled: false; label: "Disabled"; } }
+                        Segmented { model: ["7D", "30D", "90D", "1Y", "All"]; current-index: 1; label: "Range"; }
+                    }
+                    HorizontalLayout {
+                        spacing: 18px;
+                        alignment: start;
+                        Segmented { model: ["System", "Paper", "Night"]; current-index: 2; segment-width: 76px; small: true; show-focus: true; }
+                        Segmented { model: ["Off", "On"]; current-index: 0; small: true; enabled: false; }
+                    }
+                    HorizontalLayout {
+                        spacing: 24px;
+                        Slider { value: 1.25; minimum: 0.5; maximum: 2; step: 0.05; value-text: "1.25×"; label: "Speed"; }
+                        Slider { value: 0.7; show-focus: true; value-text: "70 %"; label: "Volume"; }
+                        Slider { value: 0.3; enabled: false; value-text: "30 %"; label: "Disabled"; }
+                    }
+                    HorizontalLayout {
+                        spacing: 20px;
+                        ProgressLine { value: 0.42; buffered: 0.7; }
+                        ProgressLine { value: 0.42; buffered: 0.7; force-hover: true; }
+                        ProgressLine { value: 0.8; buffered: 0.8; show-focus: true; }
+                        ProgressLine { value: 0.25; interactive: false; }
+                    }
+                }
+            }
+
+            // ---------------- Right column ----------------
+            VerticalLayout {
+                width: 636px;
+                spacing: 30px;
+                alignment: start;
+
+                Section {
+                    title: "Navigation";
+                    HorizontalLayout {
+                        spacing: 28px;
+                        alignment: start;
+                        VerticalLayout {
+                            width: 228px;
+                            spacing: 4px;
+                            alignment: start;
+                            NavItem { icon: Icons.house; text: "Home"; selected: true; }
+                            NavItem { icon: Icons.history; text: "History"; trailing: "128"; }
+                            NavItem { icon: Icons.chart-column; text: "Analytics"; show-focus: true; }
+                            NavItem { icon: Icons.audio-lines; text: "Voices"; enabled: false; }
+                        }
+                        VerticalLayout {
+                            width: 200px;
+                            spacing: 2px;
+                            alignment: start;
+                            SectionLabel { text: "Settings"; }
+                            Rectangle { height: 6px; }
+                            NavItem { small: true; icon: Icons.user; text: "Account"; selected: true; }
+                            NavItem { small: true; icon: Icons.mic; text: "Voice & model"; }
+                            NavItem { small: true; icon: Icons.keyboard; text: "Triggers"; }
+                        }
+                        VerticalLayout {
+                            spacing: 4px;
+                            alignment: start;
+                            NavItem { collapsed: true; icon: Icons.house; text: "Home"; selected: true; }
+                            NavItem { collapsed: true; icon: Icons.history; text: "History"; }
+                            NavItem { collapsed: true; icon: Icons.settings; text: "Settings"; }
+                        }
+                    }
+                    SectionLabel { text: "Recent"; link-text: "All history"; }
+                    SectionLabel { text: "Today"; trailing-text: "12 reads · 18 min"; }
+                }
+
+                Section {
+                    title: "List rows";
+                    note: "large · compact · selected · focused";
+                    VerticalLayout {
+                        spacing: 2px;
+                        ListRow {
+                            art: root.art-1;
+                            title: "George";
+                            subtitle: "Male · British · Narration";
+                            Button { text: "Preview"; size: ButtonSize.sm; icon: Icons.play; }
+                            Button { width: 92px; text: "Use voice"; kind: ButtonKind.primary; size: ButtonSize.sm; }
+                        }
+                        ListRow {
+                            art: root.art-2;
+                            title: "Charlotte";
+                            subtitle: "Female · Swedish · Conversational";
+                            selected: true;
+                            Button { text: "Preview"; size: ButtonSize.sm; icon: Icons.play; }
+                            Badge { width: 92px; text: "In use"; kind: BadgeKind.outline; size: BadgeSize.md; icon: Icons.check; }
+                        }
+                        ListRow {
+                            size: ListRowSize.compact;
+                            art: root.small-1;
+                            title: "The quiet revolution in personal computing was never about faster chips";
+                            subtitle: "Outlook · George · 10 h ago";
+                            meta: "0:42";
+                            show-focus: true;
+                            VerticalLayout { alignment: center; IconButton { icon: Icons.play; label: "Play"; size: IconButtonSize.sm; } }
+                        }
+                        ListRow {
+                            size: ListRowSize.compact;
+                            icon: Icons.text-select;
+                            title: "Select text anywhere";
+                            subtitle: "A chip appears next to the selection";
+                            interactive: false;
+                            KeyCombo { keys: ["Ctrl", "Alt", "R"]; }
+                        }
+                        ListRow {
+                            size: ListRowSize.compact;
+                            art: root.small-2;
+                            title: "Disabled row";
+                            subtitle: "Voice unavailable";
+                            enabled: false;
+                        }
+                        SkeletonRow { size: SkeletonRowSize.compact; }
+                    }
+                }
+
+                Section {
+                    title: "Badges, toasts, loading";
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+                        Badge { text: "In use"; kind: BadgeKind.outline; }
+                        Badge { text: "Free replay"; }
+                        Badge { text: "New"; kind: BadgeKind.solid; }
+                        Badge { text: "Connected"; dot: BadgeDot.success; }
+                        Badge { text: "Key invalid"; dot: BadgeDot.danger; kind: BadgeKind.outline; }
+                        Badge { text: "Starred"; icon: Icons.star; }
+                        Spinner { size: 16px; }
+                        Spinner { size: 22px; }
+                        Spinner { size: 22px; color: Theme.text-secondary; running: false; }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        alignment: start;
+                        Toast { message: "Copied to clipboard"; kind: ToastKind.success; }
+                        Toast { message: "Read deleted"; action-text: "Undo"; }
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        Toast {
+                            kind: ToastKind.error;
+                            title: "Couldn't reach ElevenLabs";
+                            message: "Check your connection and try again.";
+                            action-text: "Retry";
+                        }
+                    }
+                }
+
+                Section {
+                    title: "Art, cards";
+                    HorizontalLayout {
+                        spacing: 14px;
+                        alignment: start;
+                        ArtThumb { width: 110px; height: 82px; source: root.art-3; }
+                        ArtThumb { width: 110px; height: 82px; }
+                        ArtThumb { width: 56px; height: 56px; source: root.small-3; }
+                        ArtThumb { width: 44px; height: 44px; source: root.small-1; }
+                        VerticalLayout { alignment: center; ArtThumb { width: 24px; height: 24px; round: true; source: root.small-2; } }
+                        VerticalLayout { alignment: center; ArtThumb { width: 16px; height: 16px; round: true; } }
+                    }
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Card {
+                            kind: CardKind.outline;
+                            CaptionText { text: "Today"; }
+                            NumberText { text: "18 min"; }
+                            Rectangle {
+                                height: 3px;
+                                border-radius: 1.5px;
+                                background: Theme.track;
+                                Rectangle { x: 0; width: parent.width * 0.6; border-radius: 1.5px; background: Theme.primary; }
+                            }
+                        }
+                        Card {
+                            kind: CardKind.inset;
+                            CaptionText { text: "Inset"; }
+                            BodyText { text: "Expanded row details and text blocks."; }
+                        }
+                        Card {
+                            kind: CardKind.surface;
+                            CaptionText { text: "Surface"; }
+                            BodyText { text: "On the backdrop."; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------------- Full-width row: overlays ----------------
+        Section {
+            title: "Dialog, empty state, scroll area";
+            HorizontalLayout {
+                spacing: 24px;
+                alignment: start;
+
+                // Dialog over its scrim, inside a framed area that stands in for the window.
+                Rectangle {
+                    width: 610px;
+                    height: 300px;
+                    border-radius: Theme.radius-card;
+                    clip: true;
+                    background: Theme.backdrop;
+                    Image {
+                        width: 100%;
+                        height: 100%;
+                        source: root.backdrop;
+                        image-fit: cover;
+                    }
+                    Dialog {
+                        title: "Delete this read?";
+                        icon: Icons.trash-2;
+                        size: DialogSize.sm;
+                        danger: true;
+                        primary-text: "Delete";
+                        secondary-text: "Cancel";
+                        BodyText { text: "It disappears from History and Analytics. The audio cache for it is removed too."; }
+                    }
+                }
+
+                Rectangle {
+                    width: 330px;
+                    height: 300px;
+                    border-radius: Theme.radius-card;
+                    border-width: 1px;
+                    border-color: Theme.divider;
+                    EmptyState {
+                        art: root.art-4;
+                        icon: Icons.history;
+                        title: "Nothing read yet";
+                        body: "Select text in any app and press Ctrl Alt R.";
+                        action-text: "Try it";
+                    }
+                }
+
+                Rectangle {
+                    width: 330px;
+                    height: 300px;
+                    border-radius: Theme.radius-card;
+                    border-width: 1px;
+                    border-color: Theme.divider;
+                    clip: true;
+                    ScrollArea {
+                        always-show-bar: true;
+                        edge-fade: true;
+                        VerticalLayout {
+                            padding: 16px;
+                            padding-right: 24px;
+                            spacing: 0px;
+                            SectionLabel { text: "Voices"; trailing-text: "24"; }
+                            Rectangle { height: 8px; }
+                            for v in [
+                                { t: "George", s: "Male · British", a: root.small-1 },
+                                { t: "Charlotte", s: "Female · Swedish", a: root.small-2 },
+                                { t: "Brian", s: "Male · American", a: root.small-3 },
+                                { t: "Lily", s: "Female · British", a: root.small-4 },
+                                { t: "Daniel", s: "Male · British", a: root.small-5 },
+                                { t: "Aria", s: "Female · American", a: root.small-6 },
+                                { t: "Callum", s: "Male · Transatlantic", a: root.small-7 },
+                            ]: ListRow {
+                                size: ListRowSize.compact;
+                                art: v.a;
+                                title: v.t;
+                                subtitle: v.s;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,98 @@
+{
+ "page": {
+  "$enum": "PageId.voices"
+ },
+ "page-title": "Voices",
+ "theme-dark": true,
+ "backdrop": {
+  "$image": "art/backdrop-dark.png"
+ },
+ "sidebar": {
+  "nav": [
+   {
+    "page": {
+     "$enum": "PageId.home"
+    },
+    "label": "Home",
+    "icon": "house"
+   },
+   {
+    "page": {
+     "$enum": "PageId.history"
+    },
+    "label": "History",
+    "icon": "history"
+   },
+   {
+    "page": {
+     "$enum": "PageId.analytics"
+    },
+    "label": "Analytics",
+    "icon": "chart-column"
+   },
+   {
+    "page": {
+     "$enum": "PageId.voices"
+    },
+    "label": "Voices",
+    "icon": "audio-lines"
+   },
+   {
+    "page": {
+     "$enum": "PageId.settings"
+    },
+    "label": "Settings",
+    "icon": "settings"
+   }
+  ],
+  "now": {
+   "visible": false,
+   "art": {
+    "$image": "art/small-george.png"
+   },
+   "status": "",
+   "title": "",
+   "phase": {
+    "$enum": "PlayerPhase.idle"
+   },
+   "playing": false,
+   "can-toggle": false,
+   "progress": 0,
+   "buffered": 0,
+   "time": "",
+   "time-accessible": "",
+   "error": ""
+  },
+  "credits-visible": false,
+  "credits-line": "",
+  "credits-fraction": 0,
+  "credits-low": false,
+  "add-key-visible": true,
+  "hint-label": "Read selection",
+  "hint-keys": [
+   "Ctrl",
+   "Alt",
+   "R"
+  ],
+  "hint-spoken": "Read selection: Ctrl plus Alt plus R"
+ },
+ "voices": {
+  "state": {
+   "$enum": "VoicesState.no-key"
+  },
+  "in-use": "In use: George",
+  "count": "",
+  "gender": "",
+  "accent": "",
+  "category": "",
+  "gender-options": [],
+  "accent-options": [],
+  "category-options": [],
+  "refreshing": false,
+  "state-title": "Add your ElevenLabs key to browse voices",
+  "state-body": "Voices come straight from your ElevenLabs account — the premade library plus any voices you’ve cloned or designed.",
+  "state-button": "Add API key",
+  "voices": [],
+  "revision": 1
+ }
+}

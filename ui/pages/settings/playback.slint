@@ -1,0 +1,112 @@
+// Settings → Playback (ui-settings-widget.md §2.4): playback speed (segmented, full width), volume (slider with a
+// speaker glyph), and the Text cleanup group. Stateful controls are re-asserted from `data` in `changed data` and by
+// the page on `revision` (`reassert()`).
+import { Theme, Icons, Icon } from "../../design/index.slint";
+import { PlaybackData } from "../../models.slint";
+import { SectionHead, SubHead, Row, ToggleRow, StackedRow, ChoiceSelect, ChoiceSegmented, SettingSlider }
+    from "parts.slint";
+
+export component PlaybackSection inherits Rectangle {
+    in property <PlaybackData> data;
+
+    // key = "playbackRate" (also applied live) | "text.maxChars"; value = option value.
+    callback set-choice(string, string);
+    // key = "volume" (commit; also applied live; Rust quantizes to 0.01). Label: `format-number("volume", value)`.
+    callback set-number(string, float);
+    pure callback format-number(string, float) -> string;
+    // key = "text.skipUrls" | "text.skipEmails".
+    callback set-bool(string, bool);
+
+    pure function label(key: string, value: float, fallback: string) -> string {
+        let live = root.format-number(key, value);
+        live != "" ? live : fallback
+    }
+
+    public function reassert() {
+        rate.current-index = root.data.rate-index;
+        if (!volume.dragging) { volume.value = root.data.volume; }
+        urls.checked = root.data.skip-urls;
+        emails.checked = root.data.skip-emails;
+        max-chars.current-index = root.data.max-chars-index;
+    }
+    changed data => { root.reassert(); }
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Playback";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Playback";
+        }
+        Rectangle { height: Theme.space-2; }
+
+        StackedRow {
+            divider: false;
+            title: "Playback speed";
+            description: "Applied on your PC on top of the voice’s speaking speed.";
+
+            rate := ChoiceSegmented {
+                horizontal-stretch: 1;
+                model: root.data.rate-options;
+                current-index: root.data.rate-index;
+                label: "Playback speed";
+                selected(i, v) => { root.set-choice("playbackRate", v); }
+            }
+        }
+        Row {
+            title: "Volume";
+            description: "Reading volume, independent of the system mixer.";
+
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: Icons.volume-2;
+                    size: 18px;
+                    color: Theme.text-secondary;
+                }
+            }
+            volume := SettingSlider {
+                width: 248px;
+                value: root.data.volume;
+                minimum: 0;
+                maximum: 1;
+                step: 0.01;
+                label: "Volume";
+                value-text: root.label("volume", self.value, root.data.volume-text);
+                committed(v) => {
+                    if (v != root.data.volume) { root.set-number("volume", v); }
+                }
+            }
+        }
+
+        SubHead { text: "Text cleanup"; }
+        urls := ToggleRow {
+            divider: false;
+            title: "Skip links";
+            description: "Don’t read web addresses out loud.";
+            checked: root.data.skip-urls;
+            toggled(c) => { root.set-bool("text.skipUrls", c); }
+        }
+        emails := ToggleRow {
+            title: "Skip email addresses";
+            description: "Leave out anything that looks like name@example.com.";
+            checked: root.data.skip-emails;
+            toggled(c) => { root.set-bool("text.skipEmails", c); }
+        }
+        Row {
+            title: "Longest selection";
+            description: "Longer selections are trimmed, so a stray Ctrl+A doesn’t spend your credits.";
+
+            max-chars := ChoiceSelect {
+                width: 224px;
+                model: root.data.max-chars-options;
+                current-index: root.data.max-chars-index;
+                label: "Longest selection";
+                selected(i, v) => { root.set-choice("text.maxChars", v); }
+            }
+        }
+    }
+}

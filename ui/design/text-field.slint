@@ -1,0 +1,200 @@
+// TextField and FormField.
+//
+// TextField: a single-line input (40 h, radius 12, `field` fill, `field-border`, focus border `field-border-focus`).
+//   in-out text: string               the value
+//   in    placeholder: string         text-muted
+//   in    icon: image                 optional leading 16 px glyph
+//   in    password: bool              masks the text and shows an eye button to reveal it
+//   in    enabled: bool, read-only: bool
+//   in    has-error: bool             danger border (pair with FormField's error text)
+//   in    small: bool                 36 h
+//   in    label: string               accessible label (FormField passes its label)
+//   in    show-focus: bool            draw the focused look without focus (previews)
+//   out   has-focus: bool
+//   callback edited(text: string)     every keystroke
+//   callback accepted(text: string)   Enter
+//   function focus-input(), select-all()
+//
+// FormField: label above, control (@children), one note line below; the error text replaces the hint.
+//   in    label: string               13 / 600 text
+//   in    hint: string                12 / 500 text-muted
+//   in    error: string               12 / 500 danger, with an alert glyph; replaces the hint when non-empty
+//   @children                         the control (TextField, TextArea, Select, ...)
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+import { IconButton, IconButtonSize } from "icon-button.slint";
+
+export component TextField inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <image> icon;
+    in property <bool> password: false;
+    in property <bool> enabled: true;
+    in property <bool> read-only <=> input.read-only;
+    in property <bool> has-error: false;
+    in property <bool> small: false;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: input.has-focus;
+
+    callback edited(text: string);
+    callback accepted(text: string);
+
+    public function focus-input() {
+        input.focus();
+    }
+    public function select-all() {
+        input.select-all();
+    }
+
+    property <bool> focused-look: input.has-focus || root.show-focus;
+    property <bool> revealed: false;
+
+    height: root.small ? 36px : 40px;
+    min-width: 120px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: Theme.radius-field;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: root.has-error ? Theme.danger
+        : root.focused-look ? Theme.field-border-focus
+        : touch.has-hover ? Theme.field-border-focus : Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: input;
+
+    accessible-role: text-input;
+    accessible-label: root.label != "" ? root.label : root.placeholder;
+    accessible-placeholder-text: root.placeholder;
+    accessible-value: root.password ? "" : root.text;
+    accessible-enabled: root.enabled;
+    accessible-read-only: root.read-only;
+
+    animate border-color { duration: Theme.fast; easing: ease-out; }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: root.password ? 4px : 14px;
+        spacing: 10px;
+
+        if root.icon.width > 0: Icon {
+            source: root.icon;
+            size: 16px;
+            color: root.focused-look ? Theme.text : Theme.text-secondary;
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            Text {
+                width: 100%;
+                height: 100%;
+                text: root.text == "" ? root.placeholder : "";
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-muted;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+
+            input := TextInput {
+                property <length> scroll-x;
+                x: min(0px, max(parent.width - self.width, self.scroll-x));
+                width: max(parent.width, self.preferred-width + self.text-cursor-width);
+                height: 100%;
+                enabled: root.enabled;
+                single-line: true;
+                input-type: root.password && !root.revealed ? InputType.password : InputType.text;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                color: Theme.text;
+                selection-background-color: Theme.selection;
+                selection-foreground-color: Theme.text;
+                vertical-alignment: center;
+                accessible-role: none;
+
+                cursor-position-changed(pos) => {
+                    if (pos.x + self.scroll-x < 0px) {
+                        self.scroll-x = -pos.x;
+                    } else if (pos.x + self.scroll-x > parent.width - self.text-cursor-width) {
+                        self.scroll-x = parent.width - self.text-cursor-width - pos.x;
+                    }
+                }
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+        }
+
+        if root.password: VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: root.revealed ? @image-url("../icons/eye-off.svg") : @image-url("../icons/eye.svg");
+                label: root.revealed ? "Hide" : "Show";
+                size: IconButtonSize.sm;
+                enabled: root.enabled;
+                clicked => { root.revealed = !root.revealed; }
+            }
+        }
+    }
+}
+
+export component FormField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> hint;
+    in property <string> error;
+
+    spacing: Theme.space-2;
+    vertical-stretch: 0;
+
+    if root.label != "": Text {
+        text: root.label;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        accessible-role: none;
+    }
+
+    @children
+
+    if root.error != "": HorizontalLayout {
+        spacing: 6px;
+        Icon {
+            source: @image-url("../icons/circle-alert.svg");
+            size: 14px;
+            color: Theme.danger;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.error;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-medium;
+            color: Theme.danger;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.error;
+        }
+    }
+    if root.error == "" && root.hint != "": Text {
+        text: root.hint;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.hint;
+    }
+}

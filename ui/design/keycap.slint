@@ -1,0 +1,81 @@
+// Keycap and KeyCombo: keyboard shortcut chips ("Ctrl" "K").
+//
+// Keycap
+//   in    text: string           one key label ("Ctrl", "K", "↵"). One glyph = a 22 px circle; longer = a 22-h chip.
+//   in    small: bool            18 h variant for dense rows (10 px text)
+// KeyCombo (row helper)
+//   in    keys: [string]         e.g. ["Ctrl", "Alt", "R"]; empty shows `empty-text`
+//   in    empty-text: string     shown in text-muted when `keys` is empty (default "Not set")
+//   in    small: bool            passes through to every Keycap
+//   in    gap: length            gap between caps (default 4 px)
+// Accessible label: "Ctrl plus Alt plus R" (up to 5 keys), or the empty text.
+
+import { Theme } from "theme.slint";
+
+export component Keycap {
+    in property <string> text;
+    in property <bool> small: false;
+
+    property <length> side: root.small ? 18px : 22px;
+
+    height: root.side;
+    min-width: root.side;
+    preferred-width: max(root.side, label.preferred-width + (root.small ? 10px : 14px));
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Rectangle {
+        border-radius: label.text.character-count <= 1 ? root.height / 2 : (root.small ? 6px : Theme.radius-keycap);
+        background: Theme.chip;
+        border-width: Theme.hairline;
+        border-color: Theme.field-border;
+    }
+
+    label := Text {
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: root.small ? Theme.size-keycap-small : Theme.size-keycap;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text-secondary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+export component KeyCombo inherits VerticalLayout {
+    in property <[string]> keys;
+    in property <string> empty-text: "Not set";
+    in property <bool> small: false;
+    in property <length> gap: 4px;
+
+    alignment: center;
+    horizontal-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.keys.length == 0 ? root.empty-text
+        : root.keys[0]
+          + (root.keys.length > 1 ? " plus " + root.keys[1] : "")
+          + (root.keys.length > 2 ? " plus " + root.keys[2] : "")
+          + (root.keys.length > 3 ? " plus " + root.keys[3] : "")
+          + (root.keys.length > 4 ? " plus " + root.keys[4] : "");
+
+    HorizontalLayout {
+        spacing: root.gap;
+        alignment: start;
+        for key in root.keys: Keycap {
+            text: key;
+            small: root.small;
+        }
+    }
+    if root.keys.length == 0: Text {
+        text: root.empty-text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-caption;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-muted;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}

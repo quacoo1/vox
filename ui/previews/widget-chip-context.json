@@ -1,0 +1,13 @@
+{
+  "data": {
+    "kind": {
+      "$enum": "ChipKind.context"
+    },
+    "label": "Read with Vox",
+    "art": {
+      "$image": "art/small-george.png"
+    },
+    "hiding": false,
+    "show-key": 0
+  }
+}

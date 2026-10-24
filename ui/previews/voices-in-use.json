@@ -1,0 +1,136 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: My reading voice",
+    "count": "2 of 24",
+    "gender": "",
+    "accent": "",
+    "category": "cloned",
+    "gender-options": [
+      {
+        "value": "",
+        "label": "All",
+        "accessible-label": "All genders"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "accessible-label": "Female"
+      },
+      {
+        "value": "male",
+        "label": "Male",
+        "accessible-label": "Male"
+      },
+      {
+        "value": "neutral",
+        "label": "Neutral",
+        "accessible-label": "Neutral"
+      }
+    ],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "australian",
+        "label": "Australian",
+        "accessible-label": "Australian"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      },
+      {
+        "value": "irish",
+        "label": "Irish",
+        "accessible-label": "Irish"
+      },
+      {
+        "value": "swedish",
+        "label": "Swedish",
+        "accessible-label": "Swedish"
+      },
+      {
+        "value": "transatlantic",
+        "label": "Transatlantic",
+        "accessible-label": "Transatlantic"
+      }
+    ],
+    "category-options": [
+      {
+        "value": "",
+        "label": "All types",
+        "accessible-label": "All types"
+      },
+      {
+        "value": "cloned",
+        "label": "Cloned",
+        "accessible-label": "Cloned"
+      },
+      {
+        "value": "generated",
+        "label": "Designed",
+        "accessible-label": "Designed"
+      },
+      {
+        "value": "premade",
+        "label": "Premade",
+        "accessible-label": "Premade"
+      },
+      {
+        "value": "professional",
+        "label": "Professional",
+        "accessible-label": "Professional"
+      }
+    ],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "clone-02",
+        "name": "Interview voice (podcast)",
+        "art": {
+          "$image": "art/thumb-will.png"
+        },
+        "subtitle": "Cloned · Male · American · Podcast",
+        "description": "Cloned from the March episodes.",
+        "tags": [],
+        "caption": "Cloned · Podcast",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-01",
+        "name": "My reading voice",
+        "art": {
+          "$image": "art/thumb-river.png"
+        },
+        "subtitle": "Cloned",
+        "description": "No description.",
+        "tags": [],
+        "caption": "Cloned",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.none"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

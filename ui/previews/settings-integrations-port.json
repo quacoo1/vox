@@ -1,0 +1,492 @@
+{
+ "data": {
+  "loading": false,
+  "saving": false,
+  "status": "Saved automatically",
+  "sections": [
+   {
+    "value": "account",
+    "label": "Account",
+    "accessible-label": "Account"
+   },
+   {
+    "value": "voice",
+    "label": "Voice & model",
+    "accessible-label": "Voice & model"
+   },
+   {
+    "value": "playback",
+    "label": "Playback",
+    "accessible-label": "Playback"
+   },
+   {
+    "value": "triggers",
+    "label": "Triggers",
+    "accessible-label": "Triggers"
+   },
+   {
+    "value": "widget",
+    "label": "Widget",
+    "accessible-label": "Widget"
+   },
+   {
+    "value": "appearance",
+    "label": "Appearance",
+    "accessible-label": "Appearance"
+   },
+   {
+    "value": "library",
+    "label": "Library & privacy",
+    "accessible-label": "Library & privacy"
+   },
+   {
+    "value": "integrations",
+    "label": "Integrations",
+    "accessible-label": "Integrations"
+   },
+   {
+    "value": "about",
+    "label": "About",
+    "accessible-label": "About"
+   }
+  ],
+  "revision": 1,
+  "account": {
+   "state": {
+    "$enum": "AccountState.stored"
+   },
+   "badge": {
+    "text": "Connected",
+    "tone": {
+     "$enum": "BadgeTone.success"
+    }
+   },
+   "form-open": false,
+   "replacing": false,
+   "busy": false,
+   "field-label": "New API key",
+   "hint": "Needs Text to Speech access. Add “User: read” to see your credits here.",
+   "error": "",
+   "submit-label": "Save new key",
+   "lead": "",
+   "limited-warning": "",
+   "remove-busy": false,
+   "credits": {
+    "state": {
+     "$enum": "CreditsState.ready"
+    },
+    "title": "",
+    "tier": "Creator",
+    "percent": "39%",
+    "percent-accessible": "39 percent of credits left",
+    "fraction": 0.39,
+    "low": false,
+    "facts": "38.8K of 100K left",
+    "reset": "Resets in 12 days",
+    "detail": "38,766 of 100,000 characters left. Resets in 12 days",
+    "message": "",
+    "action-label": "",
+    "refreshing": false
+   },
+   "notice": ""
+  },
+  "voice": {
+   "voice-name": "George",
+   "voice-art": {
+    "$image": "art/thumb-george.png"
+   },
+   "voice-tags": [
+    "Male",
+    "British",
+    "Middle aged",
+    "Warm",
+    "Narration"
+   ],
+   "tags-loading": false,
+   "model-options": [
+    {
+     "value": "eleven_flash_v2_5",
+     "label": "Flash v2.5",
+     "accessible-label": "Flash v2.5"
+    },
+    {
+     "value": "eleven_turbo_v2_5",
+     "label": "Turbo v2.5",
+     "accessible-label": "Turbo v2.5"
+    },
+    {
+     "value": "eleven_multilingual_v2",
+     "label": "Multilingual v2",
+     "accessible-label": "Multilingual v2"
+    },
+    {
+     "value": "eleven_v3",
+     "label": "v3",
+     "accessible-label": "v3"
+    }
+   ],
+   "model-index": 0,
+   "model-description": "Ultra low latency speech synthesis in 32 languages. Half the cost of the multilingual models.",
+   "model-badges": [
+    {
+     "text": "0.5× credits",
+     "tone": {
+      "$enum": "BadgeTone.neutral"
+     }
+    },
+    {
+     "text": "40K chars / request",
+     "tone": {
+      "$enum": "BadgeTone.neutral"
+     }
+    },
+    {
+     "text": "32 languages",
+     "tone": {
+      "$enum": "BadgeTone.neutral"
+     }
+    }
+   ],
+   "model-error": "",
+   "models-loading": false,
+   "language-options": [
+    {
+     "value": "",
+     "label": "Auto-detect",
+     "accessible-label": "Auto-detect"
+    },
+    {
+     "value": "en",
+     "label": "English",
+     "accessible-label": "English"
+    },
+    {
+     "value": "de",
+     "label": "German",
+     "accessible-label": "German"
+    },
+    {
+     "value": "fr",
+     "label": "French",
+     "accessible-label": "French"
+    },
+    {
+     "value": "ja",
+     "label": "Japanese",
+     "accessible-label": "Japanese"
+    }
+   ],
+   "language-index": 0,
+   "quality-options": [
+    {
+     "value": "mp3_44100_128",
+     "label": "High · 128 kbps",
+     "accessible-label": "High · 128 kbps"
+    },
+    {
+     "value": "mp3_44100_64",
+     "label": "Standard · 64 kbps",
+     "accessible-label": "Standard · 64 kbps"
+    },
+    {
+     "value": "mp3_22050_32",
+     "label": "Data saver · 32 kbps",
+     "accessible-label": "Data saver · 32 kbps"
+    }
+   ],
+   "quality-index": 0,
+   "stability": 0.5,
+   "stability-text": "50%",
+   "similarity": 0.75,
+   "similarity-text": "75%",
+   "style": 0.0,
+   "style-text": "0%",
+   "speed": 1.0,
+   "speed-text": "1.00×",
+   "speaker-boost": true,
+   "reset-enabled": false,
+   "test-busy": false
+  },
+  "playback": {
+   "rate-options": [
+    {
+     "value": "0.75",
+     "label": "0.75×",
+     "accessible-label": "0.75 times speed"
+    },
+    {
+     "value": "1",
+     "label": "1×",
+     "accessible-label": "1 times speed"
+    },
+    {
+     "value": "1.25",
+     "label": "1.25×",
+     "accessible-label": "1.25 times speed"
+    },
+    {
+     "value": "1.5",
+     "label": "1.5×",
+     "accessible-label": "1.5 times speed"
+    },
+    {
+     "value": "1.75",
+     "label": "1.75×",
+     "accessible-label": "1.75 times speed"
+    },
+    {
+     "value": "2",
+     "label": "2×",
+     "accessible-label": "2 times speed"
+    }
+   ],
+   "rate-index": 2,
+   "volume": 0.8,
+   "volume-text": "80%",
+   "skip-urls": true,
+   "skip-emails": false,
+   "max-chars-options": [
+    {
+     "value": "2000",
+     "label": "2,000 characters",
+     "accessible-label": "2,000 characters"
+    },
+    {
+     "value": "5000",
+     "label": "5,000 characters",
+     "accessible-label": "5,000 characters"
+    },
+    {
+     "value": "10000",
+     "label": "10,000 characters",
+     "accessible-label": "10,000 characters"
+    },
+    {
+     "value": "20000",
+     "label": "20,000 characters",
+     "accessible-label": "20,000 characters"
+    },
+    {
+     "value": "50000",
+     "label": "50,000 characters",
+     "accessible-label": "50,000 characters"
+    },
+    {
+     "value": "100000",
+     "label": "100,000 characters",
+     "accessible-label": "100,000 characters"
+    }
+   ],
+   "max-chars-index": 3
+  },
+  "triggers": {
+   "hook-available": true,
+   "hook-notice-title": "",
+   "hook-notice-body": "",
+   "right-click-chip": true,
+   "selection-popup": false,
+   "hotkeys-enabled": true,
+   "hotkeys": [
+    {
+     "action": "readSelection",
+     "label": "Read selection",
+     "description": "Copies the selected text and reads it",
+     "keys": [
+      "Ctrl",
+      "Alt",
+      "R"
+     ],
+     "spoken": "Ctrl plus Alt plus R",
+     "recording": false,
+     "preview": [],
+     "hint": "",
+     "warning": ""
+    },
+    {
+     "action": "readClipboard",
+     "label": "Read clipboard",
+     "description": "Reads whatever text is on the clipboard",
+     "keys": [
+      "Ctrl",
+      "Alt",
+      "V"
+     ],
+     "spoken": "Ctrl plus Alt plus V",
+     "recording": false,
+     "preview": [],
+     "hint": "",
+     "warning": ""
+    },
+    {
+     "action": "playPause",
+     "label": "Play / pause",
+     "description": "Toggles the current reading",
+     "keys": [
+      "Ctrl",
+      "Alt",
+      "P"
+     ],
+     "spoken": "Ctrl plus Alt plus P",
+     "recording": false,
+     "preview": [],
+     "hint": "",
+     "warning": ""
+    },
+    {
+     "action": "stop",
+     "label": "Stop",
+     "description": "Stops and clears the current reading",
+     "keys": [
+      "Ctrl",
+      "Alt",
+      "S"
+     ],
+     "spoken": "Ctrl plus Alt plus S",
+     "recording": false,
+     "preview": [],
+     "hint": "",
+     "warning": ""
+    }
+   ],
+   "media-keys": true,
+   "restore-clipboard": true,
+   "excluded-apps": [
+    "photoshop.exe",
+    "mstsc.exe"
+   ],
+   "exclude-error": ""
+  },
+  "widget": {
+   "enabled": true,
+   "position-options": [
+    {
+     "value": "bottom-right",
+     "label": "Bottom right",
+     "accessible-label": "Bottom right"
+    },
+    {
+     "value": "top-right",
+     "label": "Top right",
+     "accessible-label": "Top right"
+    },
+    {
+     "value": "bottom-center",
+     "label": "Bottom center",
+     "accessible-label": "Bottom center"
+    },
+    {
+     "value": "near-cursor",
+     "label": "Cursor",
+     "accessible-label": "Near the cursor"
+    },
+    {
+     "value": "remember",
+     "label": "Last spot",
+     "accessible-label": "Where I last dragged it"
+    }
+   ],
+   "position-index": 0,
+   "position-hint": "Above the clock, out of the way of most documents.",
+   "compact": false,
+   "highlight-words": true,
+   "auto-hide": true
+  },
+  "appearance": {
+   "theme-options": [
+    {
+     "value": "system",
+     "label": "System",
+     "accessible-label": "System"
+    },
+    {
+     "value": "paper",
+     "label": "Paper",
+     "accessible-label": "Paper"
+    },
+    {
+     "value": "night",
+     "label": "Night",
+     "accessible-label": "Night"
+    }
+   ],
+   "theme-index": 2,
+   "intro": "The theme changes this window. The floating player and the chip always stay dark.",
+   "theme-notes": [
+    "Follows Windows dark mode",
+    "Light window",
+    "Dark window"
+   ]
+  },
+  "library": {
+   "cache-badge": "187MB",
+   "save-history": true,
+   "store-text": true,
+   "retention-options": [
+    {
+     "value": "0",
+     "label": "Keep forever",
+     "accessible-label": "Keep forever"
+    },
+    {
+     "value": "7",
+     "label": "7 days",
+     "accessible-label": "7 days"
+    },
+    {
+     "value": "30",
+     "label": "30 days",
+     "accessible-label": "30 days"
+    },
+    {
+     "value": "90",
+     "label": "90 days",
+     "accessible-label": "90 days"
+    },
+    {
+     "value": "365",
+     "label": "1 year",
+     "accessible-label": "1 year"
+    }
+   ],
+   "retention-index": 0,
+   "cache-audio": true,
+   "cache-limit": 500,
+   "cache-limit-max": 5000,
+   "cache-limit-text": "500 MB",
+   "usage-text": "187 MB of 500 MB · 214 reads cached",
+   "usage-fraction": 0.374,
+   "usage-high": false,
+   "clear-cache-enabled": true,
+   "clear-cache-busy": false,
+   "export-busy": false,
+   "clear-history-busy": false
+  },
+  "integrations": {
+   "bridge-enabled": true,
+   "bridge-badge": {
+    "text": "Not running",
+    "tone": {
+     "$enum": "BadgeTone.attention"
+    }
+   },
+   "port-error": "Use a port between 1024 and 65535.",
+   "port-note": "",
+   "explorer-enabled": false,
+   "explorer-installed": false,
+   "launch-at-login": true,
+   "start-minimized": false,
+   "close-to-tray": true,
+   "copied": ""
+  },
+  "about": {
+   "version": "1.0.0",
+   "runtime": "Rust 1.98 · Slint 1.18.1",
+   "build": "a41c9e2",
+   "data-folder": "C:\\Users\\Kwaku\\AppData\\Roaming\\Vox",
+   "data-folder-ready": true,
+   "demo": false
+  }
+ },
+ "scroll-to": "integrations",
+ "port-draft": "00080"
+}

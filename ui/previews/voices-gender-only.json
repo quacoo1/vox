@@ -1,0 +1,84 @@
+{
+  "search-text": "",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: My reading voice",
+    "count": "3 voices",
+    "gender": "",
+    "accent": "",
+    "category": "",
+    "gender-options": [
+      {
+        "value": "",
+        "label": "All",
+        "accessible-label": "All genders"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "accessible-label": "Female"
+      },
+      {
+        "value": "male",
+        "label": "Male",
+        "accessible-label": "Male"
+      }
+    ],
+    "accent-options": [],
+    "category-options": [],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "clone-02",
+        "name": "Interview voice (podcast)",
+        "art": {
+          "$image": "art/thumb-will.png"
+        },
+        "subtitle": "Cloned · Male · Podcast",
+        "description": "Cloned from the March episodes.",
+        "tags": [],
+        "caption": "Cloned · Podcast",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-04",
+        "name": "Mum reading",
+        "art": {
+          "$image": "art/thumb-lily.png"
+        },
+        "subtitle": "Cloned · Female",
+        "description": "Cloned from a birthday voicemail.",
+        "tags": [],
+        "caption": "Cloned",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "clone-01",
+        "name": "My reading voice",
+        "art": {
+          "$image": "art/thumb-river.png"
+        },
+        "subtitle": "Cloned · Female",
+        "description": "No description.",
+        "tags": [],
+        "caption": "Cloned",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.none"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

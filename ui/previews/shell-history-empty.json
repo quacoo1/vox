@@ -1,0 +1,161 @@
+{
+ "page": {
+  "$enum": "PageId.history"
+ },
+ "page-title": "History",
+ "theme-dark": true,
+ "backdrop": {
+  "$image": "art/backdrop-dark.png"
+ },
+ "sidebar": {
+  "nav": [
+   {
+    "page": {
+     "$enum": "PageId.home"
+    },
+    "label": "Home",
+    "icon": "house"
+   },
+   {
+    "page": {
+     "$enum": "PageId.history"
+    },
+    "label": "History",
+    "icon": "history"
+   },
+   {
+    "page": {
+     "$enum": "PageId.analytics"
+    },
+    "label": "Analytics",
+    "icon": "chart-column"
+   },
+   {
+    "page": {
+     "$enum": "PageId.voices"
+    },
+    "label": "Voices",
+    "icon": "audio-lines"
+   },
+   {
+    "page": {
+     "$enum": "PageId.settings"
+    },
+    "label": "Settings",
+    "icon": "settings"
+   }
+  ],
+  "now": {
+   "visible": false,
+   "art": {
+    "$image": "art/small-george.png"
+   },
+   "status": "",
+   "title": "",
+   "phase": {
+    "$enum": "PlayerPhase.idle"
+   },
+   "playing": false,
+   "can-toggle": false,
+   "progress": 0,
+   "buffered": 0,
+   "time": "",
+   "time-accessible": "",
+   "error": ""
+  },
+  "credits-visible": true,
+  "credits-line": "39% credits left",
+  "credits-fraction": 0.39,
+  "credits-low": false,
+  "add-key-visible": false,
+  "hint-label": "Read selection",
+  "hint-keys": [
+   "Ctrl",
+   "Alt",
+   "R"
+  ],
+  "hint-spoken": "Read selection: Ctrl plus Alt plus R"
+ },
+ "history": {
+  "state": {
+   "$enum": "HistoryState.nothing-yet"
+  },
+  "dimmed": false,
+  "count-label": "0 reads",
+  "actions-visible": false,
+  "exporting": false,
+  "clearing": false,
+  "can-export": false,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "history",
+  "state-title": "Nothing read yet",
+  "state-body": "Select text in any app, right-click and choose “Read with Vox” — or press",
+  "state-keys": [
+   "Ctrl",
+   "Alt",
+   "R"
+  ],
+  "state-body-after": ". Every read lands here.",
+  "state-button": "Paste & read",
+  "rows": [],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

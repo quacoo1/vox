@@ -1,0 +1,146 @@
+{
+  "search-text": "a really long search query that keeps going past the end of the field",
+  "data": {
+    "state": {
+      "$enum": "VoicesState.list"
+    },
+    "in-use": "In use: Professional clone — Dr. Margaret Okonkwo-Ellsworth (audiobook narration, take 3)",
+    "count": "2 of 128",
+    "gender": "non_binary",
+    "accent": "mid_atlantic_received",
+    "category": "professional",
+    "gender-options": [
+      {
+        "value": "",
+        "label": "All",
+        "accessible-label": "All genders"
+      },
+      {
+        "value": "female",
+        "label": "Female",
+        "accessible-label": "Female"
+      },
+      {
+        "value": "male",
+        "label": "Male",
+        "accessible-label": "Male"
+      },
+      {
+        "value": "neutral",
+        "label": "Neutral",
+        "accessible-label": "Neutral"
+      },
+      {
+        "value": "non_binary",
+        "label": "Non binary",
+        "accessible-label": "Non binary"
+      }
+    ],
+    "accent-options": [
+      {
+        "value": "",
+        "label": "All accents",
+        "accessible-label": "All accents"
+      },
+      {
+        "value": "american",
+        "label": "American",
+        "accessible-label": "American"
+      },
+      {
+        "value": "australian",
+        "label": "Australian",
+        "accessible-label": "Australian"
+      },
+      {
+        "value": "british",
+        "label": "British",
+        "accessible-label": "British"
+      },
+      {
+        "value": "irish",
+        "label": "Irish",
+        "accessible-label": "Irish"
+      },
+      {
+        "value": "swedish",
+        "label": "Swedish",
+        "accessible-label": "Swedish"
+      },
+      {
+        "value": "transatlantic",
+        "label": "Transatlantic",
+        "accessible-label": "Transatlantic"
+      },
+      {
+        "value": "mid_atlantic_received",
+        "label": "Mid atlantic received pronunciation",
+        "accessible-label": "Mid atlantic received pronunciation"
+      }
+    ],
+    "category-options": [
+      {
+        "value": "",
+        "label": "All types",
+        "accessible-label": "All types"
+      },
+      {
+        "value": "cloned",
+        "label": "Cloned",
+        "accessible-label": "Cloned"
+      },
+      {
+        "value": "generated",
+        "label": "Designed",
+        "accessible-label": "Designed"
+      },
+      {
+        "value": "premade",
+        "label": "Premade",
+        "accessible-label": "Premade"
+      },
+      {
+        "value": "professional",
+        "label": "Professional",
+        "accessible-label": "Professional"
+      }
+    ],
+    "refreshing": false,
+    "state-title": "",
+    "state-body": "",
+    "state-button": "",
+    "voices": [
+      {
+        "id": "pro-01",
+        "name": "Professional clone — Dr. Margaret Okonkwo-Ellsworth (audiobook narration, take 3)",
+        "art": {
+          "$image": "art/thumb-matilda.png"
+        },
+        "subtitle": "Professional · Non binary · Mid atlantic received pronunciation · Audiobook narration and long-form non-fiction",
+        "description": "A deliberately unhurried, rounded voice recorded over three sessions for long-form non-fiction, with careful breaths between paragraphs and no music bed.",
+        "tags": [],
+        "caption": "Professional · Audiobook narration and long-form non-fiction",
+        "in-use": true,
+        "preview": {
+          "$enum": "PreviewState.ready"
+        }
+      },
+      {
+        "id": "pro-02",
+        "name": "Supercalifragilisticexpialidocious-Voice-With-No-Spaces-At-All-0123456789",
+        "art": {
+          "$image": "art/thumb-callum.png"
+        },
+        "subtitle": "Professional · Non binary · Mid atlantic received pronunciation",
+        "description": "No description.",
+        "tags": [],
+        "caption": "Professional",
+        "in-use": false,
+        "preview": {
+          "$enum": "PreviewState.loading"
+        }
+      }
+    ],
+    "revision": 1
+  }
+}

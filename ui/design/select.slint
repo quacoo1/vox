@@ -1,0 +1,265 @@
+// Select and SelectMenu: a dropdown that looks like a secondary pill with a chevron.
+//
+// Select
+//   in    model: [string]                  option labels
+//   in-out current-index: int              selected option (-1 = none: shows the placeholder)
+//   out   current-value: string            label of the selected option
+//   in    placeholder: string              shown in text-muted when nothing is selected
+//   in    enabled: bool
+//   in    small: bool                      32 h (default 40 h)
+//   in    label: string                    accessible label ("Model")
+//   in    show-focus: bool                 draw the focus ring without focus (previews)
+//   out   has-focus: bool, is-open: bool
+//   callback selected(index: int, value: string)   a new option was chosen (click, Enter, or arrow keys while closed)
+//   function open(), close()
+// Keys (closed): Enter / Space / Alt+Down open; Up/Down select the previous / next option directly.
+// Keys (open): Up/Down move the highlight, Enter / Space choose, Esc closes. A click outside closes.
+// The popup opens below the pill, at least as wide as it (min 180 px), at most 8 rows tall (then it scrolls).
+//
+// SelectMenu: the popup list on its own (also used for overflow menus and in previews).
+//   in    model: [string]
+//   in    current-index: int               the row with the check mark
+//   in-out highlighted-index: int          keyboard highlight (hover also highlights)
+//   in    max-rows: int                    rows before scrolling (default 8)
+//   callback picked(index: int)            a row was clicked
+// Look: `popup` fill, `popup-border` hairline, radius 14, a soft shadow, 36-h rows with radius 10, hover fill,
+// a check mark on the selected row.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+
+export component SelectMenu {
+    in property <[string]> model;
+    in property <int> current-index: -1;
+    in-out property <int> highlighted-index: -1;
+    in property <int> max-rows: 8;
+
+    callback picked(index: int);
+
+    property <length> row-h: 36px;
+    property <length> pad: 6px;
+    property <int> rows: min(root.max-rows, root.model.length);
+
+    min-width: 180px;
+    preferred-width: 220px;
+    height: root.rows * root.row-h + 2 * root.pad;
+    accessible-role: list;
+
+    Rectangle {
+        border-radius: Theme.radius-popup;
+        background: Theme.popup;
+        border-width: Theme.hairline;
+        border-color: Theme.popup-border;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    flick := Flickable {
+        x: root.pad;
+        y: root.pad;
+        width: root.width - 2 * root.pad;
+        height: root.height - 2 * root.pad;
+        content-height: root.model.length * root.row-h;
+        interactive: root.model.length > root.max-rows;
+        // Keep the keyboard highlight in view.
+        content-y: root.highlighted-index < 0 ? 0px
+            : -max(0px, min((root.model.length - root.rows) * root.row-h,
+                (root.highlighted-index - root.rows + 1) * root.row-h));
+
+        for item[i] in root.model: Rectangle {
+            y: i * root.row-h;
+            width: flick.width;
+            height: root.row-h;
+            border-radius: 10px;
+            background: row-touch.pressed ? Theme.pressed : (row-touch.has-hover || i == root.highlighted-index) ? Theme.hover : transparent;
+            accessible-role: list-item;
+            accessible-label: item;
+            accessible-item-selectable: true;
+            accessible-item-selected: i == root.current-index;
+            accessible-item-index: i;
+            accessible-item-count: root.model.length;
+            accessible-action-default => { root.picked(i); }
+            animate background { duration: Theme.fast; easing: ease-out; }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 10px;
+                spacing: 8px;
+                Text {
+                    horizontal-stretch: 1;
+                    text: item;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: i == root.current-index ? Theme.weight-semibold : Theme.weight-medium;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                if i == root.current-index: Icon {
+                    source: @image-url("../icons/check.svg");
+                    size: 16px;
+                    color: Theme.text;
+                }
+            }
+
+            row-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.picked(i); }
+            }
+        }
+    }
+}
+
+export component Select {
+    in property <[string]> model;
+    in-out property <int> current-index: -1;
+    out property <string> current-value: root.current-index >= 0 && root.current-index < root.model.length
+        ? root.model[root.current-index] : "";
+    in property <string> placeholder: "Choose";
+    in property <bool> enabled: true;
+    in property <bool> small: false;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: press.has-focus;
+    out property <bool> is-open: popup.is-open;
+
+    callback selected(index: int, value: string);
+
+    public function open() {
+        if (root.enabled && root.model.length > 0) {
+            root.highlight = max(0, root.current-index);
+            popup.show();
+        }
+    }
+    public function close() {
+        popup.close();
+    }
+
+    property <int> highlight: -1;
+
+    function choose(i: int) {
+        if (i >= 0 && i < root.model.length && i != root.current-index) {
+            root.current-index = i;
+            root.selected(i, root.model[i]);
+        }
+    }
+
+    height: root.small ? 32px : 40px;
+    min-width: 120px;
+    preferred-width: max(160px, row.preferred-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.current-value;
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-expand => { root.open(); }
+    accessible-action-default => { root.open(); }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+        border-width: Theme.hairline;
+        border-color: (press.has-hover || popup.is-open) ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    row := HorizontalLayout {
+        padding-left: root.small ? 14px : 18px;
+        padding-right: root.small ? 10px : 14px;
+        spacing: 8px;
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.current-value != "" ? root.current-value : root.placeholder;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label : Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: root.current-value != "" ? Theme.text : Theme.text-muted;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Icon {
+            source: @image-url("../icons/chevron-down.svg");
+            size: 16px;
+            color: Theme.text-secondary;
+        }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.open(); }
+        key(event) => {
+            if (event.text == Key.DownArrow && event.modifiers.alt) {
+                root.open();
+                return accept;
+            }
+            if (event.text == Key.DownArrow) {
+                root.choose(min(root.model.length - 1, root.current-index + 1));
+                return accept;
+            }
+            if (event.text == Key.UpArrow) {
+                root.choose(max(0, root.current-index - 1));
+                return accept;
+            }
+            reject
+        }
+    }
+
+    popup := PopupWindow {
+        x: 0;
+        y: root.height + 6px;
+        width: max(root.width, 180px);
+        height: menu.height;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-keys;
+
+        popup-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    popup.close();
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.highlight = min(root.model.length - 1, root.highlight + 1);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.highlight = max(0, root.highlight - 1);
+                    return accept;
+                }
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.choose(root.highlight);
+                    popup.close();
+                    return accept;
+                }
+                reject
+            }
+
+            menu := SelectMenu {
+                width: parent.width;
+                model: root.model;
+                current-index: root.current-index;
+                highlighted-index <=> root.highlight;
+                picked(i) => {
+                    root.choose(i);
+                    popup.close();
+                }
+            }
+        }
+    }
+}

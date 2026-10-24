@@ -1,0 +1,83 @@
+// SectionLabel: the muted sentence-case heading that starts a section ("Assets created in this file").
+// Colour: Theme.text-label (between text-muted and text-secondary, as measured in the reference).
+//
+//   in    text: string              sentence case, never ALL CAPS (13 / 500, text-label)
+//   in    link-text: string         optional trailing link ("All history"), shown with an arrow
+//   in    trailing-text: string     optional trailing meta in text-muted (a count, a date range); ignored with a link
+//   out   link-has-focus: bool
+//   callback link-clicked()         the trailing link was activated (click, Enter or Space)
+// Height hugs the text (about 18 px); pages add their own spacing above (24-32) and below (12-16).
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+import { Icon } from "icon.slint";
+
+export component SectionLabel inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> link-text;
+    in property <string> trailing-text;
+    out property <bool> link-has-focus;
+
+    callback link-clicked();
+
+    spacing: 12px;
+    vertical-stretch: 0;
+
+    Text {
+        horizontal-stretch: 1;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-label;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+    }
+
+    if root.link-text != "": link := Rectangle {
+        horizontal-stretch: 0;
+        accessible-role: button;
+        accessible-label: root.link-text;
+        accessible-action-default => { root.link-clicked(); }
+
+        FocusRing {
+            radius: 6px;
+            shown: link-press.focus-visible;
+        }
+
+        HorizontalLayout {
+            spacing: 4px;
+            Text {
+                text: root.link-text;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-semibold;
+                color: link-press.pressed ? Theme.text-muted : link-press.has-hover ? Theme.text : Theme.text-secondary;
+                vertical-alignment: center;
+                accessible-role: none;
+                animate color { duration: Theme.fast; easing: ease-out; }
+            }
+            Icon {
+                source: @image-url("../icons/arrow-right.svg");
+                size: 14px;
+                color: link-press.pressed ? Theme.text-muted : link-press.has-hover ? Theme.text : Theme.text-secondary;
+            }
+        }
+
+        link-press := Pressable {
+            activated => { root.link-clicked(); }
+        }
+    }
+
+    if root.link-text == "" && root.trailing-text != "": Text {
+        text: root.trailing-text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-muted;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}

@@ -1,0 +1,66 @@
+// Skeleton: loading placeholders. `skeleton`-coloured rounded shapes with a slow (1.4 s) opacity pulse.
+//
+// Skeleton (one bar / block)
+//   in    radius: length            default: a pill for bars under 20 px high, else 10 px
+//   in    animated: bool            pulse (default true)
+//   Size it like any element (width / height, or let a layout stretch it). Preferred: 120 x 12.
+// SkeletonRow (a ListRow-shaped placeholder)
+//   in    size: SkeletonRowSize     large (110x82 art, 106 h) | compact (44x44 art, 60 h)
+//   in    title-width: percent      default 46 % of the text column
+//   in    subtitle-width: percent   default 30 %
+// Accessible label "Loading".
+
+import { Theme } from "theme.slint";
+
+export enum SkeletonRowSize { large, compact }
+
+export component Skeleton {
+    in property <length> radius: root.height < 20px ? root.height / 2 : 10px;
+    in property <bool> animated: true;
+
+    property <float> phase: root.animated
+        ? mod(animation-tick() / 1ms, Theme.pulse / 1ms) / (Theme.pulse / 1ms) : 0;
+
+    preferred-width: 120px;
+    preferred-height: 12px;
+    accessible-role: progress-indicator;
+    accessible-label: "Loading";
+
+    Rectangle {
+        border-radius: root.radius;
+        background: Theme.skeleton;
+        opacity: 0.55 + 0.45 * (0.5 + 0.5 * cos(root.phase * 360deg));
+    }
+}
+
+export component SkeletonRow inherits HorizontalLayout {
+    in property <SkeletonRowSize> size: SkeletonRowSize.large;
+    in property <percent> title-width: 46%;
+    in property <percent> subtitle-width: 30%;
+
+    property <bool> large: root.size == SkeletonRowSize.large;
+
+    padding-top: root.large ? 12px : 8px;
+    padding-bottom: root.large ? 12px : 8px;
+    spacing: root.large ? Theme.space-6 : Theme.space-4;
+    vertical-stretch: 0;
+
+    Skeleton {
+        width: root.large ? 110px : 44px;
+        height: root.large ? 82px : 44px;
+        radius: root.large ? Theme.radius-thumb-large : Theme.radius-thumb;
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: root.large ? 10px : 8px;
+        horizontal-stretch: 1;
+        Rectangle {
+            height: 12px;
+            Skeleton { x: 0; width: parent.width * root.title-width; height: 12px; }
+        }
+        Rectangle {
+            height: 10px;
+            Skeleton { x: 0; width: parent.width * root.subtitle-width; height: 10px; }
+        }
+    }
+}

@@ -1,0 +1,111 @@
+// EmptyState: large art, a title, a line of body text and an optional primary pill. Centred in its area.
+//
+//   in    art: image                 110x82 art (backdrop crop or voice art); empty = placeholder gradient
+//   in    icon: image                optional glyph in a small badge on the art's bottom-right corner (in `text`, on a
+//                                    `chip` disc cut out by a `panel` ring), e.g. history, audio-lines
+//   in    title: string              15 / 600 text
+//   in    body: string               14 / 400 text-secondary, centred, wraps (max width 360)
+//   in    action-text: string        optional primary pill
+//   in    secondary-text: string     optional secondary pill next to it
+//   callback action(), secondary-action()
+// Height hugs the content; put it in a layout area with vertical-stretch and it centres itself.
+
+import { Theme } from "theme.slint";
+import { ArtThumb } from "art-thumb.slint";
+import { Icon } from "icon.slint";
+import { Button, ButtonKind } from "button.slint";
+
+export component EmptyState inherits VerticalLayout {
+    in property <image> art;
+    in property <image> icon;
+    in property <string> title;
+    in property <string> body;
+    in property <string> action-text;
+    in property <string> secondary-text;
+
+    callback action();
+    callback secondary-action();
+
+    alignment: center;
+    spacing: 0px;
+    padding: Theme.space-8;
+
+    HorizontalLayout {
+        alignment: center;
+        ArtThumb {
+            width: 110px;
+            height: 82px;
+            source: root.art;
+            if root.icon.width > 0: Rectangle {
+                // A glyph badge on the art's bottom-right corner, cut out of the art by a panel-coloured
+                // ring (an app icon with a status badge), so the art itself stays clean.
+                x: parent.width - 30px;
+                y: parent.height - 30px;
+                width: 42px;
+                height: 42px;
+                border-radius: 21px;
+                background: Theme.panel;
+                Rectangle {
+                    x: 4px;
+                    y: 4px;
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 17px;
+                    background: Theme.chip;
+                    border-width: Theme.hairline;
+                    border-color: Theme.field-border;
+                    Icon {
+                        width: 100%;
+                        height: 100%;
+                        source: root.icon;
+                        size: 18px;
+                        color: Theme.text;
+                    }
+                }
+            }
+        }
+    }
+    Rectangle { height: root.icon.width > 0 ? Theme.space-6 : Theme.space-5; }
+    Text {
+        text: root.title;
+        font-family: Theme.font-text;
+        font-size: Theme.size-title;
+        font-weight: Theme.weight-semibold;
+        color: Theme.text;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.title;
+    }
+    Rectangle { height: Theme.space-2; }
+    HorizontalLayout {
+        alignment: center;
+        Text {
+            max-width: 360px;
+            text: root.body;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.body;
+        }
+    }
+    if root.action-text != "" || root.secondary-text != "": Rectangle { height: Theme.space-6; }
+    if root.action-text != "" || root.secondary-text != "": HorizontalLayout {
+        alignment: center;
+        spacing: Theme.space-3;
+        if root.secondary-text != "": Button {
+            text: root.secondary-text;
+            kind: ButtonKind.secondary;
+            clicked => { root.secondary-action(); }
+        }
+        if root.action-text != "": Button {
+            text: root.action-text;
+            kind: ButtonKind.primary;
+            clicked => { root.action(); }
+        }
+    }
+}

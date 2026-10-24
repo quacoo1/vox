@@ -1,0 +1,805 @@
+// The main panel's sidebar (DESIGN.md "Screens"; ui-main.md §2.6–§2.7): search field, primary nav, Settings,
+// the compact now-playing row and the credits line. Collapses to icons below 1100 px (`rail`; labels move into
+// tooltips, the footer is not rendered, the rail mini-player variant).
+//
+// Layout (full, 260 w): SearchField "Search history" (Ctrl K) · divider · Home/History/Analytics/Voices · divider ·
+// "Preferences" + Settings · (spacer) · now-playing card · footer (read-selection hint, credits line or the
+// "Add your ElevenLabs key" button). The full layout needs about 640 px of sidebar height with the now-playing card
+// (515 without it). A shorter sidebar tightens in two stages so the now-playing card and the credits line always fit
+// (the sidebar gets the window height minus 93 px):
+//   stage 1 (`compact`, sidebar < 640 px with the card / < 516 px without): tighter paddings, no "Preferences" label;
+//   stage 2 (`no-hint`, sidebar < 564 px with the card / < 442 px without): the "Read selection" hint row is dropped
+//   as well. At the 640-px minimum window (547-px sidebar) only a sidebar showing the card reaches stage 2.
+// Rail (72 w): a ghost search button (opens the search pill in a floating popup flush to the right of the rail;
+// Ctrl K does the same), icon-only nav items with tooltips ("Home" + Ctrl 1), Settings, and the round now-playing
+// button. No footer.
+//
+// Keyboard (ui-main.md §2.6): the nav list is one tab-list region ("Vox sections"); Up/Down move focus with
+// wrap-around, Home/End jump to the first/last item, Enter/Space activate, Tab leaves. Arrows never navigate by
+// themselves. The item's shortcut digit shows on hover / focus (full mode).
+//
+// Data rules for ui::shell (the Slint side shows the strings as given):
+// - The nav entries come from `data.nav` in order; the Settings entry is drawn in the second group.
+//   `NavItemData.icon` is a Lucide name from ui/icons; the expected ones are house, history, chart-column,
+//   audio-lines and settings (mic, sliders-horizontal, library, headphones and layout-grid also map to their own
+//   glyph). An unknown name falls back to the page's default glyph.
+// - `MiniPlayerData.error` already carries the fallback ("Playback stopped." when the player has no message) and
+//   `title` the "Untitled selection" fallback; both are shown as-is.
+// - The one string built here is the rail button's tooltip, "{status}: {title}" (ui-main.md §2.7): it only joins two
+//   fields that are shown separately everywhere else.
+import {
+    Theme, Icons, Icon, Pressable, FocusRing, SearchField, NavItem, SectionLabel, IconButton, IconButtonKind,
+    IconButtonSize, KeyCombo, ProgressLine, ArtThumb, Divider, Spinner, Tip,
+} from "../../design/index.slint";
+import { SidebarData, MiniPlayerData, PageId, PlayerAction, PlayerPhase, Brand, Motion } from "../../models.slint";
+
+// A tiny three-bar level meter: moves only while `active` (and not under Motion.reduce), else rests.
+component LiveBars {
+    in property <bool> active;
+    in property <brush> color: Theme.text-secondary;
+
+    property <bool> moving: root.active && !Motion.reduce;
+    property <float> t: root.moving ? animation-tick() / 1ms : 0;
+
+    width: 12px;
+    height: 12px;
+    accessible-role: none;
+
+    for i in 3: Rectangle {
+        x: 1px + i * 4px;
+        y: (root.height - self.height) / 2;
+        width: 2px;
+        height: root.moving ? 3px + 8px * abs(sin(root.t * 0.42deg + i * 67deg)) : [5px, 9px, 6px][i];
+        border-radius: 1px;
+        background: root.color;
+    }
+}
+
+// The sidebar's compact "Now reading" card (full mode).
+component MiniPlayer inherits Rectangle {
+    in property <MiniPlayerData> now;
+
+    callback action(PlayerAction);
+    callback open();
+
+    property <bool> is-error: root.now.phase == PlayerPhase.error;
+    property <bool> is-loading: root.now.phase == PlayerPhase.loading;
+
+    border-radius: Theme.radius-card;
+    background: Theme.field;
+    border-width: Theme.hairline;
+    border-color: Theme.divider;
+    accessible-role: groupbox;
+    accessible-label: "Now reading";
+
+    VerticalLayout {
+        padding: Theme.space-3;
+        spacing: Theme.space-2;
+
+        HorizontalLayout {
+            spacing: Theme.space-3;
+
+            VerticalLayout {
+                alignment: start;
+                ArtThumb {
+                    width: 40px;
+                    height: 40px;
+                    source: root.now.art;
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+
+                // Status line: activity indicator, status label, time left (fixed box so it never jitters).
+                HorizontalLayout {
+                    height: 16px;
+                    spacing: 6px;
+
+                    if root.is-loading: Spinner {
+                        size: 12px;
+                        color: Theme.text-secondary;
+                        label: root.now.status;
+                    }
+                    if root.is-error: Icon {
+                        source: Icons.circle-alert;
+                        size: 12px;
+                        color: Theme.danger;
+                    }
+                    if !root.is-loading && !root.is-error: VerticalLayout {
+                        alignment: center;
+                        LiveBars {
+                            active: root.now.playing;
+                        }
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: root.now.status;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    if root.now.time != "": Text {
+                        min-width: 40px;
+                        text: root.now.time;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        accessible-label: root.now.time-accessible;
+                    }
+                }
+
+                // Title: a button that opens the player on Home (two lines max). Hover shows a soft fill 4 px wider
+                // than the text on each side (flush vertically, so the ring clears the status line); the focus ring
+                // follows that box.
+                title-box := Rectangle {
+                    min-height: title.min-height;
+                    preferred-height: title.preferred-height;
+                    accessible-role: button;
+                    accessible-label: root.now.title;
+                    accessible-description: "Open the player";
+                    accessible-action-default => { root.open(); }
+                    forward-focus: title-press;
+
+                    Rectangle {
+                        x: -4px;
+                        y: 0px;
+                        width: parent.width + 8px;
+                        height: parent.height;
+                        border-radius: 6px;
+                        background: title-press.pressed ? Theme.pressed : title-press.has-hover ? Theme.chip : transparent;
+                        animate background { duration: Theme.fast; easing: ease-out; }
+
+                        FocusRing {
+                            radius: 6px;
+                            shown: title-press.focus-visible;
+                        }
+                        title-press := Pressable {
+                            activated => { root.open(); }
+                        }
+                        Tip {
+                            text: "Open the player";
+                        }
+                    }
+                    title := Text {
+                        width: 100%;
+                        text: root.now.title;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-label;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                        max-lines: 2;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                }
+            }
+        }
+
+        // Progress (or the error line) with Stop and Play/Pause, all on one centre line.
+        HorizontalLayout {
+            spacing: Theme.space-1;
+
+            if !root.is-error: VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                ProgressLine {
+                    interactive: false;
+                    value: root.now.progress;
+                    buffered: root.now.buffered;
+                    label: "Reading progress";
+                    value-text: root.now.time-accessible;
+                }
+            }
+            if root.is-error: VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                // The message in `text` (the danger glyph sits on the status line); the tooltip has all of it.
+                Rectangle {
+                    min-height: error-text.min-height;
+                    preferred-height: error-text.preferred-height;
+                    error-text := Text {
+                        width: 100%;
+                        text: root.now.error;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                        max-lines: 2;
+                        overflow: elide;
+                    }
+                    Tip {
+                        text: root.now.error;
+                    }
+                }
+            }
+            Rectangle { width: Theme.space-1; }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: Icons.square;
+                    label: "Stop";
+                    size: IconButtonSize.sm;
+                    tooltip: "Stop";
+                    clicked => { root.action(PlayerAction.stop); }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: root.now.playing ? Icons.pause-fill : Icons.play-fill;
+                    label: root.now.playing ? "Pause" : "Play";
+                    tooltip: root.now.playing ? "Pause" : "Play";
+                    kind: IconButtonKind.primary;
+                    size: IconButtonSize.sm;
+                    enabled: root.now.can-toggle;
+                    clicked => { root.action(PlayerAction.toggle); }
+                }
+            }
+        }
+    }
+}
+
+// The rail variant: the voice art as a ring around a small round button, with an attention dot.
+// playing / paused: Pause / Play (toggles); loading: a spinner, "Open player"; error: the alert glyph, "Open player".
+component MiniRail inherits Rectangle {
+    in property <MiniPlayerData> now;
+
+    callback action(PlayerAction);
+    callback open();
+
+    property <bool> is-error: root.now.phase == PlayerPhase.error;
+    property <bool> is-loading: root.now.phase == PlayerPhase.loading;
+    property <bool> transport: !root.is-error && !root.is-loading;
+    // No glyph while loading: the spinner is the whole icon.
+    property <image> no-glyph;
+
+    width: 44px;
+    height: 44px;
+
+    ArtThumb {
+        width: 100%;
+        height: 100%;
+        round: true;
+        source: root.now.art;
+    }
+
+    btn := IconButton {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        size: IconButtonSize.sm;
+        kind: IconButtonKind.primary;
+        icon: root.is-loading ? root.no-glyph
+            : root.is-error ? Icons.circle-alert
+            : root.now.playing ? Icons.pause-fill : Icons.play-fill;
+        label: root.transport ? (root.now.playing ? "Pause" : "Play") : "Open player";
+        enabled: root.transport ? root.now.can-toggle : true;
+        clicked => {
+            if (root.transport) {
+                root.action(PlayerAction.toggle);
+            } else {
+                root.open();
+            }
+        }
+        if root.is-loading: Spinner {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 14px;
+            height: 14px;
+            size: 14px;
+            color: Theme.on-primary;
+            track-color: transparent;
+            arc: 270deg;
+            label: root.now.status;
+        }
+    }
+
+    if root.now.playing || root.is-error: Rectangle {
+        x: parent.width - 10px;
+        y: 0px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.panel;
+        Rectangle {
+            x: 2px;
+            y: 2px;
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.is-error ? Theme.danger : Theme.text;
+        }
+    }
+
+    Tip {
+        // The documented exception to "Rust formats every string": two fields joined (see the header).
+        text: root.now.status + ": " + root.now.title;
+    }
+}
+
+// The credits line: "39% credits left" over a thin meter; a ghost row that opens Settings → Account.
+component CreditsLine inherits Rectangle {
+    in property <string> text;
+    in property <float> fraction;
+    in property <bool> low;
+
+    callback clicked();
+
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    max-height: lay.preferred-height;
+    vertical-stretch: 0;
+    border-radius: Theme.radius-field;
+    background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : transparent;
+    forward-focus: press;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-description: "ElevenLabs credits left";
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.fast; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible;
+    }
+    press := Pressable {
+        activated => { root.clicked(); }
+    }
+
+    lay := VerticalLayout {
+        padding-left: 18px;
+        padding-right: Theme.space-3;
+        padding-top: 9px;
+        padding-bottom: 11px;
+        spacing: 9px;
+
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            Text {
+                horizontal-stretch: 1;
+                text: root.text;
+                font-family: Theme.font-text;
+                font-size: Theme.size-caption;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            Icon {
+                source: Icons.chevron-right;
+                size: 14px;
+                color: press.has-hover ? Theme.text-secondary : Theme.text-muted;
+            }
+        }
+        Rectangle {
+            height: 3px;
+            border-radius: 1.5px;
+            background: Theme.track;
+            Rectangle {
+                x: 0px;
+                width: parent.width * max(0, min(1, root.fraction));
+                border-radius: 1.5px;
+                background: root.low ? Theme.danger : Theme.primary;
+            }
+        }
+    }
+}
+
+// "Add your ElevenLabs key": a full-width hairline pill with an alert glyph. The 16-px glyph is centred 28 px in,
+// on the nav glyph column (NavItem: 18 px padding + half of its 20-px glyph).
+component AddKeyButton inherits Rectangle {
+    callback clicked();
+
+    height: 36px;
+    vertical-stretch: 0;
+    border-radius: self.height / 2;
+    background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+    border-width: Theme.hairline;
+    border-color: press.has-hover ? Theme.field-border-focus : Theme.field-border;
+    forward-focus: press;
+    accessible-role: button;
+    accessible-label: "Add your ElevenLabs key";
+    accessible-action-default => { root.clicked(); }
+    animate background, border-color { duration: Theme.fast; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible;
+    }
+    press := Pressable {
+        activated => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 12px;
+        spacing: Theme.space-2;
+        Icon {
+            source: Icons.circle-alert;
+            size: 16px;
+            color: Theme.danger;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: "Add your ElevenLabs key";
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Icon {
+            source: Icons.chevron-right;
+            size: 14px;
+            color: Theme.text-muted;
+        }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    in property <SidebarData> data;
+    in property <PageId> page;
+    in property <bool> rail;
+    // The search field's text (in-out; cleared by Rust after a submit).
+    in-out property <string> search-text;
+    // Changes → focus the search field (Ctrl+K).
+    in property <int> focus-search-nonce;
+
+    callback navigate(PageId);
+    // "Search history" submitted (Enter) → History with that search, applied at once.
+    callback search(string);
+    // Now-playing row: toggle / stop.
+    callback mini-action(PlayerAction);
+    // Now-playing row title → Home.
+    callback mini-open();
+    // Credits line / "Add your ElevenLabs key" → Settings → Account.
+    callback credits-open();
+
+    // Home has the full player card, so the compact row never shows there (ui-main.md §2.6).
+    property <bool> show-now: root.data.now.visible && root.page != PageId.home;
+    // Short sidebar, stage 1: tighter paddings and no section label (the full layout ≈ 639 px with the card, 513
+    // without it).
+    property <bool> compact: !root.rail && root.height < (root.show-now ? 640px : 516px);
+    // Stage 2: the hint row goes too (the compact layout with the hint ≈ 562 px with the card, 440 without).
+    property <bool> no-hint: !root.rail && root.height < (root.show-now ? 564px : 442px);
+    property <length> side-pad: root.rail ? 14px : Theme.space-4;
+    // The rail search button's 44-px slot is centred in the rail; the popup opens flush to the rail's right edge.
+    property <length> rail-slot-x: (root.width - 44px) / 2;
+    // Keyboard focus inside the nav list.
+    property <int> focused-index: -1;
+    property <int> focus-target: -1;
+    property <int> focus-request: 0;
+    property <int> nav-count: root.data.nav.length;
+
+    function move-focus(target: int) {
+        if (root.nav-count > 0) {
+            root.focus-target = target;
+            root.focus-request += 1;
+        }
+    }
+
+    // The NavItemData.icon name (a Lucide file name) → its own glyph; unknown names fall back to the page's glyph.
+    pure function nav-icon(name: string, page: PageId) -> image {
+        if (name == "house") { return Icons.house; }
+        if (name == "history") { return Icons.history; }
+        if (name == "chart-column") { return Icons.chart-column; }
+        if (name == "audio-lines") { return Icons.audio-lines; }
+        if (name == "mic") { return Icons.mic; }
+        if (name == "settings") { return Icons.settings; }
+        if (name == "sliders-horizontal") { return Icons.sliders-horizontal; }
+        if (name == "library") { return Icons.library; }
+        if (name == "headphones") { return Icons.headphones; }
+        if (name == "layout-grid") { return Icons.layout-grid; }
+        if (page == PageId.history) { return Icons.history; }
+        if (page == PageId.analytics) { return Icons.chart-column; }
+        if (page == PageId.voices) { return Icons.audio-lines; }
+        if (page == PageId.settings) { return Icons.settings; }
+        return Icons.house;
+    }
+
+    background: transparent;
+
+    // Explicit geometry keeps the content's height out of the sidebar's layout info: `compact` / `no-hint` read the
+    // height the window gives the sidebar, never the other way round.
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+
+        VerticalLayout {
+            // ── Search ──
+            if !root.rail: VerticalLayout {
+                padding: root.side-pad;
+                padding-top: root.compact ? Theme.space-3 : Theme.space-4;
+                padding-bottom: root.compact ? Theme.space-3 : Theme.space-4;
+                field := SearchField {
+                    text <=> root.search-text;
+                    placeholder: "Search history";
+                    keys: ["Ctrl", "K"];
+                    accepted(t) => { root.search(t); }
+                    property <int> nonce: root.focus-search-nonce;
+                    changed nonce => { self.focus-input(); }
+                }
+            }
+            if root.rail: HorizontalLayout {
+                padding-top: Theme.space-4;
+                padding-bottom: Theme.space-4;
+                alignment: center;
+                Rectangle {
+                    width: 44px;
+                    height: 44px;
+                    // Ghost, so the current page's nav pill stays the only ring in the rail.
+                    IconButton {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        icon: Icons.search;
+                        label: "Search history";
+                        size: IconButtonSize.md;
+                        clicked => { search-popup.show(); }
+                        property <int> nonce: root.focus-search-nonce;
+                        changed nonce => { search-popup.show(); }
+                        Tip {
+                            text: "Search history";
+                            keys: ["Ctrl", "K"];
+                        }
+                    }
+                    // A floating surface (panel fill, hairline, soft shadow) holding the search pill, flush to the
+                    // rail: its field lines up with the button. 424 px wide, so on History and Voices it covers the
+                    // page's own search pill (≤ 380 px, 40 px into the page) instead of showing two fields side by side.
+                    search-popup := PopupWindow {
+                        x: root.width + Theme.hairline + Theme.space-2 - root.rail-slot-x;
+                        y: -Theme.space-2;
+                        width: 424px;
+                        height: 44px + 2 * Theme.space-2;
+                        close-policy: PopupClosePolicy.close-on-click-outside;
+                        forward-focus: popup-field;
+                        Rectangle {
+                            border-radius: self.height / 2;
+                            background: Theme.panel;
+                            border-width: Theme.hairline;
+                            border-color: Theme.panel-border;
+                            drop-shadow-blur: 24px;
+                            drop-shadow-offset-y: 8px;
+                            drop-shadow-color: Theme.popup-shadow;
+                        }
+                        popup-field := SearchField {
+                            x: Theme.space-2;
+                            y: Theme.space-2;
+                            width: parent.width - 2 * Theme.space-2;
+                            height: 44px;
+                            text <=> root.search-text;
+                            placeholder: "Search history";
+                            accepted(t) => {
+                                // Close first: closing restores the pre-popup focus, and the owner may then move
+                                // focus elsewhere from `search`.
+                                search-popup.close();
+                                root.search(t);
+                            }
+                            init => { self.focus-input(); }
+                        }
+                    }
+                }
+            }
+            Divider { }
+
+            // ── Navigation (one keyboard region) ──
+            FocusScope {
+                vertical-stretch: 0;
+                focus-on-click: false;
+                focus-on-tab-navigation: false;
+                accessible-role: tab-list;
+                accessible-label: Brand.app-name + " sections";
+                key-pressed(event) => {
+                    if (root.focused-index < 0 || root.nav-count == 0) {
+                        return reject;
+                    }
+                    if (event.text == Key.DownArrow) {
+                        root.move-focus(mod(root.focused-index + 1, root.nav-count));
+                        return accept;
+                    }
+                    if (event.text == Key.UpArrow) {
+                        root.move-focus(mod(root.focused-index - 1 + root.nav-count, root.nav-count));
+                        return accept;
+                    }
+                    if (event.text == Key.Home) {
+                        root.move-focus(0);
+                        return accept;
+                    }
+                    if (event.text == Key.End) {
+                        root.move-focus(root.nav-count - 1);
+                        return accept;
+                    }
+                    reject
+                }
+
+                VerticalLayout {
+                    // Primary entries
+                    VerticalLayout {
+                        padding-left: root.side-pad;
+                        padding-right: root.side-pad;
+                        padding-top: root.compact ? Theme.space-3 : Theme.space-5;
+                        padding-bottom: root.compact ? Theme.space-3 : Theme.space-5;
+                        alignment: start;
+
+                        for item[i] in root.data.nav: VerticalLayout {
+                            padding-top: item.page != PageId.settings && i > 0 ? Theme.space-1 : 0px;
+                            if item.page != PageId.settings: HorizontalLayout {
+                                alignment: root.rail ? LayoutAlignment.center : LayoutAlignment.stretch;
+                                Rectangle {
+                                    min-width: 44px;
+                                    max-width: root.rail ? 44px : 10000px;
+                                    horizontal-stretch: root.rail ? 0 : 1;
+                                    height: 44px;
+                                    nav := NavItem {
+                                        icon: root.nav-icon(item.icon, item.page);
+                                        text: item.label;
+                                        selected: item.page == root.page;
+                                        collapsed: root.rail;
+                                        trailing: !root.rail && (self.has-hover || self.has-focus) ? "" + (i + 1) : "";
+                                        accessible-description: "Ctrl+" + (i + 1);
+                                        clicked => { root.navigate(item.page); }
+                                        changed has-focus => {
+                                            if (self.has-focus) {
+                                                root.focused-index = i;
+                                            } else if (root.focused-index == i) {
+                                                root.focused-index = -1;
+                                            }
+                                        }
+                                        property <int> request: root.focus-target == i ? root.focus-request : -1;
+                                        changed request => {
+                                            if (self.request >= 0) {
+                                                self.focus();
+                                            }
+                                        }
+                                    }
+                                    if root.rail: Tip {
+                                        text: item.label;
+                                        keys: ["Ctrl", "" + (i + 1)];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider { }
+
+                    // Secondary entries (Settings)
+                    VerticalLayout {
+                        padding-left: root.side-pad;
+                        padding-right: root.side-pad;
+                        padding-top: root.compact ? Theme.space-3 : (root.rail ? Theme.space-5 : Theme.space-6);
+                        padding-bottom: root.compact ? Theme.space-2 : Theme.space-3;
+                        spacing: 0px;
+
+                        if !root.rail && !root.compact: HorizontalLayout {
+                            padding-left: 18px;
+                            padding-bottom: Theme.space-3;
+                            SectionLabel {
+                                text: "Preferences";
+                            }
+                        }
+                        for item[i] in root.data.nav: VerticalLayout {
+                            if item.page == PageId.settings: HorizontalLayout {
+                                alignment: root.rail ? LayoutAlignment.center : LayoutAlignment.stretch;
+                                Rectangle {
+                                    min-width: 44px;
+                                    max-width: root.rail ? 44px : 10000px;
+                                    horizontal-stretch: root.rail ? 0 : 1;
+                                    height: 44px;
+                                    NavItem {
+                                        icon: root.nav-icon(item.icon, item.page);
+                                        text: item.label;
+                                        selected: item.page == root.page;
+                                        collapsed: root.rail;
+                                        trailing: !root.rail && (self.has-hover || self.has-focus) ? "" + (i + 1) : "";
+                                        accessible-description: "Ctrl+" + (i + 1);
+                                        clicked => { root.navigate(item.page); }
+                                        changed has-focus => {
+                                            if (self.has-focus) {
+                                                root.focused-index = i;
+                                            } else if (root.focused-index == i) {
+                                                root.focused-index = -1;
+                                            }
+                                        }
+                                        property <int> request: root.focus-target == i ? root.focus-request : -1;
+                                        changed request => {
+                                            if (self.request >= 0) {
+                                                self.focus();
+                                            }
+                                        }
+                                    }
+                                    if root.rail: Tip {
+                                        text: item.label;
+                                        keys: ["Ctrl", "" + (i + 1)];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+            }
+
+            // ── Now playing ──
+            if root.show-now && !root.rail: VerticalLayout {
+                padding-left: root.side-pad;
+                padding-right: root.side-pad;
+                padding-bottom: root.compact ? Theme.space-2 : Theme.space-3;
+                MiniPlayer {
+                    vertical-stretch: 0;
+                    now: root.data.now;
+                    action(a) => { root.mini-action(a); }
+                    open => { root.mini-open(); }
+                }
+            }
+            if root.show-now && root.rail: HorizontalLayout {
+                alignment: center;
+                padding-bottom: Theme.space-4;
+                MiniRail {
+                    now: root.data.now;
+                    action(a) => { root.mini-action(a); }
+                    open => { root.mini-open(); }
+                }
+            }
+
+            // ── Footer (full mode only) ──
+            if !root.rail: VerticalLayout {
+                padding-left: root.side-pad;
+                padding-right: root.side-pad;
+                padding-top: Theme.space-1;
+                padding-bottom: root.compact ? Theme.space-3 : Theme.space-4;
+                spacing: Theme.space-2;
+
+                if !root.no-hint && root.data.hint-label != "": HorizontalLayout {
+                    padding-left: 18px;
+                    padding-right: Theme.space-3;
+                    height: 22px;
+                    spacing: Theme.space-2;
+                    accessible-role: text;
+                    accessible-label: root.data.hint-spoken;
+                    Text {
+                        horizontal-stretch: 1;
+                        text: root.data.hint-label;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-caption;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.text-muted;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                    if root.data.hint-keys.length > 0: KeyCombo {
+                        keys: root.data.hint-keys;
+                        small: true;
+                        accessible-role: none;
+                    }
+                }
+                if root.data.credits-visible: CreditsLine {
+                    text: root.data.credits-line;
+                    fraction: root.data.credits-fraction;
+                    low: root.data.credits-low;
+                    clicked => { root.credits-open(); }
+                }
+                if !root.data.credits-visible && root.data.add-key-visible: AddKeyButton {
+                    clicked => { root.credits-open(); }
+                }
+            }
+        }
+    }
+}

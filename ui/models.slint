@@ -1,0 +1,810 @@
+// The UI data contract (docs/ARCHITECTURE.md §7). Rust fills these structs; .slint files only present them.
+// Every string is ready to show (formatted in Rust with vox-core::format); every image is rendered by vox-art at 2x.
+// Rules: no formatting, no business logic and no colours here (colours come from the Theme global).
+// Changing a field is a contract change: update docs/ARCHITECTURE.md §7 and the Rust converters together.
+// Accessibility: Rust also fills the spoken / accessible strings (`*-accessible`, `accessible`, `*-summary`,
+// `*-spoken`); pages bind them to `accessible-label` / `accessible-value` (D-UM-30).
+// Static copy may live in the pages, but never the product name: use `Brand.app-name` / `Brand.read-with-label`
+// (contracts.md §1.1 "UI strings must never hard-code Vox") and curly apostrophes (’) everywhere.
+
+// ───────────────────────────── enums ─────────────────────────────
+
+export enum PageId { home, history, analytics, voices, settings, onboarding }
+
+// Player status as the UI sees it.
+export enum PlayerPhase { idle, loading, playing, paused, ended, error }
+
+// What the main transport button does / shows.
+export enum MainAction { play, pause, play-again, try-again }
+
+// Transport actions sent from any player surface.
+export enum PlayerAction { toggle, play, pause, stop, previous, next, cycle-rate, close }
+
+export enum ToastTone { info, success, error }
+
+export enum BadgeTone { neutral, success, attention }
+
+// ElevenLabs credits state machine (ui-main.md §1.5) plus demo.
+export enum CreditsState { loading, no-key, ready, restricted, error, demo }
+
+// Generic async content state.
+export enum LoadState { loading, ready, error, empty }
+
+// Which card the widget shows (ui-settings-widget.md §6.2).
+export enum WidgetView { toast, error, idle, compact, full }
+
+// What fills the widget body.
+export enum WidgetBody { sentence, title, banner }
+
+export enum ChipKind { context, selection }
+
+export enum PreviewState { none, ready, loading, playing }
+
+export enum HistoryRowKind { header, read }
+
+// History body states (ui-main.md §4.5).
+export enum HistoryState { loading, error, nothing-yet, no-matches, list }
+
+// Voices content states (ui-settings-widget.md §4.4).
+export enum VoicesState { loading, no-key, error, empty, no-match, list }
+
+export enum AccountState { no-key, demo, stored }
+
+// ───────────────────────────── shared ─────────────────────────────
+
+// Product name constants, set once by Rust from vox_core::constants (APP_NAME, READ_WITH_LABEL) on every window.
+export global Brand {
+    in property <string> app-name: "Vox";
+    in property <string> read-with-label: "Read with Vox";
+}
+
+// The OS "reduce motion" preference (vox_win::window::reduce_motion), set by Rust on all three windows at startup and
+// on UiUpdate::Motion. When true, pages and windows use 0 ms (1 ms) for their own animations: the widget's sentence
+// fade, scroll transitions, the card enter animation, toast banners, the chip's enter/exit and Settings smooth scroll.
+export global Motion {
+    in property <bool> reduce: false;
+}
+
+// An option of a select / segmented control.
+export struct ChoiceItem {
+    value: string,
+    label: string,
+    accessible-label: string,
+}
+
+// A label followed by keycaps ("Selection [Ctrl][Alt][R]").
+export struct KeyGroup {
+    label: string,
+    keys: [string],
+}
+
+export struct Fact {
+    label: string,
+    value: string,
+    tooltip: string,
+}
+
+export struct BadgeData {
+    text: string,
+    tone: BadgeTone,
+}
+
+export struct ToastData {
+    id: string,
+    tone: ToastTone,
+    title: string,
+    message: string,
+    // Empty = no action button.
+    action-label: string,
+    // In its 180 ms exit animation (still in the stack; clicks are ignored).
+    leaving: bool,
+    // Unique per push: a same-id replacement gets a new key (the enter animation replays).
+    key: int,
+}
+
+// The single modal slot of the main window. Ids: "history-clear" (History), "remove-key", "retention",
+// "library-clear-history" (Settings).
+export struct DialogData {
+    open: bool,
+    // Identifies the dialog in confirm/cancel callbacks.
+    id: string,
+    title: string,
+    body: string,
+    confirm-label: string,
+    cancel-label: string,
+    danger: bool,
+    busy: bool,
+}
+
+// Built per surface by ui::convert::credits_data (Home / Analytics / Sidebar / Settings Account / Onboarding copy
+// differs; `demo` only on Settings Account).
+export struct CreditsData {
+    state: CreditsState,
+    // Home no-key / restricted / error title ("No API key", "Usage hidden", "Credits unavailable"); empty elsewhere.
+    title: string,
+    // Badge, e.g. "Creator" (empty = none).
+    tier: string,
+    // "39%"
+    percent: string,
+    // "39 percent of credits left"
+    percent-accessible: string,
+    // 0..1 left
+    fraction: float,
+    low: bool,
+    // "38.8K of 100K left"
+    facts: string,
+    // "Resets in 12 days" (empty = unknown)
+    reset: string,
+    // "38,766 of 100,000 characters left. Resets in 12 days" (tooltip / accessible value)
+    detail: string,
+    // Body text for no-key / restricted / error states.
+    message: string,
+    // Button for no-key / restricted / error states ("Add key", "Manage key", "Retry"); empty = none.
+    action-label: string,
+    // A forced refresh is in flight (Analytics "Refresh balance" spins and is disabled while refreshing || loading).
+    refreshing: bool,
+}
+
+// One bar of a chart.
+export struct BarData {
+    // 0..1 of the tallest bar.
+    level: float,
+    // Axis label ("" = unlabelled).
+    label: string,
+    today: bool,
+    zero: bool,
+    tooltip-title: string,
+    tooltip-value: string,
+    tooltip-sub: string,
+    // Spoken value ("Tue, Sep 30: 1h 5m, 3 reads"); also the polite live text while selected by keyboard.
+    accessible: string,
+}
+
+// ───────────────────────────── shell ─────────────────────────────
+
+export struct NavItemData {
+    page: PageId,
+    label: string,
+    // Lucide icon name (ui/icons).
+    icon: string,
+}
+
+// The sidebar's compact "now playing" row (DESIGN.md; mini player of ui-main.md §2.7).
+export struct MiniPlayerData {
+    visible: bool,
+    art: image,
+    // "Now reading", "Paused", "Preparing", "Couldn't read"
+    status: string,
+    title: string,
+    phase: PlayerPhase,
+    // Shows pause (else play).
+    playing: bool,
+    can-toggle: bool,
+    progress: float,
+    buffered: float,
+    // "-3:12" / "~-3:12" (empty when unknown)
+    time: string,
+    // "3:12 left" / "about 3:12 left" (formatClock, ui-main.md §2.7 / §11.1)
+    time-accessible: string,
+    error: string,
+}
+
+export struct SidebarData {
+    nav: [NavItemData],
+    now: MiniPlayerData,
+    credits-visible: bool,
+    // "39% credits left"
+    credits-line: string,
+    credits-fraction: float,
+    credits-low: bool,
+    // "Add your ElevenLabs key" warning button instead of credits.
+    add-key-visible: bool,
+    // "Read selection" + keycaps, or "Right-click → Read with Vox" when no hotkey.
+    hint-label: string,
+    hint-keys: [string],
+    // The hint read aloud ("Read selection: Ctrl plus Alt plus R").
+    hint-spoken: string,
+}
+
+// ───────────────────────────── Home ─────────────────────────────
+
+export struct NowPlayingData {
+    // Idle body (nothing playing / ended without title).
+    idle: bool,
+    art: image,
+    title: string,
+    meta: string,
+    meta-is-error: bool,
+    // "Chrome", "Live", "Paused", "Finished"
+    badges: [string],
+    phase: PlayerPhase,
+    time: string,
+    time-estimate: bool,
+    time-accessible: string,
+    progress: float,
+    buffered: float,
+    seekable: bool,
+    can-stop: bool,
+    can-previous: bool,
+    can-next: bool,
+    main-action: MainAction,
+    main-enabled: bool,
+    // The raw title (tooltip on the truncated one).
+    title-tooltip: string,
+    // Idle body copy.
+    idle-title: string,
+    idle-sub: string,
+    idle-keys: [string],
+    // The idle keycaps read aloud ("Ctrl plus Alt plus R").
+    idle-keys-spoken: string,
+    // "Replay last"
+    replay-last-visible: bool,
+    replay-last-tooltip: string,
+    replay-last-busy: bool,
+}
+
+export struct StatBlockData {
+    loading: bool,
+    label: string,
+    badge: string,
+    // Big Display number ("4h 20m", "39%")
+    value: string,
+    // The big number read aloud ("4 hours 20 minutes listened today").
+    value-accessible: string,
+    caption: string,
+    sub: string,
+    // 0..1 line meter
+    fraction: float,
+    // The meter's accessible value ("39% of the daily goal" / "Goal reached: 20 minutes listened").
+    accessible-value: string,
+    done: bool,
+}
+
+export struct WeekData {
+    loading: bool,
+    // Card label: "Last 7 days" (BRIEF.md: "This week" is a rolling 7 days, labelled as such).
+    title: string,
+    total: string,
+    bars: [BarData],
+    streak: string,
+    best: string,
+    streak-active: bool,
+    // "Listening per day. Monday: 5 minutes, …"
+    accessible-description: string,
+}
+
+export struct RecentRow {
+    id: string,
+    art: image,
+    title: string,
+    // "Outlook · George · 10 h ago"
+    meta: string,
+    duration: string,
+    failed: bool,
+    failed-tooltip: string,
+    cached: bool,
+    favorite: bool,
+    // In the player and playing: the button pauses.
+    live: bool,
+    // In the player and paused: the button resumes (BRIEF.md "A paused read on Recent offers Resume").
+    resumable: bool,
+    busy: bool,
+    accessible-label: string,
+}
+
+export struct WayRow {
+    title: string,
+    body: string,
+    key-groups: [KeyGroup],
+    icon: string,
+    section: string,
+    off: bool,
+}
+
+export struct HomeData {
+    // First load failed → inline error with Retry (BRIEF.md "Home"); later failures keep the last data (ready).
+    state: LoadState,
+    error-title: string,
+    error-body: string,
+    // Retry in flight (the error card's button spins).
+    retrying: bool,
+    greeting: string,
+    date-line: string,
+    now: NowPlayingData,
+    today: StatBlockData,
+    credits: CreditsData,
+    week: WeekData,
+    quick-read-words: string,
+    // The trimmed Quick read text is not empty (Read button and Ctrl+Enter).
+    quick-read-can-read: bool,
+    read-busy: bool,
+    clipboard-busy: bool,
+    recent-loading: bool,
+    recent: [RecentRow],
+    ways: [WayRow],
+    voice-name: string,
+    voice-meta: string,
+    voice-art: image,
+    // "Voice: George. Flash v2.5, speed 1 times. Change voice"
+    voice-accessible: string,
+}
+
+// ───────────────────────────── History ─────────────────────────────
+
+// A flat list row: a day header or a read.
+export struct HistoryRow {
+    kind: HistoryRowKind,
+    id: string,
+    // Header: "Today" / "4 reads · 12m"
+    header-label: string,
+    header-meta: string,
+    // Read: collapsed
+    art: image,
+    source-icon: string,
+    source-label: string,
+    title: string,
+    meta: string,
+    time-tooltip: string,
+    favorite: bool,
+    // "Playing", "Paused", "Failed", "Free replay"
+    badges: [string],
+    progress: float,
+    percent: string,
+    complete: bool,
+    can-replay: bool,
+    replay-label: string,
+    replay-tooltip: string,
+    // Read: expanded details
+    expanded: bool,
+    full-text: string,
+    notes: [string],
+    facts: [Fact],
+    details: [Fact],
+    url-label: string,
+}
+
+export struct HistoryData {
+    state: HistoryState,
+    dimmed: bool,
+    count-label: string,
+    actions-visible: bool,
+    exporting: bool,
+    clearing: bool,
+    can-export: bool,
+    // Filters as applied. The field's text is MainWindow.history-search-text (in-out; Rust writes it only to reset it).
+    search: string,
+    favorites-only: bool,
+    source: string,
+    source-options: [ChoiceItem],
+    // State copy (error / nothing yet / no matches)
+    state-icon: string,
+    state-title: string,
+    state-body: string,
+    state-keys: [string],
+    // Text after the keycaps (". Every read lands here."); body, keycaps and body-after render inline.
+    state-body-after: string,
+    state-button: string,
+    rows: [HistoryRow],
+    footer: string,
+    can-load-more: bool,
+    loading-more: bool,
+    end-of-history: bool,
+    // Bumped when Rust overrides what the user did to a stateful control (Clear filters…): re-assert from data.
+    revision: int,
+}
+
+// ───────────────────────────── Analytics ─────────────────────────────
+
+export struct KpiData {
+    icon: string,
+    label: string,
+    value: string,
+    // The value read aloud.
+    value-accessible: string,
+    // The sparkline's accessible label.
+    spark-label: string,
+    unit: string,
+    sub: string,
+    spark: [float],
+    dots: [bool],
+}
+
+export struct HeatCellData {
+    day: int,
+    hour: int,
+    // 0..1 (sqrt scale)
+    level: float,
+    peak: bool,
+    now: bool,
+    tooltip-title: string,
+    tooltip-value: string,
+    // "Monday 21:00–22:00: 12m"; also the polite live text while selected by keyboard.
+    accessible: string,
+}
+
+export struct ShareRow {
+    key: string,
+    rank: string,
+    icon: string,
+    art: image,
+    label: string,
+    sub: string,
+    value: string,
+    percent: string,
+    fraction: float,
+    first: bool,
+    // The row read aloud.
+    accessible: string,
+}
+
+export struct AnalyticsData {
+    state: LoadState,
+    dimmed: bool,
+    // Retry after a first-load failure in flight (the error card's button spins).
+    retrying: bool,
+    range: string,
+    ranges: [ChoiceItem],
+    range-label: string,
+    refresh-failed: bool,
+    error: string,
+    empty: bool,
+    empty-title: string,
+    empty-body: string,
+    // Hero
+    listened: string,
+    listened-accessible: string,
+    today: string,
+    today-accessible: string,
+    days-active: string,
+    // The meter's spoken value: "24 of 30 days" (D-UM-30, ui-main.md §5.6)
+    days-active-accessible: string,
+    days-active-fraction: float,
+    audio-generated: string,
+    kpis: [KpiData],
+    // Daily listening
+    daily: [BarData],
+    daily-avg: string,
+    daily-avg-accessible: string,
+    daily-peak: string,
+    daily-peak-accessible: string,
+    daily-empty: string,
+    daily-summary: string,
+    // When you listen
+    heat: [HeatCellData],
+    heat-peak: string,
+    heat-day-labels: [string],
+    heat-hour-labels: [string],
+    heat-summary: string,
+    // How you start reads / top lists
+    sources: [ShareRow],
+    sources-empty: string,
+    sources-summary: string,
+    top-apps: [ShareRow],
+    top-apps-summary: string,
+    top-voices: [ShareRow],
+    top-voices-summary: string,
+    credits: CreditsData,
+    billed: string,
+}
+
+// ───────────────────────────── Voices ─────────────────────────────
+
+export struct VoiceRow {
+    id: string,
+    name: string,
+    art: image,
+    // "Male · American · Narration"
+    subtitle: string,
+    description: string,
+    tags: [string],
+    caption: string,
+    in-use: bool,
+    preview: PreviewState,
+}
+
+// The search field's text is MainWindow.voices-search-text (in-out).
+export struct VoicesData {
+    state: VoicesState,
+    in-use: string,
+    count: string,
+    gender: string,
+    accent: string,
+    category: string,
+    gender-options: [ChoiceItem],
+    accent-options: [ChoiceItem],
+    category-options: [ChoiceItem],
+    refreshing: bool,
+    state-title: string,
+    state-body: string,
+    state-button: string,
+    voices: [VoiceRow],
+    // Bumped when Rust overrides the filter selects (Clear filters): re-assert from data.
+    revision: int,
+}
+
+// ───────────────────────────── Settings ─────────────────────────────
+// Text fields keep their own text: the account key field, the excluded-app input and the port field are bound to the
+// in-out MainWindow.settings-key-draft / settings-exclude-draft / settings-port-draft (Rust writes them only to reset).
+
+export struct AccountData {
+    state: AccountState,
+    badge: BadgeData,
+    form-open: bool,
+    replacing: bool,
+    busy: bool,
+    field-label: string,
+    hint: string,
+    error: string,
+    submit-label: string,
+    lead: string,
+    limited-warning: string,
+    remove-busy: bool,
+    credits: CreditsData,
+    // Stored key could not be migrated/read (AppInfo.api_key_notice); empty = none.
+    notice: string,
+}
+
+export struct VoiceModelData {
+    voice-name: string,
+    voice-art: image,
+    voice-tags: [string],
+    tags-loading: bool,
+    model-options: [ChoiceItem],
+    model-index: int,
+    model-description: string,
+    model-badges: [BadgeData],
+    model-error: string,
+    models-loading: bool,
+    language-options: [ChoiceItem],
+    language-index: int,
+    quality-options: [ChoiceItem],
+    quality-index: int,
+    stability: float,
+    stability-text: string,
+    similarity: float,
+    similarity-text: string,
+    style: float,
+    style-text: string,
+    speed: float,
+    speed-text: string,
+    speaker-boost: bool,
+    reset-enabled: bool,
+    test-busy: bool,
+}
+
+export struct PlaybackData {
+    rate-options: [ChoiceItem],
+    rate-index: int,
+    volume: float,
+    volume-text: string,
+    skip-urls: bool,
+    skip-emails: bool,
+    max-chars-options: [ChoiceItem],
+    max-chars-index: int,
+}
+
+export struct HotkeyRowData {
+    // "readSelection" | "readClipboard" | "playPause" | "stop"
+    action: string,
+    label: string,
+    description: string,
+    keys: [string],
+    spoken: string,
+    recording: bool,
+    // Held modifiers while recording.
+    preview: [string],
+    // Flash hint while recording ("Add Ctrl, Alt or Win").
+    hint: string,
+    // Persistent / transient warning under the row.
+    warning: string,
+}
+
+export struct TriggersData {
+    hook-available: bool,
+    // Notice while the hook is unavailable (vox_core::copy::HOOK_UNAVAILABLE_*); empty when available.
+    hook-notice-title: string,
+    hook-notice-body: string,
+    right-click-chip: bool,
+    selection-popup: bool,
+    hotkeys-enabled: bool,
+    hotkeys: [HotkeyRowData],
+    media-keys: bool,
+    restore-clipboard: bool,
+    excluded-apps: [string],
+    exclude-error: string,
+}
+
+export struct WidgetSettingsData {
+    enabled: bool,
+    position-options: [ChoiceItem],
+    position-index: int,
+    position-hint: string,
+    compact: bool,
+    highlight-words: bool,
+    auto-hide: bool,
+}
+
+export struct AppearanceData {
+    theme-options: [ChoiceItem],
+    theme-index: int,
+    // vox_core::copy::APPEARANCE_INTRO (the floating player and the chip always stay dark).
+    intro: string,
+    // One note per theme option, same order (vox_core::copy::THEME_NOTES).
+    theme-notes: [string],
+}
+
+export struct LibraryData {
+    cache-badge: string,
+    save-history: bool,
+    store-text: bool,
+    retention-options: [ChoiceItem],
+    retention-index: int,
+    cache-audio: bool,
+    // MB, slider 50..cache-limit-max step 50
+    cache-limit: float,
+    cache-limit-max: float,
+    cache-limit-text: string,
+    usage-text: string,
+    usage-fraction: float,
+    usage-high: bool,
+    clear-cache-enabled: bool,
+    clear-cache-busy: bool,
+    export-busy: bool,
+    clear-history-busy: bool,
+}
+
+export struct IntegrationsData {
+    bridge-enabled: bool,
+    bridge-badge: BadgeData,
+    port-error: string,
+    port-note: string,
+    explorer-enabled: bool,
+    explorer-installed: bool,
+    launch-at-login: bool,
+    start-minimized: bool,
+    close-to-tray: bool,
+    // The copy chip text that was just copied (shows "Copied" for 1.4 s).
+    copied: string,
+}
+
+export struct AboutData {
+    version: string,
+    runtime: string,
+    // Short build hash ("dev" for local builds).
+    build: string,
+    data-folder: string,
+    data-folder-ready: bool,
+    demo: bool,
+}
+
+export struct SettingsData {
+    loading: bool,
+    saving: bool,
+    // "Saving" / "Saved automatically"
+    status: string,
+    sections: [ChoiceItem],
+    // Bumped on every rebuild that must override what the user did (revert, Reset, retention cancel, a change made
+    // elsewhere): sections re-assert toggles / selects / sliders from data in `changed data` handlers.
+    revision: int,
+    account: AccountData,
+    voice: VoiceModelData,
+    playback: PlaybackData,
+    triggers: TriggersData,
+    widget: WidgetSettingsData,
+    appearance: AppearanceData,
+    library: LibraryData,
+    integrations: IntegrationsData,
+    about: AboutData,
+}
+
+// ───────────────────────────── Onboarding ─────────────────────────────
+
+export struct KeyStepData {
+    has-key: bool,
+    form-visible: bool,
+    replacing: bool,
+    busy: bool,
+    error: string,
+    hint: string,
+    connected-caption: string,
+    warning: string,
+    // Stored key could not be migrated/read (AppInfo.api_key_notice); empty = none.
+    notice: string,
+}
+
+export struct VoiceStepData {
+    state: LoadState,
+    title: string,
+    body: string,
+    items: [VoiceRow],
+}
+
+export struct TryStepData {
+    can-read: bool,
+    caption: string,
+    busy: bool,
+    sample: string,
+    keys: [string],
+}
+
+export struct OnboardingData {
+    // 0 welcome, 1 key, 2 voice, 3 try, 4 done
+    step: int,
+    furthest: int,
+    step-labels: [string],
+    crumb: string,
+    next-label: string,
+    next-secondary: bool,
+    show-back: bool,
+    show-skip: bool,
+    finishing: bool,
+    art: image,
+    key: KeyStepData,
+    voices: VoiceStepData,
+    try-it: TryStepData,
+    tips: [KeyGroup],
+}
+
+// ───────────────────────────── floating windows ─────────────────────────────
+
+export struct WidgetData {
+    view: WidgetView,
+    body: WidgetBody,
+    art: image,
+    // "Chrome"
+    source: string,
+    voice: string,
+    phase: PlayerPhase,
+    // "Reading", "Synthesizing", …
+    status: string,
+    status-loading: bool,
+    rate: string,
+    show-rate: bool,
+    title: string,
+    spoken: string,
+    current: string,
+    upcoming: string,
+    // Bumped when the sentence changes (fade-in).
+    sentence-key: int,
+    // Bumped on a new session, a full↔compact switch, and each appearance of the error / standalone toast card (replays
+    // the card enter animation; status changes do not bump it).
+    card-key: int,
+    time: string,
+    time-estimate: bool,
+    time-accessible: string,
+    progress: float,
+    buffered: float,
+    // The progress bar's accessible value: "1:03 of about 4:23" (vox_core::format::progress_accessible).
+    progress-accessible: string,
+    seekable: bool,
+    previous-enabled: bool,
+    next-enabled: bool,
+    previous-label: string,
+    next-label: string,
+    main-action: MainAction,
+    compact-loading: bool,
+    warning-visible: bool,
+    // "Stops early" / "Stopped early"
+    warning-lead: string,
+    warning-reason: string,
+    warning-link: bool,
+    warning-tooltip: string,
+    // The compact pill's red dot: "Stops early: {message}".
+    warning-dot-tooltip: string,
+    error-title: string,
+    error-detail: string,
+    // "Open settings" / "Try again" / ""
+    error-action: string,
+    toast: ToastData,
+    toast-visible: bool,
+}
+
+export struct ChipData {
+    kind: ChipKind,
+    label: string,
+    art: image,
+    // Exit animation running (presses ignored).
+    hiding: bool,
+    // Bumped on every show (replays the enter animation).
+    show-key: int,
+}

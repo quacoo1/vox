@@ -1,0 +1,191 @@
+// Slider: a 4 px track with a primary fill and a 16 px knob; optional value label on the right.
+//
+//   in-out value: float               the value (updated live while dragging / on keys)
+//   in    minimum: float              default 0
+//   in    maximum: float              default 1
+//   in    step: float                 snapping step (default 0.01; 0 = continuous)
+//   in    enabled: bool
+//   in    show-value: bool            show the value label at the right (default true)
+//   in    value-text: string          label text; empty = the snapped value as a number
+//   in    value-width: length         fixed label box so the track never jitters (default 48 px)
+//   in    label: string               accessible label ("Speed")
+//   in    show-focus: bool            draw the focus ring without focus (previews)
+//   out   dragging: bool, has-focus: bool
+//   callback changed(value: float)    live, only when the snapped value differs
+//   callback committed(value: float)  on release, and on every key press
+// Keys: Right/Up +step, Left/Down -step, PageUp/PageDown +-max(step, range / 10), Home min, End max.
+// Snap: min + round((v - min) / step) * step, clamped to [min, max].
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+
+export component Slider inherits Rectangle {
+    in-out property <float> value: 0;
+    in property <float> minimum: 0;
+    in property <float> maximum: 1;
+    in property <float> step: 0.01;
+    in property <bool> enabled: true;
+    in property <bool> show-value: true;
+    in property <string> value-text;
+    in property <length> value-width: 48px;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> dragging: false;
+    out property <bool> has-focus: press.has-focus;
+
+    callback changed(value: float);
+    callback committed(value: float);
+
+    property <float> range: max(0.000001, root.maximum - root.minimum);
+    property <float> fraction: max(0, min(1, (root.value - root.minimum) / root.range));
+    property <bool> active: press.has-hover || root.dragging || press.focus-visible;
+
+    function snap(v: float) -> float {
+        if (root.step <= 0) {
+            return max(root.minimum, min(root.maximum, v));
+        }
+        return max(root.minimum, min(root.maximum,
+            root.minimum + round((v - root.minimum) / root.step) * root.step));
+    }
+    function set-from-x(px: length) {
+        let f = max(0, min(1, (px - root.knob-room / 2) / max(1px, track-box.width - root.knob-room)));
+        let v = root.snap(root.minimum + f * root.range);
+        if (v != root.value) {
+            root.value = v;
+            root.changed(v);
+        }
+    }
+    function nudge(delta: float) {
+        let v = root.snap(root.value + delta);
+        if (v != root.value) {
+            root.value = v;
+            root.changed(v);
+        }
+        root.committed(root.value);
+    }
+    property <length> knob-room: 16px;
+    property <string> shown-text: root.value-text != "" ? root.value-text
+        : root.step >= 1 ? round(root.value) : round(root.value * 100) / 100;
+
+    min-width: 120px;
+    height: 24px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: slider;
+    accessible-label: root.label;
+    accessible-value: root.shown-text;
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: root.maximum;
+    accessible-value-step: root.step;
+    accessible-enabled: root.enabled;
+    accessible-action-increment => { root.nudge(max(root.step, root.range / 100)); }
+    accessible-action-decrement => { root.nudge(-max(root.step, root.range / 100)); }
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+
+        track-box := Rectangle {
+            horizontal-stretch: 1;
+
+            track := Rectangle {
+                x: root.knob-room / 2;
+                width: parent.width - root.knob-room;
+                height: 4px;
+                y: (parent.height - self.height) / 2;
+                border-radius: self.height / 2;
+                background: Theme.track;
+            }
+            Rectangle {
+                x: track.x;
+                y: track.y;
+                height: track.height;
+                width: track.width * root.fraction;
+                border-radius: self.height / 2;
+                background: Theme.primary;
+            }
+            knob := Rectangle {
+                property <length> d: root.active ? 18px : 16px;
+                width: self.d;
+                height: self.d;
+                x: track.x + track.width * root.fraction - self.width / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: self.width / 2;
+                background: Theme.primary;
+                border-width: Theme.hairline;
+                border-color: Theme.panel;
+                animate width, height { duration: Theme.fast; easing: ease-out; }
+
+                FocusRing {
+                    radius: knob.width / 2;
+                    gap: 2px;
+                    shown: press.focus-visible || root.show-focus;
+                }
+            }
+
+            press := Pressable {
+                enabled: root.enabled;
+                activate-on-enter: false;
+                pointer-event(event) => {
+                    if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                        root.dragging = true;
+                        root.set-from-x(self.mouse-x);
+                    } else if (event.button == PointerEventButton.left && event.kind == PointerEventKind.up) {
+                        if (root.dragging) {
+                            root.dragging = false;
+                            root.committed(root.value);
+                        }
+                    } else if (event.kind == PointerEventKind.cancel) {
+                        root.dragging = false;
+                    }
+                }
+                moved => {
+                    if (root.dragging) {
+                        root.set-from-x(self.mouse-x);
+                    }
+                }
+                key(event) => {
+                    if (event.text == Key.RightArrow || event.text == Key.UpArrow) {
+                        root.nudge(root.step > 0 ? root.step : root.range / 100);
+                        return accept;
+                    }
+                    if (event.text == Key.LeftArrow || event.text == Key.DownArrow) {
+                        root.nudge(-(root.step > 0 ? root.step : root.range / 100));
+                        return accept;
+                    }
+                    if (event.text == Key.PageUp) {
+                        root.nudge(max(root.step, root.range / 10));
+                        return accept;
+                    }
+                    if (event.text == Key.PageDown) {
+                        root.nudge(-max(root.step, root.range / 10));
+                        return accept;
+                    }
+                    if (event.text == Key.Home) {
+                        root.nudge(root.minimum - root.value);
+                        return accept;
+                    }
+                    if (event.text == Key.End) {
+                        root.nudge(root.maximum - root.value);
+                        return accept;
+                    }
+                    reject
+                }
+            }
+        }
+
+        if root.show-value: Text {
+            width: root.value-width;
+            text: root.shown-text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-secondary;
+            horizontal-alignment: left;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+}

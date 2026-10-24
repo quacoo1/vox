@@ -1,0 +1,98 @@
+// Tooltips. Slint 1.18 has a builtin `Tooltip` element (hover delay, pointer-anchored, input-transparent popup);
+// these components give it the Vox look.
+//
+// TooltipBubble: the visual. An inverse pill (near-white on dark, near-black on light), 12 / 600 text.
+//   in    text: string            one short line ("Copy", "Replay"); wraps to 2 lines past `max-text-width`
+//   in    keys: [string]          optional shortcut shown after the text in small inverse keycaps (["Ctrl", "K"])
+//   in    max-text-width: length  default 240 px
+//
+// Tip: attach a tooltip to the element it is placed in. It fills its parent (do not put it in a layout; place it
+// inside a Button, IconButton, Rectangle, ... whose area should trigger it).
+//   in    text: string, keys: [string]   as TooltipBubble
+//   in    enabled: bool                  false = never shows
+//   Example: IconButton { icon: Icons.copy; label: "Copy"; Tip { text: "Copy text"; } }
+// Hover-only by nature: always give the control its own accessible label as well.
+
+import { Theme } from "theme.slint";
+
+export component TooltipBubble {
+    in property <string> text;
+    in property <[string]> keys;
+    in property <length> max-text-width: 240px;
+
+    property <bool> one-line: label.preferred-height < 24px;
+
+    preferred-width: lay.preferred-width;
+    preferred-height: lay.preferred-height;
+    min-width: lay.min-width;
+    min-height: lay.min-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Rectangle {
+        border-radius: root.one-line ? root.height / 2 : 10px;
+        background: Theme.tooltip;
+        drop-shadow-blur: 12px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    lay := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: root.keys.length > 0 ? 5px : 10px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        spacing: 8px;
+
+        label := Text {
+            max-width: root.max-text-width;
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.on-tooltip;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+            accessible-role: none;
+        }
+        if root.keys.length > 0: HorizontalLayout {
+            spacing: 3px;
+            for key in root.keys: Rectangle {
+                height: 18px;
+                min-width: 18px;
+                preferred-width: max(18px, k.preferred-width + 8px);
+                border-radius: k.text.character-count <= 1 ? 9px : 5px;
+                background: Theme.on-tooltip.with-alpha(0.10);
+                k := Text {
+                    text: key;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-keycap-small;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.on-tooltip.with-alpha(0.7);
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}
+
+export component Tip inherits Rectangle {
+    in property <string> text;
+    in property <[string]> keys;
+    in property <bool> enabled: true;
+
+    background: transparent;
+
+    if root.enabled && root.text != "": Tooltip {
+        TooltipBubble {
+            text: root.text;
+            keys: root.keys;
+        }
+    }
+}

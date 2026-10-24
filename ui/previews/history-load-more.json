@@ -1,0 +1,435 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.list"
+  },
+  "dimmed": false,
+  "count-label": "214 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "",
+  "state-title": "",
+  "state-body": "",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "",
+  "rows": [
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Yesterday",
+    "header-label": "Yesterday",
+    "header-meta": "2 reads · 5m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r5",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-daniel.png"
+    },
+    "source-icon": "clipboard",
+    "source-label": "Clipboard",
+    "title": "Release notes 2.4: faster startup, a new compact player, and fixes for the selection popup on high-DPI displays.",
+    "meta": "Clipboard · Daniel · 1:32 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 10:04 PM",
+    "favorite": false,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r6",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-aria.png"
+    },
+    "source-icon": "type",
+    "source-label": "Typed in app",
+    "title": "Remember to call the pharmacy before five, then pick up the parcel at the post office.",
+    "meta": "Typed in app · Aria · 3:47 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 6:30 PM",
+    "favorite": true,
+    "badges": [
+     "Paused"
+    ],
+    "progress": 0.74,
+    "percent": "74%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Wednesday",
+    "header-label": "Wednesday",
+    "header-meta": "2 reads · 3m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r7",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-roger.png"
+    },
+    "source-icon": "folder-open",
+    "source-label": "File Explorer",
+    "title": "Annual report 2026 — Letter to shareholders. This year we doubled our investment in research and opened two new studios.",
+    "meta": "Explorer · Roger · 12:31 · 2 days ago",
+    "time-tooltip": "Wednesday, October 15, 2026 at 9:12 AM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.21,
+    "percent": "21%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r8",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-sarah.png"
+    },
+    "source-icon": "terminal",
+    "source-label": "Command line",
+    "title": "Build finished in 42 seconds with 0 warnings.",
+    "meta": "Command line · Sarah · 0:22 · 2 days ago",
+    "time-tooltip": "Wednesday, October 15, 2026 at 8:01 AM",
+    "favorite": false,
+    "badges": [],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Mon, Oct 13",
+    "header-label": "Mon, Oct 13",
+    "header-meta": "2 reads · 3m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r10",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-callum.png"
+    },
+    "source-icon": "mouse-pointer-click",
+    "source-label": "Right-click chip",
+    "title": "Quick reminder: the design review moved to Thursday at 2 PM. Bring printed copies of the onboarding flow and the new widget states.",
+    "meta": "Slack · Callum · 2:44 · 4:18 PM",
+    "time-tooltip": "Monday, October 13, 2026 at 4:18 PM",
+    "favorite": false,
+    "badges": [],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r11",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-matilda.png"
+    },
+    "source-icon": "keyboard",
+    "source-label": "Hotkey",
+    "title": "Shopping list: oat milk, sourdough, lemons, basil, two tins of tomatoes and a bag of espresso beans.",
+    "meta": "Notepad · Matilda · 1:05 · 11:02 AM",
+    "time-tooltip": "Monday, October 13, 2026 at 11:02 AM",
+    "favorite": true,
+    "badges": [],
+    "progress": 0.56,
+    "percent": "56%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Thu, Oct 9",
+    "header-label": "Thu, Oct 9",
+    "header-meta": "2 reads · 5m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r9",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-laura.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "How to brew pour-over coffee at home: grind size, water temperature and a steady spiral pour.",
+    "meta": "Edge · Laura · 8:14 · 9:05 PM",
+    "time-tooltip": "Thursday, October 9, 2026 at 9:05 PM",
+    "favorite": false,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 0.45,
+    "percent": "45%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r12",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-alice.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "The long road to the summit: notes from a week walking the Haute Route between Chamonix and Zermatt.",
+    "meta": "Chrome · Alice · ~9:40 · 8:30 AM",
+    "time-tooltip": "Thursday, October 9, 2026 at 8:30 AM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.12,
+    "percent": "12%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   }
+  ],
+  "footer": "Showing 50 of 214",
+  "can-load-more": true,
+  "loading-more": false,
+  "end-of-history": false,
+  "revision": 1
+ }
+}

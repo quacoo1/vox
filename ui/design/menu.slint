@@ -1,0 +1,200 @@
+// Menus: the overflow (⋯) menu for rows (Copy / Star / Delete) and other short action lists.
+//
+// MenuEntry (struct): { text: string, icon: image, danger: bool, disabled: bool, separator-before: bool }
+//
+// MenuList: the popup panel on its own (previews, or inside your own PopupWindow).
+//   in    entries: [MenuEntry]
+//   in-out highlighted-index: int     keyboard highlight (hover also highlights)
+//   callback activated(index: int)    an enabled entry was clicked
+// Look: `popup` fill, `popup-border` hairline, radius 14, soft shadow, 36-h rows (radius 10) with a 16 px glyph,
+// danger entries in `danger`, an optional hairline separator above an entry.
+//
+// MenuButton: an IconButton (default ⋯ "More actions") that opens a MenuList below it, right-aligned.
+//   in    entries: [MenuEntry]
+//   in    icon: image, label: string, size: IconButtonSize, kind: IconButtonKind   (as IconButton)
+//   in    enabled: bool
+//   in    menu-width: length           default 200 px
+//   out   is-open: bool
+//   callback activated(index: int)     an entry was chosen (click, or Enter / Space on the highlight)
+//   function open(), close()
+// Keys while open: Up / Down move, Enter / Space choose, Esc closes. A click outside closes.
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+import { IconButton, IconButtonKind, IconButtonSize } from "icon-button.slint";
+
+export struct MenuEntry {
+    text: string,
+    icon: image,
+    danger: bool,
+    disabled: bool,
+    separator-before: bool,
+}
+
+export component MenuList {
+    in property <[MenuEntry]> entries;
+    in-out property <int> highlighted-index: -1;
+
+    callback activated(index: int);
+
+    property <length> row-h: 36px;
+    property <length> pad: 6px;
+
+    min-width: 160px;
+    preferred-width: 200px;
+    height: col.preferred-height;
+    accessible-role: list;
+
+    Rectangle {
+        border-radius: Theme.radius-popup;
+        background: Theme.popup;
+        border-width: Theme.hairline;
+        border-color: Theme.popup-border;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    col := VerticalLayout {
+        padding: root.pad;
+        spacing: 0px;
+
+        for e[i] in root.entries: VerticalLayout {
+            if e.separator-before && i > 0: Rectangle {
+                height: 9px;
+                Rectangle {
+                    x: 6px;
+                    y: 4px;
+                    width: parent.width - 12px;
+                    height: Theme.hairline;
+                    background: Theme.divider;
+                }
+            }
+            Rectangle {
+                height: root.row-h;
+                border-radius: 10px;
+                background: e.disabled ? transparent : row-touch.pressed ? Theme.pressed : (row-touch.has-hover || i == root.highlighted-index) ? Theme.hover : transparent;
+                opacity: e.disabled ? 0.4 : 1;
+                accessible-role: list-item;
+                accessible-label: e.text;
+                accessible-enabled: !e.disabled;
+                accessible-item-index: i;
+                accessible-item-count: root.entries.length;
+                accessible-action-default => {
+                    if (!e.disabled) {
+                        root.activated(i);
+                    }
+                }
+                animate background { duration: Theme.fast; easing: ease-out; }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 12px;
+                    spacing: 10px;
+                    if e.icon.width > 0: Icon {
+                        source: e.icon;
+                        size: 16px;
+                        color: e.danger ? Theme.danger : Theme.text-secondary;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: e.text;
+                        font-family: Theme.font-text;
+                        font-size: Theme.size-body;
+                        font-weight: Theme.weight-medium;
+                        color: e.danger ? Theme.danger : Theme.text;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                }
+
+                row-touch := TouchArea {
+                    enabled: !e.disabled;
+                    mouse-cursor: pointer;
+                    clicked => { root.activated(i); }
+                }
+            }
+        }
+    }
+}
+
+export component MenuButton inherits IconButton {
+    in property <[MenuEntry]> entries;
+    in property <length> menu-width: 200px;
+    out property <bool> is-open: popup.is-open;
+
+    callback activated(index: int);
+
+    public function open() {
+        if (root.enabled && root.entries.length > 0) {
+            root.highlight = -1;
+            popup.show();
+        }
+    }
+    public function close() {
+        popup.close();
+    }
+
+    property <int> highlight: -1;
+
+    function step(delta: int) {
+        // Move by one, skipping up to two disabled entries.
+        let n = root.entries.length;
+        let a = mod(max(-1, root.highlight) + delta + n, n);
+        let b = root.entries[a].disabled ? mod(a + delta + n, n) : a;
+        root.highlight = root.entries[b].disabled ? mod(b + delta + n, n) : b;
+    }
+
+    icon: @image-url("../icons/more-horizontal.svg");
+    label: "More actions";
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-expand => { root.open(); }
+
+    clicked => { root.open(); }
+
+    popup := PopupWindow {
+        x: root.width - root.menu-width;
+        y: root.height + 6px;
+        width: root.menu-width;
+        height: list.height;
+        close-policy: close-on-click-outside;
+        forward-focus: keys;
+
+        keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    popup.close();
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.step(1);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.step(-1);
+                    return accept;
+                }
+                if ((event.text == Key.Return || event.text == Key.Space) && root.highlight >= 0) {
+                    if (!root.entries[root.highlight].disabled) {
+                        root.activated(root.highlight);
+                        popup.close();
+                    }
+                    return accept;
+                }
+                reject
+            }
+
+            list := MenuList {
+                width: parent.width;
+                entries: root.entries;
+                highlighted-index <=> root.highlight;
+                activated(i) => {
+                    root.activated(i);
+                    popup.close();
+                }
+            }
+        }
+    }
+}

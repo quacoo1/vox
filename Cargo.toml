@@ -1,0 +1,111 @@
+[workspace]
+resolver = "2"
+members = [
+    "tools/vox-shot",
+    "crates/vox-art",
+    "crates/vox-core",
+    "crates/vox-text",
+    "crates/vox-store",
+    "crates/vox-tts",
+    "crates/vox-audio",
+    "crates/vox-win",
+    "crates/vox-bridge",
+    "crates/vox-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+publish = false
+license = "Proprietary"
+
+# Every dependency shared by more than one crate (or likely to be) is pinned here once.
+# Crates refer to them with `name.workspace = true` and may add features locally.
+# See docs/ARCHITECTURE.md §1 for which crate uses what.
+[workspace.dependencies]
+# Workspace crates
+vox-core = { path = "crates/vox-core" }
+vox-text = { path = "crates/vox-text" }
+vox-store = { path = "crates/vox-store" }
+vox-tts = { path = "crates/vox-tts" }
+vox-audio = { path = "crates/vox-audio" }
+vox-win = { path = "crates/vox-win" }
+vox-bridge = { path = "crates/vox-bridge" }
+vox-art = { path = "crates/vox-art" }
+
+# Data and errors
+serde = { version = "1.0.229", features = ["derive"] }
+# preserve_order: settings.json is compared textually with what we would write (persistence.md §3.4);
+# a sorted map would make every file look "different".
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+
+# Time (the one time crate for the whole workspace; local time zone via the OS)
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+
+# Concurrency
+crossbeam-channel = "0.5.17"
+parking_lot = "0.12.5"
+
+# Ids, text, encodings
+uuid = { version = "1.28.0", features = ["v4"] }
+regex = "1.13.1"
+fancy-regex = "0.19.2"
+url = "2.5.8"
+encoding_rs = "0.8.42"
+icu_segmenter = "2.3.0"
+icu_collator = "2.3.1"
+unicode-segmentation = "1.13.3"
+base64 = "0.22.1"
+sha2 = "0.10.9"
+hex = "0.4.3"
+aes-gcm = "0.10.3"
+
+# Logging
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std", "registry"] }
+
+# Network
+ureq = { version = "3.4.2", default-features = false, features = ["rustls", "gzip"] }
+# Only the vox-tts engine tests' mock server uses tiny_http; the bridge has its own accept loop (ARCHITECTURE.md §8
+# D-INT-16) and parses request heads with httparse.
+tiny_http = "0.12.0"
+httparse = "1.10.1"
+socket2 = "0.6.5"
+
+# Audio
+symphonia = { version = "0.6.1", default-features = false, features = ["mp3", "wav", "pcm"] }
+cpal = "0.18.2"
+rubato = "5.0.1"
+rtrb = "0.4.0"
+
+# Windows
+windows = "0.62.2"
+winreg = "0.56.0"
+# The tray icon is vox_win::notify_icon (NOTIFYICON_VERSION_4, D-SH-18); its menu is muda (the version tray-icon 0.26
+# used), shown with `ContextMenu::show_context_menu_for_hwnd`.
+muda = { version = "0.21.2", default-features = false }
+
+# Art
+tiny-skia = "0.12.0"
+
+# UI
+slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-skia", "compat-1-2", "accessibility", "unstable-winit-030", "image-default-formats"] }
+slint-build = "=1.18.1"
+
+# Tests
+tempfile = "3.27.0"
+
+# Disk on the dev machine is tight: keep only line tables for our crates and no debug info for dependencies.
+[profile.dev]
+debug = "line-tables-only"
+
+# vox-app's Slint-generated code makes its incremental cache several GB per build variant; the disk can't hold it.
+[profile.dev.package.vox-app]
+incremental = false
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false

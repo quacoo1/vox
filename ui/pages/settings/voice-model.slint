@@ -1,0 +1,265 @@
+// Settings → Voice & model (ui-settings-widget.md §2.3). Header actions "Browse voices" and "Test voice"; the current
+// voice with its art and tags (the tags get the whole text width); Model / Language / Audio quality selects; the five
+// voice settings with Reset.
+// Stateful controls (selects, sliders, the toggle) are re-asserted from `data` in `changed data` and by the page on
+// `revision` (`reassert()`, ARCHITECTURE.md §7.1); a slider being dragged is left alone. Slider labels:
+// `format-number(key, value)` (falls back to the `*-text` from data when the callback is not bound, e.g. in previews).
+import { Theme, Icons, Button, ButtonKind, ButtonSize, Badge, Skeleton, ArtThumb } from "../../design/index.slint";
+import { VoiceModelData } from "../../models.slint";
+import { SectionHead, SubHead, Row, ToggleRow, ChoiceSelect, SettingSlider } from "parts.slint";
+
+export component VoiceModelSection inherits Rectangle {
+    in property <VoiceModelData> data;
+
+    // Selects: key = "modelId" | "languageCode" | "outputFormat", value = option value.
+    callback set-choice(string, string);
+    // Sliders commit on release: key = "voice.stability" | "voice.similarityBoost" | "voice.style" | "voice.speed".
+    // Rust quantizes (step 0.01). The label beside a slider is `format-number(key, slider.value)` (live while dragging).
+    callback set-number(string, float);
+    pure callback format-number(string, float) -> string;
+    // Toggle: key = "voice.useSpeakerBoost".
+    callback set-bool(string, bool);
+    callback test-voice();
+    callback browse-voices();
+    callback reset-voice-settings();
+
+    property <length> control-width: 224px;
+    // Track + 12-px gap + 48-px right-aligned value box.
+    property <length> slider-width: 248px;
+
+    pure function label(key: string, value: float, fallback: string) -> string {
+        let live = root.format-number(key, value);
+        live != "" ? live : fallback
+    }
+
+    public function reassert() {
+        model-select.current-index = root.data.model-index;
+        language-select.current-index = root.data.language-index;
+        quality-select.current-index = root.data.quality-index;
+        if (!stability.dragging) { stability.value = root.data.stability; }
+        if (!similarity.dragging) { similarity.value = root.data.similarity; }
+        if (!style.dragging) { style.value = root.data.style; }
+        if (!speed.dragging) { speed.value = root.data.speed; }
+        boost.checked = root.data.speaker-boost;
+    }
+    changed data => { root.reassert(); }
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Voice & model";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Voice & model";
+            Button {
+                text: "Browse voices";
+                size: ButtonSize.sm;
+                trailing-icon: Icons.arrow-right;
+                clicked => { root.browse-voices(); }
+            }
+            Button {
+                text: "Test voice";
+                kind: ButtonKind.primary;
+                size: ButtonSize.sm;
+                icon: Icons.play;
+                loading: root.data.test-busy;
+                clicked => { root.test-voice(); }
+            }
+        }
+
+        // ── Current voice ──
+        HorizontalLayout {
+            padding-top: Theme.space-5;
+            padding-bottom: Theme.space-5;
+            spacing: Theme.space-5;
+
+            VerticalLayout {
+                alignment: center;
+                ArtThumb {
+                    width: 110px;
+                    height: 82px;
+                    source: root.data.voice-art;
+                    label: root.data.voice-name;
+                }
+            }
+            VerticalLayout {
+                min-width: 0px;
+                preferred-width: 0px;
+                max-width: 100000px;
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: Theme.space-1;
+
+                Text {
+                    text: "Current voice";
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-caption;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.text-muted;
+                }
+                Text {
+                    text: root.data.voice-name;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-title;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                Rectangle { height: 4px; }
+                if root.data.tags-loading: HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    Skeleton { width: 48px; height: 22px; }
+                    Skeleton { width: 64px; height: 22px; }
+                    Skeleton { width: 56px; height: 22px; }
+                }
+                if !root.data.tags-loading && root.data.voice-tags.length > 0: FlexboxLayout {
+                    spacing: 6px;
+                    for tag in root.data.voice-tags: Badge { text: tag; }
+                }
+            }
+        }
+
+        // ── Model, language, quality ──
+        Row {
+            title: "Model";
+            description: root.data.model-description;
+            badges: root.data.model-badges;
+            warning: root.data.model-error;
+
+            Rectangle {
+                width: root.control-width;
+                height: 40px;
+                // While models load and none is known, a placeholder replaces the select.
+                model-select := ChoiceSelect {
+                    width: parent.width;
+                    visible: !root.data.models-loading;
+                    model: root.data.model-options;
+                    current-index: root.data.model-index;
+                    label: "Model";
+                    selected(i, v) => { root.set-choice("modelId", v); }
+                }
+                if root.data.models-loading: Skeleton {
+                    width: parent.width;
+                    height: parent.height;
+                    radius: parent.height / 2;
+                }
+            }
+        }
+        Row {
+            title: "Language";
+            description: "Auto-detect works for most text. Pin a language for short or mixed snippets.";
+
+            language-select := ChoiceSelect {
+                width: root.control-width;
+                model: root.data.language-options;
+                current-index: root.data.language-index;
+                label: "Language";
+                selected(i, v) => { root.set-choice("languageCode", v); }
+            }
+        }
+        Row {
+            title: "Audio quality";
+            description: "Lower bitrates download faster and take less cache space.";
+
+            quality-select := ChoiceSelect {
+                width: root.control-width;
+                model: root.data.quality-options;
+                current-index: root.data.quality-index;
+                label: "Audio quality";
+                selected(i, v) => { root.set-choice("outputFormat", v); }
+            }
+        }
+
+        // ── Voice settings ──
+        SubHead {
+            text: "Voice settings";
+            Button {
+                text: "Reset";
+                kind: ButtonKind.ghost;
+                size: ButtonSize.sm;
+                icon: Icons.rotate-ccw;
+                enabled: root.data.reset-enabled;
+                accessible-text: "Reset voice settings";
+                clicked => { root.reset-voice-settings(); }
+            }
+        }
+        Row {
+            divider: false;
+            title: "Stability";
+            description: "Higher is steadier and more even; lower is more expressive.";
+
+            stability := SettingSlider {
+                width: root.slider-width;
+                value: root.data.stability;
+                minimum: 0;
+                maximum: 1;
+                step: 0.01;
+                label: "Stability";
+                value-text: root.label("voice.stability", self.value, root.data.stability-text);
+                committed(v) => {
+                    if (v != root.data.stability) { root.set-number("voice.stability", v); }
+                }
+            }
+        }
+        Row {
+            title: "Similarity";
+            description: "How closely the output sticks to the original voice.";
+
+            similarity := SettingSlider {
+                width: root.slider-width;
+                value: root.data.similarity;
+                minimum: 0;
+                maximum: 1;
+                step: 0.01;
+                label: "Similarity";
+                value-text: root.label("voice.similarityBoost", self.value, root.data.similarity-text);
+                committed(v) => {
+                    if (v != root.data.similarity) { root.set-number("voice.similarityBoost", v); }
+                }
+            }
+        }
+        Row {
+            title: "Style";
+            description: "Exaggerates the speaker’s style. Adds latency above 0.";
+
+            style := SettingSlider {
+                width: root.slider-width;
+                value: root.data.style;
+                minimum: 0;
+                maximum: 1;
+                step: 0.01;
+                label: "Style";
+                value-text: root.label("voice.style", self.value, root.data.style-text);
+                committed(v) => {
+                    if (v != root.data.style) { root.set-number("voice.style", v); }
+                }
+            }
+        }
+        Row {
+            title: "Speaking speed";
+            description: "Generated by ElevenLabs, so pitch stays natural.";
+
+            speed := SettingSlider {
+                width: root.slider-width;
+                value: root.data.speed;
+                minimum: 0.7;
+                maximum: 1.2;
+                step: 0.01;
+                label: "Speaking speed";
+                value-text: root.label("voice.speed", self.value, root.data.speed-text);
+                committed(v) => {
+                    if (v != root.data.speed) { root.set-number("voice.speed", v); }
+                }
+            }
+        }
+        boost := ToggleRow {
+            title: "Speaker boost";
+            description: "Sharper likeness to the voice, slightly slower to generate.";
+            checked: root.data.speaker-boost;
+            toggled(c) => { root.set-bool("voice.useSpeakerBoost", c); }
+        }
+    }
+}

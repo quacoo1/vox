@@ -1,0 +1,73 @@
+// Toggle: a 40x24 switch.
+//
+//   in-out checked: bool             the value (the Toggle flips it itself on activation)
+//   in    enabled: bool              false = 40 % opacity, no interaction
+//   in    label: string              accessible label (the setting's title), required for screen readers
+//   in    show-focus: bool           draw the focus ring without focus (previews)
+//   out   has-focus: bool
+//   callback toggled(checked: bool)  after a click, Enter or Space flipped `checked`
+// Off: `track` with a muted knob. On: `primary` track with an `on-primary` knob. The knob slides in 180 ms.
+// A settings row can call `toggle.flip()` when its label area is clicked.
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+
+export component Toggle inherits Rectangle {
+    in-out property <bool> checked: false;
+    in property <bool> enabled: true;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: press.has-focus;
+
+    callback toggled(checked: bool);
+
+    public function flip() {
+        if (root.enabled) {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+
+    width: 40px;
+    height: 24px;
+    border-radius: self.height / 2;
+    background: root.checked ? (press.has-hover ? Theme.primary-hover : Theme.primary)
+        : (press.has-hover ? Theme.pressed : Theme.track);
+    border-width: root.checked ? 0px : Theme.hairline;
+    border-color: Theme.field-border;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: press;
+
+    accessible-role: switch;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { root.flip(); }
+
+    animate background { duration: Theme.medium; easing: ease-out; }
+
+    FocusRing {
+        radius: root.border-radius;
+        shown: press.focus-visible || root.show-focus;
+    }
+
+    knob := Rectangle {
+        property <length> d: press.pressed ? 20px : 18px;
+        width: self.d;
+        height: 18px;
+        y: (root.height - self.height) / 2;
+        x: root.checked ? root.width - self.width - 3px : 3px;
+        border-radius: self.height / 2;
+        background: root.checked ? Theme.on-primary : Theme.knob-off;
+        border-width: root.checked ? 0px : Theme.hairline;
+        border-color: Theme.knob-off-border;
+        animate x, width { duration: Theme.medium; easing: ease-out; }
+        animate background { duration: Theme.medium; easing: ease-out; }
+    }
+
+    press := Pressable {
+        enabled: root.enabled;
+        activated => { root.flip(); }
+    }
+}

@@ -1,0 +1,64 @@
+{
+  "data": {
+    "view": {
+      "$enum": "WidgetView.compact"
+    },
+    "body": {
+      "$enum": "WidgetBody.title"
+    },
+    "art": {
+      "$image": "art/small-george.png"
+    },
+    "source": "Chrome",
+    "voice": "George",
+    "phase": {
+      "$enum": "PlayerPhase.ended"
+    },
+    "status": "Stopped early",
+    "status-loading": false,
+    "rate": "1×",
+    "show-rate": true,
+    "title": "Quarterly planning notes: the team agreed to move the launch to the second week of November",
+    "spoken": "The quiet revolution in personal",
+    "current": "computing",
+    "upcoming": "was never about faster chips.",
+    "sentence-key": 0,
+    "card-key": 0,
+    "time": "0:23",
+    "time-estimate": false,
+    "time-accessible": "0:23",
+    "progress": 1.0,
+    "buffered": 1.0,
+    "progress-accessible": "0:23 of 0:23",
+    "seekable": true,
+    "previous-enabled": true,
+    "next-enabled": false,
+    "previous-label": "Previous sentence",
+    "next-label": "Next sentence",
+    "main-action": {
+      "$enum": "MainAction.play-again"
+    },
+    "compact-loading": false,
+    "warning-visible": true,
+    "warning-lead": "Stopped early",
+    "warning-reason": "out of credits",
+    "warning-link": true,
+    "warning-tooltip": "Your ElevenLabs quota is used up.\nOpen settings",
+    "warning-dot-tooltip": "",
+    "error-title": "",
+    "error-detail": "",
+    "error-action": "",
+    "toast": {
+      "id": "",
+      "tone": {
+        "$enum": "ToastTone.info"
+      },
+      "title": "",
+      "message": "",
+      "action-label": "",
+      "leaving": false,
+      "key": 0
+    },
+    "toast-visible": false
+  }
+}

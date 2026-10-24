@@ -1,0 +1,204 @@
+// Settings → Library & privacy (ui-settings-widget.md §2.8). Header badge = cache size; history toggles and the
+// retention select; the Audio cache group (toggle, size-limit slider, usage meter + Clear cache); Your data (Export…,
+// Clear history). Each action has its own busy flag (D-USW-16).
+//
+// Re-assertion (ARCHITECTURE.md §7.1): toggles and the slider follow `changed data` and the page's `revision`
+// (`reassert()`). The retention select is the exception: Rust runs the retention guard (450 ms settle, then the
+// `retention` dialog), and while it runs the select keeps showing the user's pending choice although the stored value
+// is unchanged. Cache re-measures push a new LibraryData every few seconds while listening, so a `changed data`
+// re-assert would snap that pending choice back. The select is therefore re-asserted only when the stored
+// `retention-index` itself changes (a save, a change made elsewhere) or on `revision` (the guard's Cancel, a failed
+// count, any override). If Rust mirrors the pending choice into `retention-index`, this still holds.
+import { Theme, Icons, Button, ButtonKind, ButtonSize, Badge, Divider } from "../../design/index.slint";
+import { LibraryData } from "../../models.slint";
+import { SectionHead, SubHead, Row, ToggleRow, WrapText, Meter, ChoiceSelect, SettingSlider } from "parts.slint";
+
+export component LibrarySection inherits Rectangle {
+    in property <LibraryData> data;
+
+    // key = "library.saveHistory" | "library.storeText" | "library.cacheAudio".
+    callback set-bool(string, bool);
+    // key = "library.retentionDays" (Rust runs the retention guard: 450 ms settle + confirmation dialog).
+    callback set-choice(string, string);
+    // key = "library.cacheLimitMB" (slider commit, MB; Rust quantizes to 50). Label: `format-number(key, value)`.
+    callback set-number(string, float);
+    pure callback format-number(string, float) -> string;
+    callback clear-cache();
+    callback export-history();
+    // Opens the `library-clear-history` dialog ("Clear history?").
+    callback clear-history();
+
+    pure function label(key: string, value: float, fallback: string) -> string {
+        let live = root.format-number(key, value);
+        live != "" ? live : fallback
+    }
+
+    function reassert-data() {
+        save.checked = root.data.save-history;
+        store.checked = root.data.store-text;
+        cache.checked = root.data.cache-audio;
+        if (!limit.dragging) { limit.value = min(root.data.cache-limit, root.data.cache-limit-max); }
+    }
+    // Called by the page when `SettingsData.revision` changes: everything, the retention select included.
+    public function reassert() {
+        root.reassert-data();
+        retention.current-index = root.data.retention-index;
+    }
+    changed data => { root.reassert-data(); }
+    // The stored retention changed (not just any LibraryData push): show it.
+    property <int> stored-retention: root.data.retention-index;
+    changed stored-retention => { retention.current-index = root.data.retention-index; }
+
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "Library & privacy";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "Library & privacy";
+            intro: "Everything stays on this PC. Text is only sent to ElevenLabs to be spoken.";
+            if root.data.cache-badge != "": Badge { text: root.data.cache-badge; }
+        }
+        Rectangle { height: Theme.space-2; }
+
+        save := ToggleRow {
+            divider: false;
+            title: "Save history";
+            description: "Keep a list of what you’ve listened to, for replays and analytics.";
+            checked: root.data.save-history;
+            toggled(c) => { root.set-bool("library.saveHistory", c); }
+        }
+        store := ToggleRow {
+            title: "Store full text";
+            description: "Off keeps only the first 160 characters of each read.";
+            enabled: root.data.save-history;
+            checked: root.data.store-text;
+            toggled(c) => { root.set-bool("library.storeText", c); }
+        }
+        Row {
+            title: "Keep history for";
+            description: "Older reads are deleted automatically. Favorites are always kept.";
+            dim: !root.data.save-history;
+
+            retention := ChoiceSelect {
+                width: 224px;
+                enabled: root.data.save-history;
+                model: root.data.retention-options;
+                current-index: root.data.retention-index;
+                label: "Keep history for";
+                selected(i, v) => { root.set-choice("library.retentionDays", v); }
+            }
+        }
+
+        // ── Audio cache ──
+        SubHead { text: "Audio cache"; }
+        cache := ToggleRow {
+            divider: false;
+            title: "Cache audio";
+            description: "Replays from history play instantly and cost no credits.";
+            checked: root.data.cache-audio;
+            toggled(c) => { root.set-bool("library.cacheAudio", c); }
+        }
+        Row {
+            title: "Cache size limit";
+            description: "Oldest audio is removed first when the cache is full.";
+
+            limit := SettingSlider {
+                width: 248px;
+                value-width: 52px;
+                value: min(root.data.cache-limit, root.data.cache-limit-max);
+                minimum: 50;
+                maximum: root.data.cache-limit-max;
+                step: 50;
+                label: "Cache size limit";
+                value-text: root.label("library.cacheLimitMB", self.value, root.data.cache-limit-text);
+                committed(v) => {
+                    if (v != min(root.data.cache-limit, root.data.cache-limit-max)) {
+                        root.set-number("library.cacheLimitMB", v);
+                    }
+                }
+            }
+        }
+        // In use: usage line + meter, and Clear cache.
+        Divider { }
+        HorizontalLayout {
+            padding-top: Theme.space-4;
+            padding-bottom: Theme.space-4;
+            spacing: Theme.space-6;
+
+            VerticalLayout {
+                min-width: 0px;
+                preferred-width: 0px;
+                max-width: 100000px;
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: Theme.space-1;
+
+                Text {
+                    text: "In use";
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                WrapText { text: root.data.usage-text; }
+                Rectangle { height: Theme.space-2; }
+                HorizontalLayout {
+                    Meter {
+                        max-width: 320px;
+                        value: root.data.usage-fraction;
+                        alert: root.data.usage-high;
+                        label: "Audio cache used";
+                        // Rust-made (D-UM-30): "187 MB of 500 MB · 214 reads cached", "Measuring…".
+                        value-text: root.data.usage-text;
+                    }
+                    Rectangle { horizontal-stretch: 0.0001; }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Button {
+                    text: "Clear cache";
+                    size: ButtonSize.sm;
+                    icon: Icons.trash-2;
+                    enabled: root.data.clear-cache-enabled;
+                    loading: root.data.clear-cache-busy;
+                    clicked => { root.clear-cache(); }
+                }
+            }
+        }
+
+        // ── Your data ──
+        SubHead { text: "Your data"; }
+        Row {
+            divider: false;
+            title: "Export history";
+            description: "Save every read, with text and stats, as a JSON file.";
+
+            Button {
+                text: "Export…";
+                size: ButtonSize.sm;
+                icon: Icons.download;
+                loading: root.data.export-busy;
+                accessible-text: "Export history";
+                clicked => { root.export-history(); }
+            }
+        }
+        Row {
+            title: "Clear history";
+            description: "Deletes every read and the analytics built from them.";
+
+            Button {
+                text: "Clear history";
+                kind: ButtonKind.danger;
+                size: ButtonSize.sm;
+                icon: Icons.trash-2;
+                loading: root.data.clear-history-busy;
+                clicked => { root.clear-history(); }
+            }
+        }
+    }
+}

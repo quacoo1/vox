@@ -1,0 +1,542 @@
+{
+ "page": {
+  "$enum": "PageId.voices"
+ },
+ "page-title": "Voices",
+ "theme-dark": true,
+ "backdrop": {
+  "$image": "art/backdrop-dark.png"
+ },
+ "sidebar": {
+  "nav": [
+   {
+    "page": {
+     "$enum": "PageId.home"
+    },
+    "label": "Home",
+    "icon": "house"
+   },
+   {
+    "page": {
+     "$enum": "PageId.history"
+    },
+    "label": "History",
+    "icon": "history"
+   },
+   {
+    "page": {
+     "$enum": "PageId.analytics"
+    },
+    "label": "Analytics",
+    "icon": "chart-column"
+   },
+   {
+    "page": {
+     "$enum": "PageId.voices"
+    },
+    "label": "Voices",
+    "icon": "audio-lines"
+   },
+   {
+    "page": {
+     "$enum": "PageId.settings"
+    },
+    "label": "Settings",
+    "icon": "settings"
+   }
+  ],
+  "now": {
+   "visible": true,
+   "art": {
+    "$image": "art/small-charlotte.png"
+   },
+   "status": "Paused",
+   "title": "Why the best interfaces disappear",
+   "phase": {
+    "$enum": "PlayerPhase.paused"
+   },
+   "playing": false,
+   "can-toggle": true,
+   "progress": 0.71,
+   "buffered": 1,
+   "time": "-0:48",
+   "time-accessible": "0:48 left",
+   "error": ""
+  },
+  "credits-visible": true,
+  "credits-line": "39% credits left",
+  "credits-fraction": 0.39,
+  "credits-low": false,
+  "add-key-visible": false,
+  "hint-label": "Read selection",
+  "hint-keys": [
+   "Ctrl",
+   "Alt",
+   "R"
+  ],
+  "hint-spoken": "Read selection: Ctrl plus Alt plus R"
+ },
+ "voices": {
+  "state": {
+   "$enum": "VoicesState.list"
+  },
+  "in-use": "In use: George",
+  "count": "24 voices",
+  "gender": "",
+  "accent": "",
+  "category": "",
+  "gender-options": [
+   {
+    "value": "",
+    "label": "All",
+    "accessible-label": "All genders"
+   },
+   {
+    "value": "female",
+    "label": "Female",
+    "accessible-label": "Female"
+   },
+   {
+    "value": "male",
+    "label": "Male",
+    "accessible-label": "Male"
+   },
+   {
+    "value": "neutral",
+    "label": "Neutral",
+    "accessible-label": "Neutral"
+   }
+  ],
+  "accent-options": [
+   {
+    "value": "",
+    "label": "All accents",
+    "accessible-label": "All accents"
+   },
+   {
+    "value": "american",
+    "label": "American",
+    "accessible-label": "American"
+   },
+   {
+    "value": "australian",
+    "label": "Australian",
+    "accessible-label": "Australian"
+   },
+   {
+    "value": "british",
+    "label": "British",
+    "accessible-label": "British"
+   },
+   {
+    "value": "irish",
+    "label": "Irish",
+    "accessible-label": "Irish"
+   },
+   {
+    "value": "swedish",
+    "label": "Swedish",
+    "accessible-label": "Swedish"
+   },
+   {
+    "value": "transatlantic",
+    "label": "Transatlantic",
+    "accessible-label": "Transatlantic"
+   }
+  ],
+  "category-options": [
+   {
+    "value": "",
+    "label": "All types",
+    "accessible-label": "All types"
+   },
+   {
+    "value": "cloned",
+    "label": "Cloned",
+    "accessible-label": "Cloned"
+   },
+   {
+    "value": "generated",
+    "label": "Designed",
+    "accessible-label": "Designed"
+   },
+   {
+    "value": "premade",
+    "label": "Premade",
+    "accessible-label": "Premade"
+   },
+   {
+    "value": "professional",
+    "label": "Professional",
+    "accessible-label": "Professional"
+   }
+  ],
+  "refreshing": false,
+  "state-title": "",
+  "state-body": "",
+  "state-button": "",
+  "voices": [
+   {
+    "id": "clone-02",
+    "name": "Interview voice (podcast)",
+    "art": {
+     "$image": "art/thumb-will.png"
+    },
+    "subtitle": "Cloned · Male · American · Podcast",
+    "description": "Cloned from the March episodes.",
+    "tags": [],
+    "caption": "Cloned · Podcast",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "clone-01",
+    "name": "My reading voice",
+    "art": {
+     "$image": "art/thumb-river.png"
+    },
+    "subtitle": "Cloned",
+    "description": "No description.",
+    "tags": [],
+    "caption": "Cloned",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.none"
+    }
+   },
+   {
+    "id": "pro-01",
+    "name": "Studio narrator",
+    "art": {
+     "$image": "art/thumb-roger.png"
+    },
+    "subtitle": "Professional · Male · Irish · Audiobook",
+    "description": "Recorded in a treated booth for long-form reading.",
+    "tags": [],
+    "caption": "Professional · Audiobook",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "gen-01",
+    "name": "Night reader",
+    "art": {
+     "$image": "art/thumb-sarah.png"
+    },
+    "subtitle": "Designed · Female · British · Meditation",
+    "description": "Soft, low and slow, for reading before bed.",
+    "tags": [],
+    "caption": "Designed · Meditation",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "Xb7hH8MSUJpSbSDYk0k2",
+    "name": "Alice",
+    "art": {
+     "$image": "art/thumb-alice.png"
+    },
+    "subtitle": "Female · British · News",
+    "description": "Clear, warm and confident; made for explainers and e-learning.",
+    "tags": [],
+    "caption": "News",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "9BWtsMINqrJLrRacOk9x",
+    "name": "Aria",
+    "art": {
+     "$image": "art/thumb-aria.png"
+    },
+    "subtitle": "Female · American · Social media",
+    "description": "Calm, slightly husky and expressive.",
+    "tags": [],
+    "caption": "Social media",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "pqHfZKP75CvOlQylNhV4",
+    "name": "Bill",
+    "art": {
+     "$image": "art/thumb-bill.png"
+    },
+    "subtitle": "Male · American · Narration",
+    "description": "A trustworthy older voice for documentaries.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "nPczCjzI2devNBz1zQrb",
+    "name": "Brian",
+    "art": {
+     "$image": "art/thumb-brian.png"
+    },
+    "subtitle": "Male · American · Narration",
+    "description": "Deep, resonant and steady.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "N2lVS1w4EtoT3dr4eOWO",
+    "name": "Callum",
+    "art": {
+     "$image": "art/thumb-callum.png"
+    },
+    "subtitle": "Male · Transatlantic · Characters",
+    "description": "Gravelly and a little unsettling; good for villains.",
+    "tags": [],
+    "caption": "Characters",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "IKne3meq5aSn9XLyUdCD",
+    "name": "Charlie",
+    "art": {
+     "$image": "art/thumb-charlie.png"
+    },
+    "subtitle": "Male · Australian · Conversational",
+    "description": "Relaxed, natural and casual.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "XB0fDUnXU5powFXDhCwa",
+    "name": "Charlotte",
+    "art": {
+     "$image": "art/thumb-charlotte.png"
+    },
+    "subtitle": "Female · Swedish · Characters",
+    "description": "Sensual and raspy, good for video game characters.",
+    "tags": [],
+    "caption": "Characters",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "iP95p4xoKVk53GoZ742B",
+    "name": "Chris",
+    "art": {
+     "$image": "art/thumb-chris.png"
+    },
+    "subtitle": "Male · American · Conversational",
+    "description": "Down to earth and easy to listen to.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "onwK4e9ZLuTAKqWW03F9",
+    "name": "Daniel",
+    "art": {
+     "$image": "art/thumb-daniel.png"
+    },
+    "subtitle": "Male · British · News",
+    "description": "Authoritative, measured newsreader.",
+    "tags": [],
+    "caption": "News",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "cjVigY5qzO86Huf0OWal",
+    "name": "Eric",
+    "art": {
+     "$image": "art/thumb-eric.png"
+    },
+    "subtitle": "Male · American · Conversational",
+    "description": "Smooth and friendly, for agents and assistants.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "JBFqnCBsd6RMkjVDRZzb",
+    "name": "George",
+    "art": {
+     "$image": "art/thumb-george.png"
+    },
+    "subtitle": "Male · British · Narration",
+    "description": "Warm, mature storyteller with a gentle rasp.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": true,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "cgSgspJ2msm6clMCkdW9",
+    "name": "Jessica",
+    "art": {
+     "$image": "art/thumb-jessica.png"
+    },
+    "subtitle": "Female · American · Conversational",
+    "description": "Young, bright and playful.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "FGY2WhTYpPnrIDTdsKH5",
+    "name": "Laura",
+    "art": {
+     "$image": "art/thumb-laura.png"
+    },
+    "subtitle": "Female · American · Social media",
+    "description": "Upbeat and quirky.",
+    "tags": [],
+    "caption": "Social media",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "TX3LPaxmHKxFdv7VOQHJ",
+    "name": "Liam",
+    "art": {
+     "$image": "art/thumb-liam.png"
+    },
+    "subtitle": "Male · American · Narration",
+    "description": "Energetic, youthful and clear.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "pFZP5JQG7iQjIQuC4Bku",
+    "name": "Lily",
+    "art": {
+     "$image": "art/thumb-lily.png"
+    },
+    "subtitle": "Female · British · Narration",
+    "description": "Velvety and warm, made for audiobooks.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "XrExE9yKIg1WjnnlVkGX",
+    "name": "Matilda",
+    "art": {
+     "$image": "art/thumb-matilda.png"
+    },
+    "subtitle": "Female · American · Narration",
+    "description": "Friendly and pleasant for long reads.",
+    "tags": [],
+    "caption": "Narration",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "SAz9YHcvj6GT2YYXdXww",
+    "name": "River",
+    "art": {
+     "$image": "art/thumb-river.png"
+    },
+    "subtitle": "Neutral · American · Conversational",
+    "description": "Relaxed and even, with a neutral tone.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "CwhRBWXzGAHq8TQ4Fs17",
+    "name": "Roger",
+    "art": {
+     "$image": "art/thumb-roger.png"
+    },
+    "subtitle": "Male · American · Conversational",
+    "description": "Easy-going and laid back.",
+    "tags": [],
+    "caption": "Conversational",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "EXAVITQu4vr4xnSDxMaL",
+    "name": "Sarah",
+    "art": {
+     "$image": "art/thumb-sarah.png"
+    },
+    "subtitle": "Female · American · News",
+    "description": "Young, soft and reassuring.",
+    "tags": [],
+    "caption": "News",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   },
+   {
+    "id": "bIHbv24MWmeRgasZH58o",
+    "name": "Will",
+    "art": {
+     "$image": "art/thumb-will.png"
+    },
+    "subtitle": "Male · American · Social media",
+    "description": "Friendly and optimistic.",
+    "tags": [],
+    "caption": "Social media",
+    "in-use": false,
+    "preview": {
+     "$enum": "PreviewState.ready"
+    }
+   }
+  ],
+  "revision": 1
+ }
+}

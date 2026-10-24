@@ -1,0 +1,192 @@
+// Settings → About (ui-settings-widget.md §2.10; R-Copy: the app version and the build hash replace "Electron").
+// Header badge "Demo mode" (demo only); a small hero (mark, product name, tagline); Version / Runtime / Build rows; the
+// data folder with Open (disabled until known); the demo-data note; the ElevenLabs links; the fine print.
+import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, Badge, BadgeKind, BadgeDot, Divider, Tip }
+    from "../../design/index.slint";
+import { AboutData, Brand } from "../../models.slint";
+import { SectionHead, Row, WrapText } from "parts.slint";
+
+// A fact row: label on the left, the value on the right (selectable-looking, 13 / 600 secondary).
+component FactRow inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> divider: true;
+
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.label + ": " + root.value;
+
+    if root.divider: Divider { }
+    HorizontalLayout {
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: Theme.space-6;
+        Text {
+            text: root.label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.value;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-medium;
+            color: Theme.text-secondary;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+}
+
+export component AboutSection inherits Rectangle {
+    in property <AboutData> data;
+
+    callback open-data-folder();
+    // "dashboard" | "billing" | "docs"
+    callback open-link(string);
+
+    // Pinned horizontal size info: the conditional demo row takes the section's width explicitly (see parts.slint).
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    horizontal-stretch: 1;
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: "About";
+
+    VerticalLayout {
+        spacing: 0px;
+
+        SectionHead {
+            title: "About";
+            if root.data.demo: Badge {
+                text: "Demo mode";
+                kind: BadgeKind.outline;
+                icon: Icons.sparkles;
+            }
+        }
+
+        // Hero.
+        HorizontalLayout {
+            padding-top: Theme.space-5;
+            padding-bottom: Theme.space-5;
+            spacing: Theme.space-4;
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 14px;
+                    background: Theme.primary-fill;
+                    accessible-role: none;
+                    Icon {
+                        width: 100%;
+                        height: 100%;
+                        source: Icons.audio-lines;
+                        size: 26px;
+                        color: Theme.on-primary;
+                    }
+                }
+            }
+            VerticalLayout {
+                min-width: 0px;
+                preferred-width: 0px;
+                max-width: 100000px;
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+                Text {
+                    text: Brand.app-name;
+                    font-family: Theme.font-display;
+                    font-size: Theme.size-sentence;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                WrapText { text: "Select text anywhere. Hear it in a voice you like."; }
+            }
+        }
+
+        FactRow {
+            label: "Version";
+            value: root.data.version;
+        }
+        FactRow {
+            label: "Runtime";
+            value: root.data.runtime;
+        }
+        FactRow {
+            label: "Build";
+            value: root.data.build;
+        }
+        // Before AppInfo loads the description is "Settings, history and cached audio" (plain words, not a path) and
+        // Open is disabled.
+        Row {
+            title: "Data folder";
+            description: root.data.data-folder;
+            path: root.data.data-folder-ready;
+
+            Button {
+                text: "Open";
+                size: ButtonSize.sm;
+                icon: Icons.folder-open;
+                enabled: root.data.data-folder-ready;
+                accessible-text: "Open the data folder";
+                clicked => { root.open-data-folder(); }
+                Tip {
+                    text: root.data.data-folder;
+                    enabled: root.data.data-folder-ready;
+                }
+            }
+        }
+        if root.data.demo: Row {
+            width: root.width;
+            title: "Demo data";
+            description: "You’re looking at sample history in a separate data folder. Your real library is untouched.";
+        }
+
+        // Links (they open the browser; failures are ignored).
+        Divider { }
+        VerticalLayout {
+            padding-top: Theme.space-4;
+            padding-bottom: Theme.space-2;
+            spacing: Theme.space-4;
+
+            FlexboxLayout {
+                spacing: Theme.space-2;
+                Button {
+                    text: "ElevenLabs dashboard";
+                    size: ButtonSize.sm;
+                    trailing-icon: Icons.arrow-up-right;
+                    clicked => { root.open-link("dashboard"); }
+                }
+                Button {
+                    text: "Usage & billing";
+                    size: ButtonSize.sm;
+                    trailing-icon: Icons.arrow-up-right;
+                    clicked => { root.open-link("billing"); }
+                }
+                Button {
+                    text: "API docs";
+                    size: ButtonSize.sm;
+                    trailing-icon: Icons.arrow-up-right;
+                    clicked => { root.open-link("docs"); }
+                }
+            }
+            WrapText {
+                text: Brand.app-name + " is not affiliated with ElevenLabs. Speech is generated with your own API key "
+                    + "and billed to your ElevenLabs account.";
+                text-color: Theme.text-muted;
+                size: Theme.size-caption;
+            }
+        }
+    }
+}

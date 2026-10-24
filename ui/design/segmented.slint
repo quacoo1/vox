@@ -1,0 +1,142 @@
+// Segmented: a single-choice pill group with a sliding selected pill (Analytics range, theme mode).
+//
+//   in    model: [string]                    segment labels ("7D", "30D", "90D", "1Y", "All")
+//   in-out current-index: int                selected segment (the control updates it itself)
+//   in    enabled: bool
+//   in    small: bool                        32 h (default 36 h)
+//   in    segment-width: length              width of every segment (default 0 = equal shares of the width;
+//                                            the preferred width is model.length x 64 px)
+//   in    label: string                      accessible label of the group ("Range")
+//   in    show-focus: bool                   draw the focus ring without focus (previews)
+//   out   has-focus: bool
+//   callback selected(index: int, value: string)   after a click or a key changed the selection
+// Keys: Right/Down next, Left/Up previous, Home/End first/last; each key press selects (and fires `selected`).
+// Look: `field` pill with a hairline; the selected pill is `primary` with `on-primary` text and slides (180 ms).
+
+import { Theme } from "theme.slint";
+import { Pressable, FocusRing } from "pressable.slint";
+
+export component Segmented {
+    in property <[string]> model;
+    in-out property <int> current-index: 0;
+    in property <bool> enabled: true;
+    in property <bool> small: false;
+    in property <length> segment-width: 0px;
+    in property <string> label;
+    in property <bool> show-focus: false;
+    out property <bool> has-focus: focus.has-focus;
+
+    callback selected(index: int, value: string);
+
+    property <length> pad: 3px;
+    property <int> count: max(1, root.model.length);
+    property <length> seg: root.segment-width > 0 ? root.segment-width : (root.width - 2 * root.pad) / root.count;
+
+    function select(i: int) {
+        if (i >= 0 && i < root.model.length && i != root.current-index) {
+            root.current-index = i;
+            root.selected(i, root.model[i]);
+        }
+    }
+
+    height: root.small ? 32px : 36px;
+    preferred-width: root.segment-width > 0 ? root.count * root.segment-width + 2 * root.pad : root.count * 64px + 2 * root.pad;
+    min-width: root.count * 40px + 2 * root.pad;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    opacity: root.enabled ? 1 : 0.4;
+    forward-focus: focus;
+
+    accessible-role: tab-list;
+    accessible-label: root.label;
+    accessible-value: root.current-index >= 0 && root.current-index < root.model.length ? root.model[root.current-index] : "";
+    accessible-enabled: root.enabled;
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: Theme.field;
+        border-width: Theme.hairline;
+        border-color: Theme.field-border;
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: focus.focus-visible || root.show-focus;
+    }
+
+    // Keyboard handling for the whole group (one tab stop).
+    focus := Pressable {
+        enabled: root.enabled;
+        cursor: MouseCursor.default;
+        activate-on-enter: false;
+        key(event) => {
+            if (event.text == Key.RightArrow || event.text == Key.DownArrow) {
+                root.select(min(root.model.length - 1, root.current-index + 1));
+                return accept;
+            }
+            if (event.text == Key.LeftArrow || event.text == Key.UpArrow) {
+                root.select(max(0, root.current-index - 1));
+                return accept;
+            }
+            if (event.text == Key.Home) {
+                root.select(0);
+                return accept;
+            }
+            if (event.text == Key.End) {
+                root.select(root.model.length - 1);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    thumb := Rectangle {
+        visible: root.current-index >= 0 && root.current-index < root.model.length;
+        x: root.pad + root.current-index * root.seg;
+        y: root.pad;
+        width: root.seg;
+        height: root.height - 2 * root.pad;
+        border-radius: self.height / 2;
+        background: Theme.primary-fill;
+        animate x { duration: Theme.medium; easing: ease-out; }
+    }
+
+    for item[i] in root.model: Rectangle {
+        x: root.pad + i * root.seg;
+        y: root.pad;
+        width: root.seg;
+        height: root.height - 2 * root.pad;
+        border-radius: self.height / 2;
+        background: i == root.current-index ? transparent : seg-touch.pressed ? Theme.pressed : seg-touch.has-hover ? Theme.hover : transparent;
+        accessible-role: tab;
+        accessible-label: item;
+        accessible-item-selectable: true;
+        accessible-item-selected: i == root.current-index;
+        accessible-item-index: i;
+        accessible-item-count: root.model.length;
+        accessible-action-default => { root.select(i); }
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        Text {
+            text: item;
+            font-family: Theme.font-text;
+            font-size: root.small ? Theme.size-label - 1px : Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: i == root.current-index ? Theme.on-primary : seg-touch.has-hover ? Theme.text : Theme.text-secondary;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+            animate color { duration: Theme.medium; easing: ease-out; }
+        }
+
+        seg-touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                root.select(i);
+                focus.focus-quietly();
+            }
+        }
+    }
+}

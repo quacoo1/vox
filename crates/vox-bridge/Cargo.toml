@@ -1,0 +1,22 @@
+[package]
+name = "vox-bridge"
+description = "Vox browser bridge: the localhost HTTP server the unchanged browser extension talks to"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+httparse.workspace = true
+socket2.workspace = true
+serde_json.workspace = true
+parking_lot.workspace = true
+tracing.workspace = true
+
+[dependencies.windows]
+workspace = true
+# SO_EXCLUSIVEADDRUSE (socket2 has no setter for it) and the event-driven waits (WSAEventSelect,
+# WSAWaitForMultipleEvents).
+features = ["Win32_Networking_WinSock"]
+

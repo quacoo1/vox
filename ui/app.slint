@@ -1,0 +1,10 @@
+// The root compiled by crates/vox-app/build.rs (style "fluent"). Exports the three windows, the Theme global (set
+// per window from Rust: `window.global::<Theme>().set_dark(..)`), the Brand global (product name, set once per
+// window) and every model struct/enum so the generated Rust API contains them. See docs/ARCHITECTURE.md §7.
+import { Theme } from "design/theme.slint";
+import { MainWindow } from "windows/main-window.slint";
+import { WidgetWindow } from "windows/widget-window.slint";
+import { ChipWindow } from "windows/chip-window.slint";
+
+export { Theme, MainWindow, WidgetWindow, ChipWindow }
+export * from "models.slint";

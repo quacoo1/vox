@@ -1,0 +1,987 @@
+// Voices (ui-settings-widget.md §4; DESIGN.md "Screens → Voices"). Keep the interface.
+//
+// Layout (the page fills the panel's content area; the header row with the "Voices" title is MainWindow's):
+//   Toolbar (fixed, a search landmark)
+//     row 1  [search "Search name, accent, style…" (stretches)] [Accent ▾] [Voice type ▾] [⟳ Refresh]
+//     row 2  gender pills (All, Female, Male…)                                     ✓ In use: George
+//     Without gender pills the in-use note moves into row 1, before Refresh, and there is no row 2. Without either
+//     picker the search pill stops growing at 520 px. With nothing to search (no key, a failed first load, no
+//     voices at all) the search pill is hidden and row 1 keeps only the note and Refresh, right-aligned.
+//     While loading, the toolbar already has the list's shape (placeholder pickers and pills, the note in row 2),
+//     so nothing moves when the list arrives.
+//   Body (first match on data.state)
+//     loading                      section label + 8 skeleton rows ("Loading voices")
+//     no-key / error / empty /     state panel: the glyph on a quiet disc (danger glyph for the error), title, body,
+//     no-match                     and a pill: no-key → "Add API key" (add-key), error → "Try again" (refresh),
+//                                  no-match → "Clear filters" (clear-filters, secondary pill), empty → none
+//     list                         section label "ElevenLabs library" + data.count, then one large row per voice:
+//                                  art, name, subtitle, description (muted, one line); trailing Preview pill (only
+//                                  when the voice has a sample) and "Use voice" (or the "In use" outline badge).
+// A row's sample state shows on its art (a spinner while loading, moving bars while playing) and as a hairline
+// outline around the row (hover stays a fill, so a hovered row and the sampling row never look alike); its Preview
+// pill turns into Stop, which stays clickable (stop while loading, too).
+// Changing the search or a filter scrolls the list back to the top.
+//
+// Reading of VoicesData (ready-made strings, Rust applies the spec's rules):
+//   *-options    each list starts with its "All…" entry (value ""); an EMPTY list hides that control (gender: no
+//                gender label; accent: no accent; type: fewer than two categories).
+//   gender / accent / category   the current option values; the controls only reflect them (no internal state),
+//                so Rust's overrides ("Clear filters", leaving the page, `revision`) always show without a handler.
+//   in-use       the whole note ("In use: George"); empty hides it (settings not loaded yet).
+//   count        "24 voices" / "3 of 24".
+//   refreshing   spins the Refresh pill and ignores presses (also the first load and before settings load).
+//   VoiceRow.subtitle   " · "-joined: voiceKind first for the user's own voices, then gender, accent, use case
+//                ("Cloned · Male · American · Podcast", "Designed · Female · British", "Female · British · News"
+//                for premade voices; ui-settings-widget.md §4.3 voiceKind / titleCase). This is the only place a row
+//                says it is a clone. `tags` and `caption` are not drawn on this page.
+//   VoiceRow.description   trimmed, or "No description.".
+// The search field's text is `search-text` (in-out; Rust clears it on "Clear filters" and when the page is left).
+// Accessible names composed here (VoiceRow has no accessible strings): "Play {name} sample", "Stop {name} sample",
+// "Use {name}". The gender pills are one radio group "Gender": Left / Up and Right / Down move and select (wrapping),
+// Home / End pick the first / last.
+
+import {
+    Theme, Icons, Icon, Pressable, FocusRing, Button, ButtonKind, ButtonSize, SearchField, FilterChip,
+    SectionLabel, ArtThumb, Badge, BadgeKind, BadgeSize, Skeleton, Spinner, ScrollArea
+} from "../design/index.slint";
+import { VoicesData, VoiceRow, VoicesState, PreviewState, ChoiceItem, Motion } from "../models.slint";
+
+// ───────────────────────────── private helpers ─────────────────────────────
+
+// The popup list of a ChoicePicker (SelectMenu's look: popup fill, hairline, radius 14, 36-h rows, a check mark on
+// the current option).
+component ChoiceMenu {
+    in property <[ChoiceItem]> options;
+    in property <string> value;
+    in-out property <int> highlighted-index: -1;
+    in property <int> max-rows: 8;
+
+    callback picked(index: int);
+
+    property <length> row-h: 36px;
+    property <length> pad: 6px;
+    property <int> rows: min(root.max-rows, root.options.length);
+
+    min-width: 180px;
+    preferred-width: 220px;
+    height: root.rows * root.row-h + 2 * root.pad;
+    accessible-role: list;
+
+    Rectangle {
+        border-radius: Theme.radius-popup;
+        background: Theme.popup;
+        border-width: Theme.hairline;
+        border-color: Theme.popup-border;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.popup-shadow;
+    }
+
+    flick := Flickable {
+        x: root.pad;
+        y: root.pad;
+        width: root.width - 2 * root.pad;
+        height: root.height - 2 * root.pad;
+        content-height: root.options.length * root.row-h;
+        interactive: root.options.length > root.max-rows;
+        // Keep the keyboard highlight in view.
+        content-y: root.highlighted-index < 0 ? 0px
+            : -max(0px, min((root.options.length - root.rows) * root.row-h,
+                (root.highlighted-index - root.rows + 1) * root.row-h));
+
+        for opt[i] in root.options: Rectangle {
+            property <bool> is-current: opt.value == root.value;
+            y: i * root.row-h;
+            width: flick.width;
+            height: root.row-h;
+            border-radius: 10px;
+            background: row-touch.pressed ? Theme.pressed
+                : (row-touch.has-hover || i == root.highlighted-index) ? Theme.hover : transparent;
+            accessible-role: list-item;
+            accessible-label: opt.accessible-label != "" ? opt.accessible-label : opt.label;
+            accessible-item-selectable: true;
+            accessible-item-selected: self.is-current;
+            accessible-item-index: i;
+            accessible-item-count: root.options.length;
+            accessible-action-default => { root.picked(i); }
+            animate background { duration: Theme.fast; easing: ease-out; }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 10px;
+                spacing: 8px;
+                Text {
+                    horizontal-stretch: 1;
+                    text: opt.label;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: opt.value == root.value ? Theme.weight-semibold : Theme.weight-medium;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                if opt.value == root.value: Icon {
+                    source: Icons.check;
+                    size: 16px;
+                    color: Theme.text;
+                }
+            }
+
+            row-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.picked(i); }
+            }
+        }
+    }
+}
+
+// A dropdown over ChoiceItems, picked by value. The design Select takes `[string]` labels and an index, and a
+// `[ChoiceItem]` cannot be turned into either in Slint, so this one has Select's small (32 h) secondary-pill look
+// and keys but reads the items directly (and uses their accessible labels). Like History's source picker it always
+// stays a secondary pill; a chosen filter (value != "") shows as a brighter label and border, the "All…" option as a
+// quieter label.
+component ChoicePicker {
+    in property <[ChoiceItem]> options;
+    in property <string> value;
+    // Accessible name ("Accent").
+    in property <string> label;
+
+    callback picked(value: string);
+
+    public function open() {
+        if (root.options.length > 0) {
+            root.highlight = root.found ? root.current : 0;
+            popup.show();
+        }
+    }
+
+    // Index of the option whose value is `value`: each option checks itself (no stable array search in Slint).
+    property <int> current: -1;
+    property <bool> found: root.current >= 0 && root.current < root.options.length
+        && root.options[root.current].value == root.value;
+    property <string> current-label: root.found ? root.options[root.current].label : "";
+    property <bool> active: root.value != "";
+    property <int> highlight: -1;
+    property <length> row-h: 36px;
+    property <length> pad: 6px;
+    property <int> max-rows: 8;
+    property <int> rows: min(root.max-rows, root.options.length);
+
+    function choose(i: int) {
+        if (i >= 0 && i < root.options.length && root.options[i].value != root.value) {
+            root.picked(root.options[i].value);
+        }
+    }
+
+    height: 32px;
+    min-width: 120px;
+    preferred-width: 156px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    forward-focus: press;
+
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.current-label;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-expand => { root.open(); }
+    accessible-action-default => { root.open(); }
+
+    for opt[i] in root.options: Rectangle {
+        width: 0;
+        height: 0;
+        property <bool> hit: opt.value == root.value;
+        init => {
+            if (self.hit) {
+                root.current = i;
+            }
+        }
+        changed hit => {
+            if (self.hit) {
+                root.current = i;
+            }
+        }
+    }
+
+    bg := Rectangle {
+        border-radius: root.height / 2;
+        background: press.pressed ? Theme.pressed : press.has-hover ? Theme.hover : Theme.pill-fill;
+        border-width: Theme.hairline;
+        border-color: (root.active || press.has-hover || popup.is-open) ? Theme.field-border-focus : Theme.field-border;
+        animate background, border-color { duration: Theme.fast; easing: ease-out; }
+    }
+
+    FocusRing {
+        radius: bg.border-radius;
+        shown: press.focus-visible;
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 10px;
+        spacing: 6px;
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.current-label;
+            font-family: Theme.font-text;
+            font-size: Theme.size-label;
+            font-weight: Theme.weight-semibold;
+            color: root.active ? Theme.text : Theme.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        Icon {
+            source: Icons.chevron-down;
+            size: 16px;
+            color: Theme.text-secondary;
+        }
+    }
+
+    press := Pressable {
+        activated => { root.open(); }
+        key(event) => {
+            if (event.text == Key.DownArrow && event.modifiers.alt) {
+                root.open();
+                return accept;
+            }
+            if (event.text == Key.DownArrow) {
+                root.choose(root.found ? min(root.options.length - 1, root.current + 1) : 0);
+                return accept;
+            }
+            if (event.text == Key.UpArrow) {
+                root.choose(root.found ? max(0, root.current - 1) : 0);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    popup := PopupWindow {
+        x: 0;
+        y: root.height + 6px;
+        width: max(root.width, 220px);
+        height: root.rows * root.row-h + 2 * root.pad;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-keys;
+
+        popup-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    popup.close();
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    root.highlight = min(root.options.length - 1, root.highlight + 1);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) {
+                    root.highlight = max(0, root.highlight - 1);
+                    return accept;
+                }
+                if (event.text == Key.Home) {
+                    root.highlight = 0;
+                    return accept;
+                }
+                if (event.text == Key.End) {
+                    root.highlight = root.options.length - 1;
+                    return accept;
+                }
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.choose(root.highlight);
+                    popup.close();
+                    return accept;
+                }
+                reject
+            }
+
+            ChoiceMenu {
+                options: root.options;
+                value: root.value;
+                highlighted-index <=> root.highlight;
+                max-rows: root.max-rows;
+                picked(i) => {
+                    root.choose(i);
+                    popup.close();
+                }
+            }
+        }
+    }
+}
+
+// Four bars moving out of step: "this sample is playing". Still (at varied heights) under Motion.reduce.
+component PlayingBars {
+    in property <brush> color: Theme.text;
+
+    property <bool> moving: !Motion.reduce;
+    property <float> t: root.moving ? animation-tick() / 1ms : 0;
+
+    width: 16px;
+    height: 14px;
+    accessible-role: none;
+
+    for i in 4: Rectangle {
+        property <float> rest: i == 0 ? 0.45 : i == 1 ? 0.9 : i == 2 ? 0.6 : 0.75;
+        property <float> level: root.moving
+            ? 0.3 + 0.7 * (0.5 + 0.5 * sin((root.t * (0.011 + i * 0.0023) + i * 1.7) * 1rad))
+            : self.rest;
+        x: i * 4px + 0.5px;
+        width: 2.5px;
+        height: max(3px, root.height * self.level);
+        y: (root.height - self.height) / 2;
+        border-radius: 1.25px;
+        background: root.color;
+    }
+}
+
+// The sample state on a voice's art: a small disc (panel fill, hairline) in the centre with a spinner or bars.
+component PreviewBadge {
+    in property <PreviewState> phase;
+
+    width: 40px;
+    height: 40px;
+    accessible-role: none;
+
+    Rectangle {
+        border-radius: self.width / 2;
+        background: Theme.panel.with-alpha(0.92);
+        border-width: Theme.hairline;
+        border-color: Theme.panel-border;
+    }
+    if root.phase == PreviewState.loading: Spinner {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        size: 18px;
+        color: Theme.text;
+        track-color: transparent;
+        arc: 270deg;
+        label: "";
+    }
+    if root.phase == PreviewState.playing: PlayingBars {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+    }
+}
+
+// One voice: the large ListRow shape (110x82 art, 24 px gap, 12 px vertical padding, hover fill bleeding 12 px) with
+// a third, muted line for the description and the voice's own trailing pills. While its sample loads or plays the
+// row gets a hairline outline (the selected-NavItem look) instead of a fill.
+component VoiceItem {
+    in property <VoiceRow> voice;
+
+    callback preview();
+    callback use-voice();
+
+    property <bool> sampling: root.voice.preview == PreviewState.loading || root.voice.preview == PreviewState.playing;
+    property <length> bleed: 12px;
+
+    min-height: max(106px, content.min-height);
+    preferred-height: max(106px, content.preferred-height);
+    min-width: 200px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+
+    accessible-role: list-item;
+    accessible-label: root.voice.name;
+    accessible-description: root.voice.subtitle;
+    accessible-item-selected: root.voice.in-use;
+
+    Rectangle {
+        x: -root.bleed;
+        width: root.width + 2 * root.bleed;
+        height: root.height;
+        border-radius: Theme.radius-row;
+        background: hover.has-hover ? Theme.hover : transparent;
+        border-width: root.sampling ? Theme.hairline : 0px;
+        border-color: Theme.field-border;
+        animate background { duration: Theme.fast; easing: ease-out; }
+
+        hover := TouchArea {
+            mouse-cursor: default;
+        }
+    }
+
+    content := HorizontalLayout {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: Theme.space-6;
+
+        VerticalLayout {
+            alignment: center;
+            ArtThumb {
+                width: 110px;
+                height: 82px;
+                source: root.voice.art;
+
+                if root.sampling: PreviewBadge {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    phase: root.voice.preview;
+                }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 6px;
+
+            Text {
+                text: root.voice.name;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-semibold;
+                color: Theme.text;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.voice.subtitle != "": Text {
+                text: root.voice.subtitle;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-medium;
+                color: Theme.text-secondary;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.voice.description != "": Text {
+                text: root.voice.description;
+                font-family: Theme.font-text;
+                font-size: Theme.size-label;
+                font-weight: Theme.weight-regular;
+                color: Theme.text-label;
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: root.voice.description;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-2;
+
+                if root.voice.preview != PreviewState.none: Button {
+                    // Fixed width: "Preview" and "Stop" swap without moving anything, and the pills line up.
+                    width: 120px;
+                    text: root.sampling ? "Stop" : "Preview";
+                    icon: root.sampling ? Icons.square : Icons.play;
+                    accessible-text: (root.sampling ? "Stop " : "Play ") + root.voice.name + " sample";
+                    // A toggle: pressed while the sample plays (spec §4.5).
+                    accessible-checkable: true;
+                    accessible-checked: root.voice.preview == PreviewState.playing;
+                    clicked => { root.preview(); }
+                }
+                if root.voice.in-use: Badge {
+                    width: 108px;
+                    text: "In use";
+                    kind: BadgeKind.outline;
+                    size: BadgeSize.lg;
+                    icon: Icons.check;
+                }
+                if !root.voice.in-use: Button {
+                    width: 108px;
+                    text: "Use voice";
+                    kind: ButtonKind.primary;
+                    accessible-text: "Use " + root.voice.name;
+                    clicked => { root.use-voice(); }
+                }
+            }
+        }
+    }
+}
+
+// A loading row shaped like VoiceItem (art, three text bars, the two trailing pills).
+component VoiceSkeleton inherits HorizontalLayout {
+    in property <percent> title-width: 46%;
+    in property <percent> subtitle-width: 30%;
+    in property <percent> description-width: 58%;
+
+    padding-top: 12px;
+    padding-bottom: 12px;
+    spacing: Theme.space-6;
+    vertical-stretch: 0;
+
+    Skeleton {
+        width: 110px;
+        height: 82px;
+        radius: Theme.radius-thumb-large;
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 10px;
+        horizontal-stretch: 1;
+        Rectangle {
+            height: 12px;
+            Skeleton { x: 0; width: parent.width * root.title-width; height: 12px; }
+        }
+        Rectangle {
+            height: 10px;
+            Skeleton { x: 0; width: parent.width * root.subtitle-width; height: 10px; }
+        }
+        Rectangle {
+            height: 10px;
+            opacity: 0.6;
+            Skeleton { x: 0; width: parent.width * root.description-width; height: 10px; }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            Skeleton { width: 120px; height: 40px; radius: 20px; }
+            Skeleton { width: 108px; height: 40px; radius: 20px; }
+        }
+    }
+}
+
+// A 32-h pill placeholder for the toolbar while loading (a picker or a gender pill).
+component PillSkeleton inherits Skeleton {
+    height: 32px;
+    radius: 16px;
+    horizontal-stretch: 0;
+    accessible-role: none;
+}
+
+// "✓ In use: George": quiet status text that elides (a Badge would not).
+component InUseNote inherits HorizontalLayout {
+    in property <string> text;
+
+    spacing: 6px;
+    horizontal-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Icon {
+        source: Icons.check;
+        size: 14px;
+        color: Theme.text-secondary;
+    }
+    Text {
+        max-width: 280px;
+        text: root.text;
+        font-family: Theme.font-text;
+        font-size: Theme.size-label;
+        font-weight: Theme.weight-medium;
+        color: Theme.text-secondary;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+}
+
+// No key / error / no voices / no matches: the state glyph on a quiet disc, a title, the body and a pill (primary;
+// secondary for "Clear filters"). The same shape as History's state panel.
+component StatePanel inherits VerticalLayout {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> body;
+    in property <string> button;
+    in property <bool> secondary-button;
+    // Error state: the glyph in `danger` (never a red fill).
+    in property <bool> danger;
+
+    callback action();
+
+    // Balanced wrapping for the body (Rust's error text varies): as many lines as 420 px needs, each about
+    // equally long, so no line ends with a lone word. The slack covers the longest word a greedy wrap may push down.
+    property <length> body-max: 420px;
+    property <length> body-single: body-measure.preferred-width;
+    property <int> body-lines: max(1, ceil(root.body-single / root.body-max));
+    property <length> body-width: root.body-lines <= 1 ? root.body-single
+        : min(root.body-max, root.body-single / root.body-lines + 56px);
+
+    alignment: center;
+    padding: Theme.space-8;
+    spacing: 0px;
+
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: 64px;
+            height: 64px;
+            border-radius: 32px;
+            background: Theme.chip;
+            border-width: Theme.hairline;
+            border-color: Theme.field-border;
+            Icon {
+                width: 100%;
+                height: 100%;
+                source: root.icon;
+                size: 26px;
+                color: root.danger ? Theme.danger : Theme.text;
+            }
+            // Measures the body on one line (never shown; the disc has a fixed size, so it takes no room).
+            body-measure := Text {
+                visible: false;
+                text: root.body;
+                font-family: Theme.font-text;
+                font-size: Theme.size-body;
+                font-weight: Theme.weight-regular;
+                accessible-role: none;
+            }
+        }
+    }
+    Rectangle { height: Theme.space-5; }
+    HorizontalLayout {
+        alignment: center;
+        Text {
+            max-width: 460px;
+            text: root.title;
+            font-family: Theme.font-text;
+            font-size: Theme.size-title;
+            font-weight: Theme.weight-semibold;
+            color: Theme.text;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.title;
+        }
+    }
+    if root.body != "": Rectangle { height: Theme.space-2; }
+    if root.body != "": HorizontalLayout {
+        alignment: center;
+        Text {
+            width: root.body-width;
+            text: root.body;
+            font-family: Theme.font-text;
+            font-size: Theme.size-body;
+            font-weight: Theme.weight-regular;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.body;
+        }
+    }
+    if root.button != "": Rectangle { height: Theme.space-6; }
+    if root.button != "": HorizontalLayout {
+        alignment: center;
+        Button {
+            text: root.button;
+            kind: root.secondary-button ? ButtonKind.secondary : ButtonKind.primary;
+            clicked => { root.action(); }
+        }
+    }
+}
+
+// ───────────────────────────── the page ─────────────────────────────
+
+export component VoicesPage inherits Rectangle {
+    in property <VoicesData> data;
+    in-out property <string> search-text;
+
+    // Filters (no debounce). Values are option values ("" = all).
+    callback search-edited(string);
+    callback set-gender(string);
+    callback set-accent(string);
+    callback set-category(string);
+    callback clear-filters();
+    // "Refresh voices" / error "Try again" (refresh = true).
+    callback refresh();
+    // Sample play/stop for a voice id (one at a time; pauses a reading).
+    callback preview(string);
+    // "Use voice".
+    callback use-voice(string);
+    // No-key empty state "Add API key".
+    callback add-key();
+
+    property <length> gutter: Theme.space-10;
+    property <VoicesState> view: root.data.state;
+    property <bool> loading: root.view == VoicesState.loading;
+    property <bool> is-message: root.view == VoicesState.no-key || root.view == VoicesState.error
+        || root.view == VoicesState.empty || root.view == VoicesState.no-match;
+    property <bool> has-chips: root.data.gender-options.length > 0;
+    property <bool> has-pickers: root.data.accent-options.length > 0 || root.data.category-options.length > 0;
+    // Row 2 holds the gender pills (placeholders while loading) and, at its right, the in-use note.
+    property <bool> show-row2: root.has-chips || root.loading;
+    property <bool> note-in-row1: root.data.in-use != "" && !root.show-row2;
+    // Nothing to search without a list (no key, a failed first load, no voices at all): the search pill is hidden.
+    property <bool> can-search: root.loading || root.view == VoicesState.list || root.view == VoicesState.no-match;
+    // The search pill stops growing at 520 px when nothing else shares row 1.
+    property <bool> wide-search: root.has-pickers || root.loading;
+
+    // Bumped on every search / filter change: the list goes back to the top.
+    property <int> scroll-reset: 0;
+    // Gender pills: keyboard focus requests (index into gender-options, bumped nonce).
+    property <int> gender-focus-index: -1;
+    property <int> gender-focus-nonce: 0;
+    property <int> gender-focused: -1;
+
+    pure function gender-index(v: string) -> int {
+        if (root.data.gender-options.length > 0 && root.data.gender-options[0].value == v) { return 0; }
+        if (root.data.gender-options.length > 1 && root.data.gender-options[1].value == v) { return 1; }
+        if (root.data.gender-options.length > 2 && root.data.gender-options[2].value == v) { return 2; }
+        if (root.data.gender-options.length > 3 && root.data.gender-options[3].value == v) { return 3; }
+        if (root.data.gender-options.length > 4 && root.data.gender-options[4].value == v) { return 4; }
+        if (root.data.gender-options.length > 5 && root.data.gender-options[5].value == v) { return 5; }
+        if (root.data.gender-options.length > 6 && root.data.gender-options[6].value == v) { return 6; }
+        if (root.data.gender-options.length > 7 && root.data.gender-options[7].value == v) { return 7; }
+        if (root.data.gender-options.length > 8 && root.data.gender-options[8].value == v) { return 8; }
+        if (root.data.gender-options.length > 9 && root.data.gender-options[9].value == v) { return 9; }
+        return -1;
+    }
+
+    function choose-gender(v: string) {
+        if (v != root.data.gender) {
+            root.scroll-reset += 1;
+            root.set-gender(v);
+        }
+    }
+
+    // Arrow keys / Home / End in the gender group: focus that pill and select it.
+    function pick-gender(i: int) {
+        if (i >= 0 && i < root.data.gender-options.length) {
+            root.gender-focus-index = i;
+            root.gender-focus-nonce += 1;
+            root.choose-gender(root.data.gender-options[i].value);
+        }
+    }
+
+    // Move by one pill, wrapping: from the focused pill (Tab can land on any pill), else from the selected one.
+    function step-gender(delta: int) {
+        let n = root.data.gender-options.length;
+        if (n > 0) {
+            let from = root.gender-focused >= 0 && root.gender-focused < n ? root.gender-focused
+                : max(0, root.gender-index(root.data.gender));
+            root.pick-gender(from + delta < 0 ? n - 1 : from + delta >= n ? 0 : from + delta);
+        }
+    }
+
+    background: transparent;
+
+    VerticalLayout {
+        // ---- Toolbar ----
+        VerticalLayout {
+            padding-left: root.gutter;
+            padding-right: root.gutter;
+            padding-top: Theme.space-6;
+            spacing: Theme.space-3;
+            accessible-role: search;
+            accessible-label: "Filter voices";
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+
+                // The clip keeps a very long query inside the pill: the design SearchField's text box is as wide
+                // as its text (TextInput's minimum width), so without it the text runs on under the next control.
+                // Library fix pending (`min-width: 0px` on SearchField's clipping Rectangle); then drop this wrapper
+                // and put the stretch / min / max widths on the SearchField itself.
+                if root.can-search: Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 180px;
+                    max-width: root.wide-search ? 100000px : 520px;
+                    height: 32px;
+                    border-radius: self.height / 2;
+                    clip: true;
+
+                    SearchField {
+                        width: 100%;
+                        height: 100%;
+                        small: true;
+                        text <=> root.search-text;
+                        placeholder: "Search name, accent, style…";
+                        accessible-label: "Search voices";
+                        edited(t) => {
+                            root.scroll-reset += 1;
+                            root.search-edited(t);
+                        }
+                    }
+                }
+                if !root.can-search || !root.wide-search: Rectangle { horizontal-stretch: 1; }
+
+                if root.loading: PillSkeleton { width: 156px; }
+                if root.loading: PillSkeleton { width: 144px; }
+                if !root.loading && root.data.accent-options.length > 0: ChoicePicker {
+                    width: 156px;
+                    label: "Accent";
+                    options: root.data.accent-options;
+                    value: root.data.accent;
+                    picked(v) => {
+                        root.scroll-reset += 1;
+                        root.set-accent(v);
+                    }
+                }
+                if !root.loading && root.data.category-options.length > 0: ChoicePicker {
+                    width: 144px;
+                    label: "Voice type";
+                    options: root.data.category-options;
+                    value: root.data.category;
+                    picked(v) => {
+                        root.scroll-reset += 1;
+                        root.set-category(v);
+                    }
+                }
+                if root.note-in-row1: InUseNote {
+                    text: root.data.in-use;
+                }
+                Button {
+                    text: "Refresh";
+                    size: ButtonSize.sm;
+                    icon: Icons.refresh-cw;
+                    loading: root.data.refreshing;
+                    accessible-text: "Refresh voices";
+                    clicked => { root.refresh(); }
+                }
+            }
+
+            if root.show-row2: HorizontalLayout {
+                spacing: Theme.space-4;
+
+                if root.loading: HorizontalLayout {
+                    spacing: Theme.space-2;
+                    horizontal-stretch: 0;
+                    PillSkeleton { width: 48px; }
+                    PillSkeleton { width: 76px; }
+                    PillSkeleton { width: 62px; }
+                    PillSkeleton { width: 74px; }
+                }
+
+                if !root.loading: FocusScope {
+                    focus-on-click: false;
+                    focus-on-tab-navigation: false;
+                    horizontal-stretch: 0;
+                    accessible-role: radio-group;
+                    accessible-label: "Gender";
+
+                    key-pressed(event) => {
+                        if (event.text == Key.LeftArrow || event.text == Key.UpArrow) {
+                            root.step-gender(-1);
+                            return accept;
+                        }
+                        if (event.text == Key.RightArrow || event.text == Key.DownArrow) {
+                            root.step-gender(1);
+                            return accept;
+                        }
+                        if (event.text == Key.Home) {
+                            root.pick-gender(0);
+                            return accept;
+                        }
+                        if (event.text == Key.End) {
+                            root.pick-gender(root.data.gender-options.length - 1);
+                            return accept;
+                        }
+                        reject
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+
+                        for opt[i] in root.data.gender-options: FilterChip {
+                            property <int> focus-request: root.gender-focus-nonce;
+                            changed focus-request => {
+                                if (i == root.gender-focus-index) {
+                                    self.focus();
+                                }
+                            }
+                            changed has-focus => {
+                                if (self.has-focus) {
+                                    root.gender-focused = i;
+                                }
+                            }
+
+                            text: opt.label;
+                            selected: opt.value == root.data.gender;
+                            // Never squeezed (their labels do not elide): the in-use note gives way instead.
+                            min-width: max(48px, self.preferred-width);
+                            accessible-role: radio-button;
+                            accessible-label: opt.accessible-label != "" ? opt.accessible-label : opt.label;
+                            clicked => { root.choose-gender(opt.value); }
+                        }
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if root.data.in-use != "": InUseNote {
+                    text: root.data.in-use;
+                }
+            }
+        }
+
+        // ---- Loading ----
+        if root.loading: Rectangle {
+            vertical-stretch: 1;
+            // The skeleton list is taller than most windows: it is clipped, never a reason to grow the page.
+            min-height: 0px;
+            preferred-height: 0px;
+            clip: true;
+            accessible-role: progress-indicator;
+            accessible-label: "Loading voices";
+
+            VerticalLayout {
+                alignment: start;
+                padding-left: root.gutter;
+                padding-right: root.gutter;
+                padding-top: Theme.space-8;
+
+                SectionLabel { text: "ElevenLabs library"; }
+                Rectangle { height: Theme.space-2; }
+                for w[i] in [46%, 34%, 52%, 40%, 30%, 48%, 36%, 44%]: VoiceSkeleton {
+                    title-width: w;
+                    subtitle-width: i == 0 ? 30% : i == 1 ? 38% : i == 2 ? 26% : i == 3 ? 34% : 30%;
+                    description-width: i == 0 ? 62% : i == 1 ? 50% : i == 2 ? 66% : i == 3 ? 44% : 56%;
+                }
+            }
+        }
+
+        // ---- No key / error / no voices / no matches ----
+        if root.is-message: StatePanel {
+            vertical-stretch: 1;
+            padding-bottom: Theme.space-10 + Theme.space-6;
+            icon: root.view == VoicesState.no-key ? Icons.key-round
+                : root.view == VoicesState.error ? Icons.circle-alert
+                : root.view == VoicesState.empty ? Icons.mic : Icons.search;
+            title: root.data.state-title;
+            body: root.data.state-body;
+            button: root.data.state-button;
+            secondary-button: root.view == VoicesState.no-match;
+            danger: root.view == VoicesState.error;
+            action => {
+                if (root.view == VoicesState.no-key) {
+                    root.add-key();
+                } else if (root.view == VoicesState.no-match) {
+                    root.scroll-reset += 1;
+                    root.clear-filters();
+                } else {
+                    root.refresh();
+                }
+            }
+        }
+
+        // ---- Voices ----
+        if root.view == VoicesState.list: ScrollArea {
+            property <int> reset: root.scroll-reset;
+            changed reset => { self.scroll-to-top(); }
+
+            vertical-stretch: 1;
+            edge-fade: true;
+
+            VerticalLayout {
+                alignment: start;
+                padding-left: root.gutter;
+                padding-right: root.gutter;
+                padding-top: Theme.space-8;
+                padding-bottom: Theme.space-8;
+
+                SectionLabel {
+                    text: "ElevenLabs library";
+                    trailing-text: root.data.count;
+                }
+                Rectangle { height: Theme.space-2; }
+                VerticalLayout {
+                    accessible-role: list;
+                    accessible-label: "Voices";
+
+                    for v in root.data.voices: VoiceItem {
+                        voice: v;
+                        preview => { root.preview(v.id); }
+                        use-voice => { root.use-voice(v.id); }
+                    }
+                }
+            }
+        }
+    }
+}

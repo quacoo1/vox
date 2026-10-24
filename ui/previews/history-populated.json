@@ -1,0 +1,471 @@
+{
+ "data": {
+  "state": {
+   "$enum": "HistoryState.list"
+  },
+  "dimmed": false,
+  "count-label": "9 reads",
+  "actions-visible": true,
+  "exporting": false,
+  "clearing": false,
+  "can-export": true,
+  "search": "",
+  "favorites-only": false,
+  "source": "",
+  "source-options": [
+   {
+    "value": "",
+    "label": "All sources",
+    "accessible-label": "All sources"
+   },
+   {
+    "value": "context-chip",
+    "label": "Right-click chip",
+    "accessible-label": "Right-click chip"
+   },
+   {
+    "value": "hotkey",
+    "label": "Hotkey",
+    "accessible-label": "Hotkey"
+   },
+   {
+    "value": "selection-popup",
+    "label": "Selection popup",
+    "accessible-label": "Selection popup"
+   },
+   {
+    "value": "browser-extension",
+    "label": "Browser extension",
+    "accessible-label": "Browser extension"
+   },
+   {
+    "value": "clipboard",
+    "label": "Clipboard",
+    "accessible-label": "Clipboard"
+   },
+   {
+    "value": "manual",
+    "label": "Typed in app",
+    "accessible-label": "Typed in app"
+   },
+   {
+    "value": "explorer",
+    "label": "File Explorer",
+    "accessible-label": "File Explorer"
+   },
+   {
+    "value": "replay",
+    "label": "Replay",
+    "accessible-label": "Replay"
+   },
+   {
+    "value": "cli",
+    "label": "Command line",
+    "accessible-label": "Command line"
+   }
+  ],
+  "state-icon": "",
+  "state-title": "",
+  "state-body": "",
+  "state-keys": [],
+  "state-body-after": "",
+  "state-button": "",
+  "rows": [
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Today",
+    "header-label": "Today",
+    "header-meta": "4 reads · 14m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r1",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-george.png"
+    },
+    "source-icon": "mouse-pointer-click",
+    "source-label": "Right-click chip",
+    "title": "Hi all, following up on Thursday’s planning session: the Q4 roadmap is attached, and I’d love comments on the onboarding section before Monday.",
+    "meta": "Outlook · George · 4:23 · 12 minutes ago",
+    "time-tooltip": "Friday, October 17, 2026 at 8:53 PM",
+    "favorite": false,
+    "badges": [
+     "Playing"
+    ],
+    "progress": 0.38,
+    "percent": "38%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r2",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-charlotte.png"
+    },
+    "source-icon": "keyboard",
+    "source-label": "Hotkey",
+    "title": "The quiet revolution in personal computing was never about faster chips. It was about the moment software began to listen, and the moment it began to speak back.",
+    "meta": "Chrome · Charlotte · 2:10 · 1 hour ago",
+    "time-tooltip": "Friday, October 17, 2026 at 7:41 PM",
+    "favorite": true,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r3",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-brian.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "Why the best interfaces disappear: a short history of calm technology, from Mark Weiser’s ubiquitous computing to today’s ambient assistants.",
+    "meta": "Firefox · Brian · ~6:05 · 3 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 5:12 PM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.62,
+    "percent": "62%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r4",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-lily.png"
+    },
+    "source-icon": "text-select",
+    "source-label": "Selection popup",
+    "title": "Chapter 3. The garden had gone quiet by the time she returned, and the gate stood open.",
+    "meta": "Word · Lily · 0:48 · 5 hours ago",
+    "time-tooltip": "Friday, October 17, 2026 at 3:20 PM",
+    "favorite": false,
+    "badges": [
+     "Failed"
+    ],
+    "progress": 0.0,
+    "percent": "0%",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "Replay",
+    "replay-tooltip": "Audio no longer cached and full text wasn’t saved",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Yesterday",
+    "header-label": "Yesterday",
+    "header-meta": "2 reads · 5m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r5",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-daniel.png"
+    },
+    "source-icon": "clipboard",
+    "source-label": "Clipboard",
+    "title": "Release notes 2.4: faster startup, a new compact player, and fixes for the selection popup on high-DPI displays.",
+    "meta": "Clipboard · Daniel · 1:32 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 10:04 PM",
+    "favorite": false,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r6",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-aria.png"
+    },
+    "source-icon": "type",
+    "source-label": "Typed in app",
+    "title": "Remember to call the pharmacy before five, then pick up the parcel at the post office.",
+    "meta": "Typed in app · Aria · 3:47 · yesterday",
+    "time-tooltip": "Thursday, October 16, 2026 at 6:30 PM",
+    "favorite": true,
+    "badges": [
+     "Paused"
+    ],
+    "progress": 0.74,
+    "percent": "74%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Wednesday",
+    "header-label": "Wednesday",
+    "header-meta": "2 reads · 3m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r7",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-roger.png"
+    },
+    "source-icon": "folder-open",
+    "source-label": "File Explorer",
+    "title": "Annual report 2026 — Letter to shareholders. This year we doubled our investment in research and opened two new studios.",
+    "meta": "Explorer · Roger · 12:31 · 2 days ago",
+    "time-tooltip": "Wednesday, October 15, 2026 at 9:12 AM",
+    "favorite": false,
+    "badges": [],
+    "progress": 0.21,
+    "percent": "21%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r8",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-sarah.png"
+    },
+    "source-icon": "terminal",
+    "source-label": "Command line",
+    "title": "Build finished in 42 seconds with 0 warnings.",
+    "meta": "Command line · Sarah · 0:22 · 2 days ago",
+    "time-tooltip": "Wednesday, October 15, 2026 at 8:01 AM",
+    "favorite": false,
+    "badges": [],
+    "progress": 1.0,
+    "percent": "100%",
+    "complete": true,
+    "can-replay": true,
+    "replay-label": "Replay",
+    "replay-tooltip": "Replay · uses credits",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.header"
+    },
+    "id": "h-Thu, Oct 9",
+    "header-label": "Thu, Oct 9",
+    "header-meta": "1 read · 4m",
+    "source-icon": "",
+    "source-label": "",
+    "title": "",
+    "meta": "",
+    "time-tooltip": "",
+    "favorite": false,
+    "badges": [],
+    "progress": 0,
+    "percent": "",
+    "complete": false,
+    "can-replay": false,
+    "replay-label": "",
+    "replay-tooltip": "",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   },
+   {
+    "kind": {
+     "$enum": "HistoryRowKind.read"
+    },
+    "id": "r9",
+    "header-label": "",
+    "header-meta": "",
+    "art": {
+     "$image": "art/thumb-laura.png"
+    },
+    "source-icon": "globe",
+    "source-label": "Browser extension",
+    "title": "How to brew pour-over coffee at home: grind size, water temperature and a steady spiral pour.",
+    "meta": "Edge · Laura · 8:14 · 9:05 PM",
+    "time-tooltip": "Thursday, October 9, 2026 at 9:05 PM",
+    "favorite": false,
+    "badges": [
+     "Free replay"
+    ],
+    "progress": 0.45,
+    "percent": "45%",
+    "complete": false,
+    "can-replay": true,
+    "replay-label": "Replay (free)",
+    "replay-tooltip": "Free replay from saved audio",
+    "expanded": false,
+    "full-text": "",
+    "notes": [],
+    "facts": [],
+    "details": [],
+    "url-label": ""
+   }
+  ],
+  "footer": "",
+  "can-load-more": false,
+  "loading-more": false,
+  "end-of-history": true,
+  "revision": 1
+ }
+}

@@ -1,0 +1,81 @@
+// Badge: a small 22-h status pill ("In use", "Free replay", "New", "Cloned").
+//
+//   in    text: string              12 / 600 (md 13 / 600, lg 14 / 600)
+//   in    size: BadgeSize           sm (22 h, default) | md (32 h, beside sm buttons) | lg (40 h, beside md buttons:
+//                                   a state that replaces a button, e.g. "In use" where other rows say "Use voice")
+//   in    kind: BadgeKind           filled (chip fill + hairline, default) | outline (hairline only)
+//                                   | solid (primary fill, on-primary text: rare, strong emphasis)
+//   in    icon: image               optional leading 12 px glyph
+//   in    dot: BadgeDot             none (default) | success | danger | muted: a 6 px status dot before the text
+// Not interactive.
+
+import { Theme } from "theme.slint";
+import { Icon } from "icon.slint";
+
+export enum BadgeKind { filled, outline, solid }
+export enum BadgeDot { none, success, danger, muted }
+export enum BadgeSize { sm, md, lg }
+
+export component Badge {
+    in property <string> text;
+    in property <BadgeKind> kind: BadgeKind.filled;
+    in property <image> icon;
+    in property <BadgeDot> dot: BadgeDot.none;
+    in property <BadgeSize> size: BadgeSize.sm;
+
+    property <bool> md: root.size == BadgeSize.md;
+    property <bool> lg: root.size == BadgeSize.lg;
+
+    // Button-sized outline badges sit next to real pills: they take the pills' quiet hairline (a brighter one
+    // would read as a focused button); the glyph (a check) and the missing fill mark them as a state.
+    property <color> fg: root.kind == BadgeKind.solid ? Theme.on-primary
+        : root.kind == BadgeKind.outline ? Theme.text : Theme.text-secondary;
+
+    height: root.lg ? 40px : root.md ? 32px : 22px;
+    min-width: self.height;
+    preferred-width: row.preferred-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Rectangle {
+        border-radius: root.height / 2;
+        background: root.kind == BadgeKind.solid ? Theme.primary-fill
+            : root.kind == BadgeKind.filled ? Theme.chip : transparent;
+        border-width: root.kind == BadgeKind.solid ? 0px : Theme.hairline;
+        border-color: root.kind == BadgeKind.outline && root.size == BadgeSize.sm ? Theme.field-border-focus : Theme.field-border;
+    }
+
+    row := HorizontalLayout {
+        padding-left: root.lg ? 18px : root.md ? 13px : 9px;
+        padding-right: root.lg ? 18px : root.md ? 13px : 9px;
+        spacing: root.lg ? 7px : root.md ? 6px : 5px;
+        alignment: center;
+
+        if root.dot != BadgeDot.none: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.dot == BadgeDot.success ? Theme.success
+                    : root.dot == BadgeDot.danger ? Theme.danger : Theme.text-muted;
+            }
+        }
+        if root.icon.width > 0: Icon {
+            source: root.icon;
+            size: root.lg ? 16px : root.md ? 14px : 12px;
+            color: root.fg;
+        }
+        Text {
+            text: root.text;
+            font-family: Theme.font-text;
+            font-size: root.lg ? Theme.size-body : root.md ? Theme.size-label : Theme.size-caption;
+            font-weight: Theme.weight-semibold;
+            color: root.fg;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+}

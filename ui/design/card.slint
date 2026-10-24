@@ -1,0 +1,38 @@
+// Card: a quiet container. Used sparingly: hierarchy should come from type and grey levels, not boxes.
+//
+//   in    kind: CardKind            surface (panel fill + panel-border hairline: on the backdrop, onboarding,
+//                                   widget) | outline (no fill, divider hairline: inset areas inside the panel,
+//                                   default) | inset (field fill, no border: expanded-row details, code/text blocks)
+//   in    content-padding: length   inner padding (default 20)
+//   in    content-spacing: length   gap between children (default 12)
+//   in    radius: length            default 16
+//   @children                       stacked vertically from the top (a VerticalLayout, alignment start); nest your
+//                                   own layouts for anything else
+// Not interactive (no focus); wrap content in a ListRow or Button for actions.
+
+import { Theme } from "theme.slint";
+
+export enum CardKind { surface, outline, inset }
+
+export component Card inherits Rectangle {
+    in property <CardKind> kind: CardKind.outline;
+    in property <length> content-padding: Theme.space-5;
+    in property <length> content-spacing: Theme.space-3;
+    in property <length> radius: Theme.radius-card;
+
+    border-radius: root.radius;
+    background: root.kind == CardKind.surface ? Theme.panel
+        : root.kind == CardKind.inset ? Theme.field : transparent;
+    border-width: root.kind == CardKind.inset ? 0px : Theme.hairline;
+    border-color: root.kind == CardKind.surface ? Theme.panel-border : Theme.divider;
+    vertical-stretch: 0;
+    accessible-role: groupbox;
+
+    VerticalLayout {
+        padding: root.content-padding;
+        spacing: root.content-spacing;
+        // A card stretched by its row (equal-height cards) keeps its content at the top instead of spreading it.
+        alignment: start;
+        @children
+    }
+}
