@@ -677,16 +677,31 @@ export struct AboutData {
     demo: bool,
 }
 
-// Settings → Voice providers → Amazon Polly.
-export struct PollyData {
+// Settings → Voice providers: one card per service.
+export struct ProviderCardData {
+    // Provider id ("polly", "azure", "openai", "google", "windows").
+    id: string,
+    name: string,
+    description: string,
     connected: bool,
-    // "US East (N. Virginia) · access key AKIA…WXYZ"
+    // Needs no setup (the Windows voices): no form, no disconnect.
+    built-in: bool,
+    // Connected summary ("US East (N. Virginia) · key AKIA…WXYZ", "3 voices installed").
     status: string,
     busy: bool,
     error: string,
-    // Region display names (PollyRegions order) and the selected one.
+    key-label: string,
+    key-placeholder: string,
+    // Empty = no second secret field.
+    secret-label: string,
+    // Empty = no region picker.
     region-options: [string],
     region-index: int,
+    region-hint: string,
+    // Empty = no "Get a key" link.
+    keys-url: string,
+    // e.g. "Word highlighting is estimated for this service." (empty when timing is exact).
+    timing-note: string,
 }
 
 export struct SettingsData {
@@ -699,7 +714,7 @@ export struct SettingsData {
     // elsewhere): sections re-assert toggles / selects / sliders from data in `changed data` handlers.
     revision: int,
     account: AccountData,
-    polly: PollyData,
+    providers: [ProviderCardData],
     voice: VoiceModelData,
     playback: PlaybackData,
     triggers: TriggersData,

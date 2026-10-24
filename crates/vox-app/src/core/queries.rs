@@ -58,7 +58,7 @@ pub fn build_app_info(
     settings: &SettingsStore,
     bridge: &BridgeServer,
     hook_status: Option<bool>,
-    polly: Option<vox_core::providers::PollyStatus>,
+    providers: Vec<vox_core::providers::ProviderStatus>,
 ) -> AppInfo {
     let current = settings.get();
     let api_key_notice = settings.key_status().problem.map(|p| match p {
@@ -80,8 +80,17 @@ pub fn build_app_info(
         native_hook_available: vox_core::app::native_hook_available(hook_status),
         explorer_menu_installed: catch_unwind(vox_win::registry::is_explorer_menu_installed).unwrap_or(false),
         demo_mode: runtime.flags.demo,
-        polly,
+        providers,
     }
+}
+
+/// What the UI may know about every connected provider (no secrets).
+pub fn provider_statuses(engine: &vox_tts::TtsEngine) -> Vec<vox_core::providers::ProviderStatus> {
+    engine
+        .providers()
+        .into_iter()
+        .map(|p| vox_core::providers::ProviderStatus { provider: p.provider(), summary: p.summary(), region: p.region() })
+        .collect()
 }
 
 impl Core {

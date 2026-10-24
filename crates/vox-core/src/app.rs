@@ -242,8 +242,8 @@ pub struct AppInfo {
     pub native_hook_available: bool,
     pub explorer_menu_installed: bool,
     pub demo_mode: bool,
-    /// Amazon Polly connection (no secrets); `None` when not connected.
-    pub polly: Option<crate::providers::PollyStatus>,
+    /// Connected voice providers besides ElevenLabs (no secrets), in `Provider::EXTRA` order.
+    pub providers: Vec<crate::providers::ProviderStatus>,
 }
 
 /// `AppInfo.native_hook_available` from the core's hook status (contracts.md §3.8, §1.5; ARCHITECTURE.md §3.2

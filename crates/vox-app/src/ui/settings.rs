@@ -86,7 +86,7 @@ use super::art::ArtSize;
 use super::convert::{credits_data, keycaps, strings, CreditsSurface};
 use super::generated::{
     AboutData, AccountData, AccountState, AppearanceData, BadgeData, BadgeTone, ChoiceItem, HotkeyRowData, IntegrationsData,
-    LibraryData, PlaybackData, PollyData, SettingsData, TriggersData, VoiceModelData, WidgetSettingsData,
+    LibraryData, PlaybackData, ProviderCardData, SettingsData, TriggersData, VoiceModelData, WidgetSettingsData,
 };
 use super::hotkey_recorder::{self, RecorderEvent};
 use super::shell::DeadlineTimer;
@@ -502,9 +502,9 @@ pub struct SettingsController {
     remove_req: Option<RequestId>,
     get_key_req: Option<RequestId>,
     // ── Voice providers ──
-    polly_req: Option<RequestId>,
-    polly_disconnect_req: Option<RequestId>,
-    polly_error: Option<String>,
+    /// In-flight connect (`true`) / disconnect (`false`) requests per provider.
+    provider_reqs: Vec<(RequestId, vox_core::providers::Provider, bool)>,
+    provider_errors: Vec<(vox_core::providers::Provider, String)>,
     // ── Voice & model ──
     voices: Loadable<Arc<Vec<Voice>>>,
     models: Loadable<()>,
@@ -841,63 +841,73 @@ impl SettingsController {
         self.key_req = Some(req);
         cx.core.send(Command::SetApiKey { req, key: key.to_string() });
     }
-    /// Voice providers → Amazon Polly "Connect" / "Save keys".
-    pub fn polly_connect(&mut self, cx: &mut UiCtx, access_key_id: &str, secret_access_key: &str, region_index: i32) {
-        if self.polly_req.is_some() {
+    /// Voice providers → a card's "Connect" / "Save".
+    pub fn provider_connect(&mut self, cx: &mut UiCtx, id: &str, key: &str, secret: &str, region_index: i32) {
+        use vox_core::providers::{Provider, ProviderCredentials};
+        let Some(provider) = Provider::from_id(id) else { return };
+        if self.provider_reqs.iter().any(|(_, p, _)| *p == provider) {
             return;
         }
         let region = usize::try_from(region_index)
             .ok()
-            .and_then(|i| vox_core::providers::POLLY_REGIONS.get(i))
+            .and_then(|i| provider.spec().regions.get(i))
             .map(|(r, _)| r.to_string())
             .unwrap_or_default();
-        let creds = vox_core::providers::PollyCredentials {
-            access_key_id: access_key_id.to_string(),
-            secret_access_key: secret_access_key.to_string(),
-            region,
-        };
-        match creds.validated() {
-            Err(message) => self.polly_error = Some(message),
+        let creds = ProviderCredentials { key: key.to_string(), secret: secret.to_string(), region };
+        self.provider_errors.retain(|(p, _)| *p != provider);
+        match creds.validated(provider) {
+            Err(message) => self.provider_errors.push((provider, message)),
             Ok(creds) => {
-                self.polly_error = None;
                 let req = cx.core.request_id();
-                self.polly_req = Some(req);
-                cx.core.send(Command::ConnectPolly { req, creds });
+                self.provider_reqs.push((req, provider, true));
+                cx.core.send(Command::ConnectProvider { req, provider, creds });
             }
         }
     }
-    pub fn polly_disconnect(&mut self, cx: &mut UiCtx) {
-        if self.polly_disconnect_req.is_some() || cx.app_info.polly.is_none() {
+    pub fn provider_disconnect(&mut self, cx: &mut UiCtx, id: &str) {
+        let Some(provider) = vox_core::providers::Provider::from_id(id) else { return };
+        if self.provider_reqs.iter().any(|(_, p, _)| *p == provider) || !cx.app_info.providers.iter().any(|s| s.provider == provider) {
             return;
         }
         let req = cx.core.request_id();
-        self.polly_disconnect_req = Some(req);
-        cx.core.send(Command::DisconnectPolly { req });
+        self.provider_reqs.push((req, provider, false));
+        cx.core.send(Command::DisconnectProvider { req, provider });
     }
-    pub fn polly_edited(&mut self, cx: &mut UiCtx) {
+    pub fn provider_edited(&mut self, cx: &mut UiCtx, id: &str) {
         let _ = cx;
-        self.polly_error = None;
-    }
-    fn polly_data(&self, cx: &UiCtx) -> PollyData {
-        let regions = vox_core::providers::POLLY_REGIONS;
-        let status = cx.app_info.polly.as_ref();
-        let region_index = status
-            .and_then(|s| regions.iter().position(|(r, _)| *r == s.region))
-            .unwrap_or(0);
-        PollyData {
-            connected: status.is_some(),
-            status: status
-                .map(|s| {
-                    let name = regions.iter().find(|(r, _)| *r == s.region).map_or(s.region.as_str(), |(_, n)| n);
-                    format!("{name} \u{00B7} access key {}", s.access_key_hint)
-                })
-                .unwrap_or_default()
-                .into(),
-            busy: self.polly_req.is_some() || self.polly_disconnect_req.is_some(),
-            error: self.polly_error.clone().unwrap_or_default().into(),
-            region_options: strings(regions.iter().map(|(_, n)| n.to_string())),
-            region_index: region_index as i32,
+        if let Some(provider) = vox_core::providers::Provider::from_id(id) {
+            self.provider_errors.retain(|(p, _)| *p != provider);
         }
+    }
+    fn providers_data(&self, cx: &UiCtx) -> slint::ModelRc<ProviderCardData> {
+        use vox_core::providers::Provider;
+        let cards: Vec<ProviderCardData> = Provider::EXTRA
+            .iter()
+            .map(|&provider| {
+                let spec = provider.spec();
+                let status = cx.app_info.providers.iter().find(|s| s.provider == provider);
+                let region_index = status.and_then(|s| spec.regions.iter().position(|(r, _)| *r == s.region)).unwrap_or(0);
+                ProviderCardData {
+                    id: provider.id().into(),
+                    name: provider.display_name().into(),
+                    description: spec.description.into(),
+                    connected: status.is_some(),
+                    built_in: !provider.needs_credentials(),
+                    status: status.map(|s| s.summary.clone()).unwrap_or_default().into(),
+                    busy: self.provider_reqs.iter().any(|(_, p, _)| *p == provider),
+                    error: self.provider_errors.iter().find(|(p, _)| *p == provider).map(|(_, e)| e.clone()).unwrap_or_default().into(),
+                    key_label: spec.key_label.into(),
+                    key_placeholder: spec.key_placeholder.into(),
+                    secret_label: spec.secret_label.into(),
+                    region_options: strings(spec.regions.iter().map(|(_, n)| n.to_string())),
+                    region_index: region_index as i32,
+                    region_hint: spec.region_hint.into(),
+                    keys_url: spec.keys_url.into(),
+                    timing_note: if spec.exact_timing { "" } else { "Word highlighting is estimated for this service." }.into(),
+                }
+            })
+            .collect();
+        slint::ModelRc::new(slint::VecModel::from(cards))
     }
     pub fn key_edited(&mut self, cx: &mut UiCtx) {
         let _ = cx;
@@ -1137,21 +1147,20 @@ impl SettingsController {
     }
 
     fn on_done(&mut self, cx: &mut UiCtx, req: RequestId, result: &Result<(), String>) -> bool {
-        if self.polly_req == Some(req) {
-            self.polly_req = None;
-            match result {
-                Ok(()) => {
-                    self.polly_error = None;
-                    Self::toast(cx, Toast::success("Amazon Polly connected. Its voices are on the Voices page.").with_id("polly"));
+        if let Some(i) = self.provider_reqs.iter().position(|(r, _, _)| *r == req) {
+            let (_, provider, connect) = self.provider_reqs.remove(i);
+            let name = provider.display_name();
+            match (connect, result) {
+                (true, Ok(())) => {
+                    self.provider_errors.retain(|(p, _)| *p != provider);
+                    Self::toast(cx, Toast::success(format!("{name} connected. Its voices are on the Voices page.")).with_id("provider"));
                 }
-                Err(e) => self.polly_error = Some(format::clean_error(e)),
-            }
-            return true;
-        }
-        if self.polly_disconnect_req == Some(req) {
-            self.polly_disconnect_req = None;
-            if result.is_ok() {
-                Self::toast(cx, Toast::info("Amazon Polly disconnected").with_id("polly"));
+                (true, Err(e)) => {
+                    self.provider_errors.retain(|(p, _)| *p != provider);
+                    self.provider_errors.push((provider, format::clean_error(e)));
+                }
+                (false, Ok(())) => Self::toast(cx, Toast::info(format!("{name} disconnected")).with_id("provider")),
+                (false, Err(_)) => {}
             }
             return true;
         }
@@ -1693,7 +1702,7 @@ impl PageController for SettingsController {
             sections: choice_model(vs::SETTINGS_SECTIONS.iter().map(|(id, label)| choice(*id, *label, *label)).collect()),
             revision: self.revision,
             account: self.account_data(cx),
-            polly: self.polly_data(cx),
+            providers: self.providers_data(cx),
             voice: self.voice_data(cx, &view),
             playback: Self::playback_data(&view),
             triggers: self.triggers_data(cx, &view),

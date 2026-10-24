@@ -1,12 +1,13 @@
-// Settings → Voice providers. Amazon Polly today; later cloud providers add a block each.
+// Settings → Voice providers: one card per service (Windows voices, Amazon Polly, Azure, OpenAI, Google Cloud).
 //
-// Polly block: when connected, a status row (region and masked access key) with "Change keys" and "Disconnect";
-// otherwise (or while changing keys) a form: access key ID, secret access key, region, Connect. The drafts live here
-// (never in Rust data): they are cleared when Polly becomes connected. Rust validates and answers through `data`
+// A card shows the service, its connection status and, when not connected (or while changing keys), a setup form:
+// the key field, an optional second secret field (Polly), an optional region picker (Polly, Azure), Connect and a
+// link to where the keys are made. Built-in services (Windows) have no form. The drafts live in each card (never in
+// Rust data) and are cleared when the service becomes connected. Rust validates and answers through the card data
 // (`busy`, `error`).
-import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, TextField, FormField, Select, Badge, BadgeKind, BadgeDot }
-    from "../../design/index.slint";
-import { PollyData } from "../../models.slint";
+import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, TextField, FormField, Select, Badge, BadgeKind, BadgeDot,
+    Divider } from "../../design/index.slint";
+import { ProviderCardData } from "../../models.slint";
 import { SectionHead, WrapText, AlertLine } from "parts.slint";
 
 component ProviderTile inherits Rectangle {
@@ -27,32 +28,193 @@ component ProviderTile inherits Rectangle {
     }
 }
 
-export component ProvidersSection inherits Rectangle {
-    in property <PollyData> polly;
+component ProviderCard inherits Rectangle {
+    in property <ProviderCardData> card;
 
-    // Connect with (access key id, secret access key, region index).
-    callback polly-connect(string, string, int);
-    callback polly-disconnect();
-    // Typing clears the error.
-    callback polly-edited();
-    // "Get AWS keys" opens the AWS console.
+    callback connect(string, string, int);
+    callback disconnect();
+    callback edited();
     callback open-link(string);
 
     property <bool> editing: false;
-    property <string> access-draft;
+    property <string> key-draft;
     property <string> secret-draft;
-    property <int> region-index: root.polly.region-index;
-    property <bool> show-form: !root.polly.connected || root.editing;
+    property <int> region-index: root.card.region-index;
+    property <bool> show-form: !root.card.built-in && (!root.card.connected || root.editing);
+    property <bool> has-secret: root.card.secret-label != "";
+    property <bool> has-region: root.card.region-options.length > 0;
     property <length> body-width: max(0px, root.width - 40px - Theme.space-4);
 
-    changed polly => {
-        if (root.polly.connected && !root.polly.busy && root.polly.error == "") {
+    changed card => {
+        if (root.card.connected && !root.card.busy && root.card.error == "") {
             root.editing = false;
-            root.access-draft = "";
+            root.key-draft = "";
             root.secret-draft = "";
         }
-        root.region-index = root.polly.region-index;
+        root.region-index = root.card.region-index;
     }
+
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    horizontal-stretch: 1;
+    background: transparent;
+    accessible-role: groupbox;
+    accessible-label: root.card.name;
+
+    HorizontalLayout {
+        spacing: Theme.space-4;
+
+        VerticalLayout {
+            alignment: start;
+            ProviderTile { icon: root.card.built-in ? Icons.monitor : Icons.globe; }
+        }
+
+        VerticalLayout {
+            width: root.body-width;
+            spacing: Theme.space-2;
+
+            HorizontalLayout {
+                spacing: Theme.space-2;
+                alignment: start;
+                Text {
+                    text: root.card.name;
+                    font-family: Theme.font-text;
+                    font-size: Theme.size-body;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                }
+                if root.card.connected: Badge {
+                    text: root.card.built-in ? "Built in" : "Connected";
+                    dot: BadgeDot.success;
+                    kind: BadgeKind.filled;
+                }
+            }
+
+            WrapText {
+                width: root.body-width;
+                text: root.card.connected && !root.card.built-in ? root.card.status : root.card.description;
+            }
+            if root.card.built-in && root.card.status != "": WrapText {
+                width: root.body-width;
+                text: root.card.status;
+            }
+            if root.card.timing-note != "": WrapText {
+                width: root.body-width;
+                text: root.card.timing-note;
+            }
+
+            if root.card.connected && !root.card.built-in && !root.editing: HorizontalLayout {
+                spacing: Theme.space-2;
+                alignment: start;
+                padding-top: Theme.space-2;
+                Button {
+                    text: "Change key";
+                    size: ButtonSize.sm;
+                    clicked => { root.editing = true; }
+                }
+                Button {
+                    text: "Disconnect";
+                    kind: ButtonKind.danger;
+                    size: ButtonSize.sm;
+                    loading: root.card.busy;
+                    clicked => { root.disconnect(); }
+                }
+            }
+
+            if root.show-form: VerticalLayout {
+                width: root.body-width;
+                spacing: Theme.space-4;
+                padding-top: Theme.space-2;
+
+                FormField {
+                    label: root.card.key-label;
+                    TextField {
+                        text <=> root.key-draft;
+                        icon: Icons.key-round;
+                        placeholder: root.card.key-placeholder;
+                        password: !root.has-secret;
+                        label: root.card.key-label;
+                        has-error: root.card.error != "";
+                        edited => { root.edited(); }
+                        accepted(t) => {
+                            if (!root.has-secret) {
+                                root.connect(t, "", root.region-index);
+                            }
+                        }
+                    }
+                }
+                if root.has-secret: FormField {
+                    label: root.card.secret-label;
+                    TextField {
+                        text <=> root.secret-draft;
+                        icon: Icons.lock;
+                        placeholder: root.card.secret-label;
+                        password: true;
+                        label: root.card.secret-label;
+                        has-error: root.card.error != "";
+                        edited => { root.edited(); }
+                        accepted(t) => { root.connect(root.key-draft, t, root.region-index); }
+                    }
+                }
+                if root.has-region: FormField {
+                    label: "Region";
+                    hint: root.card.region-hint;
+                    Select {
+                        model: root.card.region-options;
+                        current-index: root.region-index;
+                        label: "Region";
+                        selected(i, v) => { root.region-index = i; }
+                    }
+                }
+
+                if root.card.error != "": AlertLine {
+                    width: root.body-width;
+                    text: root.card.error;
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    Button {
+                        text: root.card.connected ? "Save" : "Connect";
+                        kind: ButtonKind.primary;
+                        size: ButtonSize.sm;
+                        loading: root.card.busy;
+                        clicked => { root.connect(root.key-draft, root.secret-draft, root.region-index); }
+                    }
+                    if root.card.connected: Button {
+                        text: "Cancel";
+                        size: ButtonSize.sm;
+                        enabled: !root.card.busy;
+                        clicked => {
+                            root.editing = false;
+                            root.key-draft = "";
+                            root.secret-draft = "";
+                        }
+                    }
+                    if root.card.keys-url != "": Button {
+                        text: "Get a key";
+                        kind: ButtonKind.ghost;
+                        size: ButtonSize.sm;
+                        trailing-icon: Icons.arrow-up-right;
+                        clicked => { root.open-link(root.card.keys-url); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ProvidersSection inherits Rectangle {
+    in property <[ProviderCardData]> cards;
+
+    // (provider id, key, secret, region index)
+    callback provider-connect(string, string, string, int);
+    callback provider-disconnect(string);
+    callback provider-edited(string);
+    callback open-link(string);
 
     min-width: 0px;
     preferred-width: 0px;
@@ -74,136 +236,15 @@ export component ProvidersSection inherits Rectangle {
             text: "Use voices from other services alongside ElevenLabs. Their voices appear on the Voices page, and each service bills its own account.";
         }
 
-        // ── Amazon Polly ──
-        HorizontalLayout {
-            width: root.width;
-            spacing: Theme.space-4;
-
-            VerticalLayout {
-                alignment: start;
-                ProviderTile { icon: Icons.globe; }
-            }
-
-            VerticalLayout {
-                width: root.body-width;
-                spacing: Theme.space-2;
-
-                HorizontalLayout {
-                    spacing: Theme.space-2;
-                    alignment: start;
-                    Text {
-                        text: "Amazon Polly";
-                        font-family: Theme.font-text;
-                        font-size: Theme.size-body;
-                        font-weight: Theme.weight-semibold;
-                        color: Theme.text;
-                        vertical-alignment: center;
-                    }
-                    if root.polly.connected: Badge {
-                        text: "Connected";
-                        dot: BadgeDot.success;
-                        kind: BadgeKind.filled;
-                    }
-                }
-
-                WrapText {
-                    width: root.body-width;
-                    text: root.polly.connected ? root.polly.status
-                        : "Neural and generative voices from AWS. Create an access key for an IAM user with the AmazonPollyReadOnlyAccess permission, then paste it here.";
-                }
-
-                if root.polly.connected && !root.editing: HorizontalLayout {
-                    spacing: Theme.space-2;
-                    alignment: start;
-                    padding-top: Theme.space-2;
-                    Button {
-                        text: "Change keys";
-                        size: ButtonSize.sm;
-                        clicked => { root.editing = true; }
-                    }
-                    Button {
-                        text: "Disconnect";
-                        kind: ButtonKind.danger;
-                        size: ButtonSize.sm;
-                        loading: root.polly.busy;
-                        clicked => { root.polly-disconnect(); }
-                    }
-                }
-
-                if root.show-form: VerticalLayout {
-                    width: root.body-width;
-                    spacing: Theme.space-4;
-                    padding-top: Theme.space-2;
-
-                    FormField {
-                        label: "Access key ID";
-                        TextField {
-                            text <=> root.access-draft;
-                            icon: Icons.user;
-                            placeholder: "AKIA…";
-                            label: "Access key ID";
-                            has-error: root.polly.error != "";
-                            edited => { root.polly-edited(); }
-                        }
-                    }
-                    FormField {
-                        label: "Secret access key";
-                        TextField {
-                            text <=> root.secret-draft;
-                            icon: Icons.key-round;
-                            placeholder: "Secret access key";
-                            password: true;
-                            label: "Secret access key";
-                            has-error: root.polly.error != "";
-                            edited => { root.polly-edited(); }
-                            accepted(t) => { root.polly-connect(root.access-draft, t, root.region-index); }
-                        }
-                    }
-                    FormField {
-                        label: "Region";
-                        hint: "Pick the region closest to you. Most voices are available in US East (N. Virginia).";
-                        Select {
-                            model: root.polly.region-options;
-                            current-index: root.region-index;
-                            label: "Region";
-                            selected(i, v) => { root.region-index = i; }
-                        }
-                    }
-
-                    if root.polly.error != "": AlertLine {
-                        width: root.body-width;
-                        text: root.polly.error;
-                    }
-
-                    HorizontalLayout {
-                        spacing: Theme.space-2;
-                        alignment: start;
-                        Button {
-                            text: root.polly.connected ? "Save keys" : "Connect";
-                            kind: ButtonKind.primary;
-                            size: ButtonSize.sm;
-                            loading: root.polly.busy;
-                            clicked => { root.polly-connect(root.access-draft, root.secret-draft, root.region-index); }
-                        }
-                        if root.polly.connected: Button {
-                            text: "Cancel";
-                            size: ButtonSize.sm;
-                            enabled: !root.polly.busy;
-                            clicked => {
-                                root.editing = false;
-                                root.access-draft = "";
-                                root.secret-draft = "";
-                            }
-                        }
-                        Button {
-                            text: "Get AWS keys";
-                            kind: ButtonKind.ghost;
-                            size: ButtonSize.sm;
-                            trailing-icon: Icons.arrow-up-right;
-                            clicked => { root.open-link("https://console.aws.amazon.com/iam/home#/security_credentials"); }
-                        }
-                    }
-                }
+        for card[i] in root.cards: VerticalLayout {
+            spacing: Theme.space-5;
+            if i > 0: Divider { }
+            ProviderCard {
+                card: card;
+                connect(k, s, r) => { root.provider-connect(card.id, k, s, r); }
+                disconnect => { root.provider-disconnect(card.id); }
+                edited => { root.provider-edited(card.id); }
+                open-link(u) => { root.open-link(u); }
             }
         }
     }

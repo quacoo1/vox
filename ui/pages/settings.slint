@@ -143,9 +143,9 @@ export component SettingsPage inherits Rectangle {
     callback get-key();
     callback credits-retry();
     // Voice providers
-    callback polly-connect(string, string, int);
-    callback polly-disconnect();
-    callback polly-edited();
+    callback provider-connect(string, string, string, int);
+    callback provider-disconnect(string);
+    callback provider-edited(string);
     // Voice & model
     callback test-voice();
     callback browse-voices();
@@ -559,10 +559,10 @@ export component SettingsPage inherits Rectangle {
                     w-providers := VerticalLayout {
                         a-providers := SectionAnchor { label: "Voice providers"; }
                         ProvidersSection {
-                            polly: root.data.polly;
-                            polly-connect(a, s, r) => { root.polly-connect(a, s, r); }
-                            polly-disconnect => { root.polly-disconnect(); }
-                            polly-edited => { root.polly-edited(); }
+                            cards: root.data.providers;
+                            provider-connect(id, k, s, r) => { root.provider-connect(id, k, s, r); }
+                            provider-disconnect(id) => { root.provider-disconnect(id); }
+                            provider-edited(id) => { root.provider-edited(id); }
                             open-link(u) => { root.open-link(u); }
                         }
                     }

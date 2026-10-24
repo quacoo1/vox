@@ -185,9 +185,16 @@ pub fn run() -> anyhow::Result<ExitCode> {
     let preview_player =
         Player::spawn(PlayerConfig { null_output: shots, name: "preview", ..PlayerConfig::default() }, preview_events(core.clone()));
     let engine = TtsEngine::new(client.clone(), Arc::new(PlayerSink { player: player.clone() }), engine_events(core.clone()), runtime.flags.mock_tts);
-    // Amazon Polly, when credentials were saved earlier (Settings → Voice providers).
-    if let Some(creds) = vox_store::provider_secrets::load_polly(&runtime.profile) {
-        engine.set_polly(Some(vox_tts::PollyClient::new(creds, crate::core::system_proxy_config().as_ref(), &vox_tts::user_agent())));
+    // Other voice providers: the Windows voices always, the rest when credentials were saved (Settings → Voice
+    // providers).
+    {
+        let proxy = crate::core::system_proxy_config();
+        let ua = vox_tts::user_agent();
+        let windows = vox_core::providers::Provider::Windows;
+        engine.set_provider(windows, vox_tts::connect_provider(windows, Default::default(), proxy.as_ref(), &ua));
+        for (provider, creds) in vox_store::provider_secrets::load_all(&runtime.profile) {
+            engine.set_provider(provider, vox_tts::connect_provider(provider, creds, proxy.as_ref(), &ua));
+        }
     }
     let selection = {
         let sink = ui_sink.clone();
@@ -251,7 +258,7 @@ pub fn run() -> anyhow::Result<ExitCode> {
     let args = vox_core::cli::parse_cli_args(&runtime.argv);
     let show_main = should_show_main_at_start(&runtime, &args, &current);
     let route = startup_route(&current, settings.key_status().problem.is_some());
-    let app_info = queries::build_app_info(&runtime, &settings, &bridge, None, engine.polly().map(|p| p.credentials().status()));
+    let app_info = queries::build_app_info(&runtime, &settings, &bridge, None, queries::provider_statuses(&engine));
     let main_placement = crate::windowing::main_window::initial_placement(
         vox_store::window_state::load_window_state(&runtime.profile).as_ref(),
         &vox_win::window::monitors(),

@@ -6043,6 +6043,7 @@ dependencies = [
  "url",
  "vox-core",
  "vox-text",
+ "windows",
 ]
 
 [[package]]

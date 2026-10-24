@@ -95,8 +95,9 @@ use crate::client::{ElevenLabsClient, SynthesisRequest, SynthesisResult};
 use crate::duration::chunk_duration;
 use crate::error::TtsError;
 use crate::mock::{mock_synthesize, positive_speed};
-use crate::polly::PollyClient;
-use vox_core::providers::{parse_polly_voice_id, provider_of, Provider};
+use crate::providers::SpeechProvider;
+use std::collections::HashMap;
+use vox_core::providers::{provider_of, split_voice_id, Provider};
 
 /// Delivery to the player (vox-app forwards to `vox_audio::Player`).
 pub trait TtsSink: Send + Sync {
@@ -220,8 +221,8 @@ struct EngineInner {
     /// Multiplies retry and mock-latency delays (1 in production; tests shorten them).
     delay_scale: f64,
     state: ReentrantMutex<RefCell<EngineState>>,
-    /// Amazon Polly, when connected (voices `polly:<engine>:<id>` route here).
-    polly: RwLock<Option<PollyClient>>,
+    /// Connected providers besides ElevenLabs (voices `<prefix>:<rest>` route here).
+    providers: RwLock<HashMap<Provider, Arc<dyn SpeechProvider>>>,
 }
 
 /// `positive()`-style speed, then the estimate `len16 / 15 / speed`.
@@ -396,12 +397,13 @@ impl EngineInner {
             }
             return Ok(mock_synthesize(&chunk.text, job.settings.voice.speed));
         }
-        if provider_of(&job.voice_id) == Provider::Polly {
-            let polly = self.polly.read().clone();
-            let (Some(polly), Some(voice)) = (polly, parse_polly_voice_id(&job.voice_id)) else {
-                return Err(crate::polly::not_connected());
+        let provider = provider_of(&job.voice_id);
+        if provider != Provider::ElevenLabs {
+            let client = self.providers.read().get(&provider).cloned();
+            let (Some(client), Some((_, rest))) = (client, split_voice_id(&job.voice_id)) else {
+                return Err(crate::providers::not_connected(provider));
             };
-            return self.with_retries(s, i, || polly.synthesize(&chunk.text, &voice, &s.cancel));
+            return self.with_retries(s, i, || client.synthesize(&chunk.text, rest, &s.cancel));
         }
         let req = SynthesisRequest {
             text: chunk.text.clone(),
@@ -581,7 +583,7 @@ impl TtsEngine {
                 mock,
                 delay_scale: scale,
                 state: ReentrantMutex::new(RefCell::new(EngineState::default())),
-                polly: RwLock::new(None),
+                providers: RwLock::new(HashMap::new()),
             }),
         }
     }
@@ -687,14 +689,28 @@ impl TtsEngine {
         st.current.as_ref().map(|c| c.session.read_id.clone())
     }
 
-    /// Connects (or with `None` disconnects) Amazon Polly for voices `polly:…`.
-    pub fn set_polly(&self, client: Option<PollyClient>) {
-        *self.inner.polly.write() = client;
+    /// Connects (or with `None` disconnects) a provider for voices with its prefix.
+    pub fn set_provider(&self, provider: Provider, client: Option<Arc<dyn SpeechProvider>>) {
+        let mut map = self.inner.providers.write();
+        match client {
+            Some(c) => {
+                map.insert(provider, c);
+            }
+            None => {
+                map.remove(&provider);
+            }
+        }
     }
 
-    /// The connected Polly client, if any.
-    pub fn polly(&self) -> Option<PollyClient> {
-        self.inner.polly.read().clone()
+    /// The connected client for `provider`, if any.
+    pub fn provider(&self, provider: Provider) -> Option<Arc<dyn SpeechProvider>> {
+        self.inner.providers.read().get(&provider).cloned()
+    }
+
+    /// Every connected provider, in `Provider::EXTRA` order.
+    pub fn providers(&self) -> Vec<Arc<dyn SpeechProvider>> {
+        let map = self.inner.providers.read();
+        Provider::EXTRA.iter().filter_map(|p| map.get(p).cloned()).collect()
     }
 
     pub fn is_mock(&self) -> bool {

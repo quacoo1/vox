@@ -11,7 +11,6 @@
 //! - Polly characters are billed by AWS, not ElevenLabs: results carry `character_cost = Some(0)` so they never count
 //!   against the ElevenLabs credits shown in the app.
 
-use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -19,7 +18,7 @@ use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use vox_core::providers::{polly_voice_id, PollyCredentials, PollyVoiceRef, Provider};
+use vox_core::providers::{parse_polly_rest, polly_voice_id, PollyVoiceRef, Provider, ProviderCredentials};
 use vox_core::read::ReadErrorCode;
 use vox_core::text16::utf16_len;
 use vox_core::tts::{Alignment, MIME_MPEG};
@@ -27,6 +26,7 @@ use vox_core::voices::Voice;
 
 use crate::cancel::CancelToken;
 use crate::client::{ProxyConfig, SynthesisResult};
+use crate::providers::{build_agent, mp3_duration_sec, send, SpeechProvider, LIST_TIMEOUT, SYNTH_TIMEOUT};
 use crate::error::TtsError;
 use crate::mock::even_alignment;
 
@@ -34,18 +34,13 @@ type HmacSha256 = Hmac<Sha256>;
 
 const SERVICE: &str = "polly";
 const SAMPLE_RATE: &str = "24000";
-const SYNTH_TIMEOUT: Duration = Duration::from_secs(45);
-const LIST_TIMEOUT: Duration = Duration::from_secs(20);
-const MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Credentials as entered are wrong or not allowed to use Polly.
 const MSG_UNAUTHORIZED: &str = "Amazon Polly refused the request. Check the access key, secret key and region in Settings → Voice providers.";
 const MSG_DENIED: &str = "This AWS key is not allowed to use Amazon Polly. Give it the AmazonPollyReadOnlyAccess permission (or polly:SynthesizeSpeech and polly:DescribeVoices).";
 const MSG_THROTTLED: &str = "Amazon Polly is busy (too many requests). Try again in a moment.";
 const MSG_TOO_LONG: &str = "This text is too long for one Amazon Polly request.";
-const MSG_NETWORK: &str = "Can’t reach Amazon Polly. Check your internet connection.";
 const MSG_GENERIC: &str = "Amazon Polly couldn’t read this text.";
-const MSG_NOT_CONNECTED: &str = "Connect Amazon Polly in Settings → Voice providers to use this voice.";
 
 /// A Polly client for one set of credentials (cheap to clone).
 #[derive(Clone)]
@@ -54,7 +49,7 @@ pub struct PollyClient {
 }
 
 struct Inner {
-    creds: PollyCredentials,
+    creds: ProviderCredentials,
     agent: ureq::Agent,
     /// Overridable for tests (`http://127.0.0.1:<port>`); production is `https://polly.<region>.amazonaws.com`.
     endpoint: String,
@@ -66,28 +61,23 @@ impl std::fmt::Debug for PollyClient {
     }
 }
 
-/// The error for a Polly voice when Polly is not connected.
-pub fn not_connected() -> TtsError {
-    TtsError::new(ReadErrorCode::NoApiKey, MSG_NOT_CONNECTED)
-}
-
 impl PollyClient {
-    pub fn new(creds: PollyCredentials, proxy: Option<&ProxyConfig>, user_agent: &str) -> Self {
+    pub fn new(creds: ProviderCredentials, proxy: Option<&ProxyConfig>, user_agent: &str) -> Self {
         let endpoint = format!("https://polly.{}.amazonaws.com", creds.region);
         Self::with_endpoint(creds, proxy, user_agent, endpoint)
     }
 
     /// [`PollyClient::new`] against another endpoint (tests).
-    pub fn with_endpoint(creds: PollyCredentials, proxy: Option<&ProxyConfig>, user_agent: &str, endpoint: String) -> Self {
+    pub fn with_endpoint(creds: ProviderCredentials, proxy: Option<&ProxyConfig>, user_agent: &str, endpoint: String) -> Self {
         Self { inner: Arc::new(Inner { creds, agent: build_agent(user_agent, proxy), endpoint }) }
     }
 
-    pub fn credentials(&self) -> &PollyCredentials {
+    pub fn credentials(&self) -> &ProviderCredentials {
         &self.inner.creds
     }
 
     /// Synthesizes `text` with `voice`: MP3 audio plus word timing.
-    pub fn synthesize(&self, text: &str, voice: &PollyVoiceRef, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+    pub fn synthesize_ref(&self, text: &str, voice: &PollyVoiceRef, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
         if cancel.is_cancelled() {
             return Err(TtsError::cancelled());
         }
@@ -148,11 +138,6 @@ impl PollyClient {
         Ok(out)
     }
 
-    /// Checks the credentials (lists voices); `Ok(voice count)`.
-    pub fn validate(&self) -> Result<usize, TtsError> {
-        self.list_voices().map(|v| v.len())
-    }
-
     fn post_speech(&self, body: &Value) -> Result<Vec<u8>, TtsError> {
         let bytes = serde_json::to_vec(body).map_err(|_| TtsError::bad_response())?;
         self.request("POST", "/v1/speech", &[], &bytes, SYNTH_TIMEOUT)
@@ -175,57 +160,16 @@ impl PollyClient {
         });
         let qs = canonical_query(query);
         let url = if qs.is_empty() { format!("{}{path}", self.inner.endpoint) } else { format!("{}{path}?{qs}", self.inner.endpoint) };
-        let result = if method == "POST" {
-            let mut rb = self.inner.agent.post(&url).header("x-amz-date", &signed.amz_date).header("authorization", &signed.authorization);
-            if let Some(ct) = content_type {
-                rb = rb.header("content-type", ct);
-            }
-            rb.config().timeout_global(Some(timeout)).max_redirects(0).build().send(body)
-        } else {
-            self.inner
-                .agent
-                .get(&url)
-                .header("x-amz-date", &signed.amz_date)
-                .header("authorization", &signed.authorization)
-                .config()
-                .timeout_global(Some(timeout))
-                .build()
-                .call()
-        };
-        let mut res = result.map_err(|e| {
-            tracing::warn!(target: "tts", "polly {method} {path}: transport error: {e}");
-            match e {
-                ureq::Error::Timeout(_) => TtsError::timeout(),
-                _ => TtsError::new(ReadErrorCode::Network, MSG_NETWORK),
-            }
-        })?;
-        let status = res.status().as_u16();
-        let error_type = res.headers().get("x-amzn-errortype").and_then(|v| v.to_str().ok()).map(str::to_string);
-        let mut raw = Vec::new();
-        res.body_mut()
-            .with_config()
-            .limit(MAX_BODY_BYTES)
-            .reader()
-            .read_to_end(&mut raw)
-            .map_err(|_| TtsError::new(ReadErrorCode::Network, MSG_NETWORK))?;
-        if (200..300).contains(&status) {
-            return Ok(raw);
+        let mut headers = vec![("x-amz-date", signed.amz_date.clone()), ("authorization", signed.authorization.clone())];
+        if let Some(ct) = content_type {
+            headers.push(("content-type", ct.to_string()));
         }
-        Err(map_error(status, error_type.as_deref(), &raw))
+        let reply = send(&self.inner.agent, "Amazon Polly", method, &url, &headers, (method == "POST").then_some(body), timeout)?;
+        if (200..300).contains(&reply.status) {
+            return Ok(reply.body);
+        }
+        Err(map_error(reply.status, reply.header("x-amzn-errortype"), &reply.body))
     }
-}
-
-fn build_agent(user_agent: &str, proxy: Option<&ProxyConfig>) -> ureq::Agent {
-    let tls = ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier).build();
-    let proxy = proxy.and_then(|p| ureq::Proxy::new(&p.url).ok()).filter(|p| matches!(p.protocol(), ureq::ProxyProtocol::Http | ureq::ProxyProtocol::Https));
-    let config = ureq::Agent::config_builder()
-        .http_status_as_error(false)
-        .user_agent(user_agent)
-        .tls_config(tls)
-        .proxy(proxy)
-        .timeout_connect(Some(Duration::from_secs(10)))
-        .build();
-    ureq::Agent::new_with_config(config)
 }
 
 /// Maps a Polly error response to a user-facing [`TtsError`].
@@ -304,6 +248,25 @@ fn map_voice(v: &Value) -> Vec<Voice> {
             }
         })
         .collect()
+}
+
+impl SpeechProvider for PollyClient {
+    fn provider(&self) -> Provider {
+        Provider::Polly
+    }
+    fn synthesize(&self, text: &str, rest: &str, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+        let voice = parse_polly_rest(rest).ok_or_else(|| TtsError::new(ReadErrorCode::Unknown, MSG_GENERIC))?;
+        self.synthesize_ref(text, &voice, cancel)
+    }
+    fn list_voices(&self) -> Result<Vec<Voice>, TtsError> {
+        PollyClient::list_voices(self)
+    }
+    fn summary(&self) -> String {
+        self.inner.creds.summary(Provider::Polly)
+    }
+    fn region(&self) -> String {
+        self.inner.creds.region.clone()
+    }
 }
 
 // ───────────────────────────── speech marks → alignment ─────────────────────────────
@@ -395,65 +358,6 @@ fn round3(x: f64) -> f64 {
     (x * 1000.0).round() / 1000.0
 }
 
-// ───────────────────────────── MP3 duration ─────────────────────────────
-
-/// Duration of an MPEG audio stream by walking its frame headers (skips an ID3v2 tag). `None` without frames.
-pub fn mp3_duration_sec(data: &[u8]) -> Option<f64> {
-    let mut i = 0usize;
-    if data.len() >= 10 && &data[..3] == b"ID3" {
-        let size = (usize::from(data[6] & 0x7f) << 21) | (usize::from(data[7] & 0x7f) << 14) | (usize::from(data[8] & 0x7f) << 7) | usize::from(data[9] & 0x7f);
-        i = 10 + size;
-    }
-    let mut seconds = 0.0;
-    let mut frames = 0usize;
-    while i + 4 <= data.len() {
-        match frame_info(&data[i..i + 4]) {
-            Some((len, samples, rate)) if len > 4 => {
-                seconds += f64::from(samples) / f64::from(rate);
-                frames += 1;
-                i += len;
-            }
-            _ => i += 1,
-        }
-    }
-    (frames > 0).then_some(seconds)
-}
-
-/// `(frame length in bytes, samples per frame, sample rate)` of an MPEG audio frame header.
-fn frame_info(h: &[u8]) -> Option<(usize, u32, u32)> {
-    if h[0] != 0xff || h[1] & 0xe0 != 0xe0 {
-        return None;
-    }
-    let version = (h[1] >> 3) & 0x03; // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
-    let layer = (h[1] >> 1) & 0x03; // 1 = Layer III, 2 = II, 3 = I
-    if version == 1 || layer == 0 {
-        return None;
-    }
-    let bitrate_index = usize::from(h[2] >> 4);
-    let rate_index = usize::from((h[2] >> 2) & 0x03);
-    let padding = usize::from((h[2] >> 1) & 0x01);
-    if bitrate_index == 0 || bitrate_index == 15 || rate_index == 3 {
-        return None;
-    }
-    let mpeg1 = version == 3;
-    const RATES: [[u32; 3]; 3] = [[44100, 48000, 32000], [22050, 24000, 16000], [11025, 12000, 8000]];
-    let rate = RATES[match version {
-        3 => 0,
-        2 => 1,
-        _ => 2,
-    }][rate_index];
-    // Kbps for Layer III (the only layer Polly emits); Layers I/II are not expected.
-    const V1_L3: [u32; 15] = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
-    const V2_L3: [u32; 15] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
-    if layer != 1 {
-        return None;
-    }
-    let kbps = if mpeg1 { V1_L3[bitrate_index] } else { V2_L3[bitrate_index] };
-    let samples: u32 = if mpeg1 { 1152 } else { 576 };
-    let len = (samples as usize / 8) * kbps as usize * 1000 / rate as usize + padding;
-    Some((len, samples, rate))
-}
-
 // ───────────────────────────── SigV4 ─────────────────────────────
 
 /// What [`sign`] needs.
@@ -464,7 +368,7 @@ pub struct SignInput<'a> {
     pub query: &'a [(String, String)],
     pub content_type: Option<&'a str>,
     pub payload: &'a [u8],
-    pub creds: &'a PollyCredentials,
+    pub creds: &'a ProviderCredentials,
     pub service: &'a str,
     pub now: DateTime<Utc>,
 }
@@ -500,11 +404,11 @@ pub fn sign(input: &SignInput<'_>) -> Signed {
     );
     let scope = format!("{date}/{}/{}/aws4_request", input.creds.region, input.service);
     let string_to_sign = format!("AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{}", hex::encode(Sha256::digest(canonical_request.as_bytes())));
-    let key = signing_key(&input.creds.secret_access_key, date, &input.creds.region, input.service);
+    let key = signing_key(&input.creds.secret, date, &input.creds.region, input.service);
     let signature = hex::encode(hmac(&key, string_to_sign.as_bytes()));
     let authorization = format!(
         "AWS4-HMAC-SHA256 Credential={}/{scope}, SignedHeaders={signed_headers}, Signature={signature}",
-        input.creds.access_key_id
+        input.creds.key
     );
     Signed { amz_date, authorization, signature }
 }
@@ -549,8 +453,8 @@ fn uri_encode_path(path: &str) -> String {
 mod tests {
     use super::*;
 
-    fn creds(secret: &str, region: &str) -> PollyCredentials {
-        PollyCredentials { access_key_id: "AKIDEXAMPLE".into(), secret_access_key: secret.into(), region: region.into() }
+    fn creds(secret: &str, region: &str) -> ProviderCredentials {
+        ProviderCredentials { key: "AKIDEXAMPLE".into(), secret: secret.into(), region: region.into() }
     }
 
     /// The worked example from the AWS SigV4 documentation (IAM ListUsers, 2015-08-30 12:36:00 UTC).
@@ -614,21 +518,6 @@ mod tests {
     }
 
     #[test]
-    fn mp3_frames_are_timed() {
-        // MPEG-2 Layer III, 24 kHz, 48 kbps: 576 samples, 144 bytes per frame (no padding).
-        let header = [0xff, 0xf3, 0x64, 0x00];
-        assert_eq!(frame_info(&header), Some((144, 576, 24000)));
-        let mut data = Vec::new();
-        for _ in 0..100 {
-            data.extend_from_slice(&header);
-            data.extend(std::iter::repeat_n(0u8, 140));
-        }
-        let d = mp3_duration_sec(&data).unwrap();
-        assert!((d - 100.0 * 576.0 / 24000.0).abs() < 1e-9, "{d}");
-        assert_eq!(mp3_duration_sec(b"not audio"), None);
-    }
-
-    #[test]
     fn voices_map_per_engine() {
         let v = json!({"Gender":"Female","Id":"Ruth","LanguageCode":"en-US","LanguageName":"US English","Name":"Ruth","SupportedEngines":["generative","long-form","neural"]});
         let out = map_voice(&v);
@@ -646,12 +535,12 @@ mod tests {
     #[test]
     #[ignore]
     fn polly_live_rejects_fake_credentials() {
-        let c = PollyCredentials { access_key_id: "AKIAIOSFODNN7EXAMPLE".into(), secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".into(), region: "us-east-1".into() };
+        let c = ProviderCredentials { key: "AKIAIOSFODNN7EXAMPLE".into(), secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".into(), region: "us-east-1".into() };
         let client = PollyClient::new(c, None, "Vox-test");
-        let e = client.list_voices().unwrap_err();
+        let e = PollyClient::list_voices(&client).unwrap_err();
         assert_eq!(e.code, ReadErrorCode::Unauthorized, "{e:?}");
         let voice = PollyVoiceRef { engine: "neural".into(), voice: "Joanna".into() };
-        let e = client.synthesize("Hello", &voice, &CancelToken::new()).unwrap_err();
+        let e = client.synthesize_ref("Hello", &voice, &CancelToken::new()).unwrap_err();
         assert_eq!(e.code, ReadErrorCode::Unauthorized, "{e:?}");
     }
 

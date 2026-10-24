@@ -572,9 +572,9 @@ impl PageController for VoicesController {
     }
 }
 
-/// An ElevenLabs key or a connected Amazon Polly: the page has voices to list.
+/// An ElevenLabs key or any connected provider (the Windows voices count): the page has voices to list.
 fn has_any_provider(cx: &UiCtx) -> bool {
-    cx.settings.has_api_key || cx.app_info.polly.is_some()
+    cx.settings.has_api_key || !cx.app_info.providers.is_empty()
 }
 
 #[cfg(test)]

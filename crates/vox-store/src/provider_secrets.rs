@@ -1,17 +1,16 @@
 //! Credentials for speech providers other than ElevenLabs, in `providers-dpapi.bin`: one DPAPI blob (current user)
-//! of a JSON object keyed by provider (`{"polly": {"accessKeyId", "secretAccessKey", "region"}}`), so later providers
-//! add a key instead of a file. Written atomically; a missing or unreadable file means "nothing connected". Never
-//! logged; the Electron build does not know this file.
+//! of a JSON object keyed by provider id (`{"polly": {"key", "secret", "region"}, "openai": {"key"}}`). Written
+//! atomically; a missing or unreadable file means "nothing connected". Never logged; the Electron build does not know
+//! this file. (Polly entries saved as `accessKeyId` / `secretAccessKey` by the first version still load.)
 
 use serde_json::{Map, Value};
-use vox_core::providers::PollyCredentials;
+use vox_core::providers::{Provider, ProviderCredentials};
 
 use crate::fsutil::write_file_atomic;
 use crate::paths::Profile;
 use crate::secrets::{dpapi_protect, dpapi_unprotect, SecretError};
 
 const FILE: &str = "providers-dpapi.bin";
-const POLLY: &str = "polly";
 
 fn read_all(profile: &Profile) -> Map<String, Value> {
     let path = profile.root().join(FILE);
@@ -35,22 +34,31 @@ fn write_all(profile: &Profile, map: &Map<String, Value>) -> Result<(), SecretEr
     Ok(())
 }
 
-/// The stored Polly credentials, if any.
-pub fn load_polly(profile: &Profile) -> Option<PollyCredentials> {
-    read_all(profile).get(POLLY).and_then(|v| serde_json::from_value(v.clone()).ok())
+/// The stored credentials of `provider`, if any.
+pub fn load(profile: &Profile, provider: Provider) -> Option<ProviderCredentials> {
+    read_all(profile).get(provider.id()).and_then(|v| serde_json::from_value(v.clone()).ok())
 }
 
-/// Stores Polly credentials (replacing earlier ones).
-pub fn save_polly(profile: &Profile, creds: &PollyCredentials) -> Result<(), SecretError> {
+/// Every provider with stored credentials, in `Provider::EXTRA` order.
+pub fn load_all(profile: &Profile) -> Vec<(Provider, ProviderCredentials)> {
+    let map = read_all(profile);
+    Provider::EXTRA
+        .into_iter()
+        .filter_map(|p| map.get(p.id()).and_then(|v| serde_json::from_value(v.clone()).ok()).map(|c| (p, c)))
+        .collect()
+}
+
+/// Stores `provider`'s credentials (replacing earlier ones).
+pub fn save(profile: &Profile, provider: Provider, creds: &ProviderCredentials) -> Result<(), SecretError> {
     let mut map = read_all(profile);
-    map.insert(POLLY.into(), serde_json::to_value(creds).map_err(|e| SecretError::Dpapi(e.to_string()))?);
+    map.insert(provider.id().into(), serde_json::to_value(creds).map_err(|e| SecretError::Dpapi(e.to_string()))?);
     write_all(profile, &map)
 }
 
-/// Forgets the Polly credentials.
-pub fn clear_polly(profile: &Profile) -> Result<(), SecretError> {
+/// Forgets `provider`'s credentials.
+pub fn clear(profile: &Profile, provider: Provider) -> Result<(), SecretError> {
     let mut map = read_all(profile);
-    if map.remove(POLLY).is_none() {
+    if map.remove(provider.id()).is_none() {
         return Ok(());
     }
     write_all(profile, &map)
@@ -61,16 +69,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn polly_credentials_round_trip_encrypted() {
+    fn credentials_round_trip_encrypted_per_provider() {
         let dir = tempfile::tempdir().unwrap();
         let profile = Profile::at(dir.path().to_path_buf(), false);
-        assert_eq!(load_polly(&profile), None);
-        let c = PollyCredentials { access_key_id: "AKIAEXAMPLE1234".into(), secret_access_key: "SecretValue123".into(), region: "eu-west-1".into() };
-        save_polly(&profile, &c).unwrap();
+        assert_eq!(load(&profile, Provider::Polly), None);
+        let polly = ProviderCredentials { key: "AKIAEXAMPLE1234".into(), secret: "SecretValue123".into(), region: "eu-west-1".into() };
+        let openai = ProviderCredentials { key: "sk-OpenAiTestKey".into(), ..Default::default() };
+        save(&profile, Provider::Polly, &polly).unwrap();
+        save(&profile, Provider::OpenAi, &openai).unwrap();
         let raw = std::fs::read(dir.path().join(FILE)).unwrap();
-        assert!(!String::from_utf8_lossy(&raw).contains("SecretValue123"), "stored encrypted");
-        assert_eq!(load_polly(&profile), Some(c));
-        clear_polly(&profile).unwrap();
-        assert_eq!(load_polly(&profile), None);
+        let text = String::from_utf8_lossy(&raw);
+        assert!(!text.contains("SecretValue123") && !text.contains("sk-OpenAiTestKey"), "stored encrypted");
+        assert_eq!(load(&profile, Provider::Polly), Some(polly.clone()));
+        assert_eq!(load_all(&profile), vec![(Provider::Polly, polly), (Provider::OpenAi, openai)]);
+        clear(&profile, Provider::Polly).unwrap();
+        assert_eq!(load(&profile, Provider::Polly), None);
+        assert!(load(&profile, Provider::OpenAi).is_some());
+    }
+
+    #[test]
+    fn the_first_polly_format_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let profile = Profile::at(dir.path().to_path_buf(), false);
+        let old = br#"{"polly":{"accessKeyId":"AKIAOLD","secretAccessKey":"s","region":"us-east-1"}}"#;
+        std::fs::write(dir.path().join(FILE), dpapi_protect(old).unwrap()).unwrap();
+        assert_eq!(load(&profile, Provider::Polly).map(|c| c.key), Some("AKIAOLD".to_string()));
     }
 }

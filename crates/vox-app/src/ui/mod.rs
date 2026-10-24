@@ -1795,9 +1795,9 @@ fn wire_main(m: &MainWindow) {
     m.on_settings_format_number(|key, value| format_number(&key, value));
     on!(m, on_settings_save_key, settings_cb, |c, cx, key| c.save_key(cx, &key));
     on!(m, on_settings_key_edited, settings_cb, |c, cx| c.key_edited(cx));
-    on!(m, on_settings_polly_connect, settings_cb, |c, cx, access, secret, region| c.polly_connect(cx, &access, &secret, region));
-    on!(m, on_settings_polly_disconnect, settings_cb, |c, cx| c.polly_disconnect(cx));
-    on!(m, on_settings_polly_edited, settings_cb, |c, cx| c.polly_edited(cx));
+    on!(m, on_settings_provider_connect, settings_cb, |c, cx, id, key, secret, region| c.provider_connect(cx, &id, &key, &secret, region));
+    on!(m, on_settings_provider_disconnect, settings_cb, |c, cx, id| c.provider_disconnect(cx, &id));
+    on!(m, on_settings_provider_edited, settings_cb, |c, cx, id| c.provider_edited(cx, &id));
     on!(m, on_settings_open_key_form, settings_cb, |c, cx| c.open_key_form(cx));
     on!(m, on_settings_cancel_key_form, settings_cb, |c, cx| c.cancel_key_form(cx));
     on!(m, on_settings_remove_key, settings_cb, |c, cx| c.remove_key(cx));

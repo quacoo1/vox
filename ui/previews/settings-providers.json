@@ -491,25 +491,112 @@
    "data-folder-ready": true,
    "demo": false
   },
-  "polly": {
-   "connected": false,
-   "status": "",
-   "busy": false,
-   "error": "",
-   "region-options": [
-    "US East (N. Virginia)",
-    "US East (Ohio)",
-    "US West (N. California)",
-    "US West (Oregon)",
-    "Canada (Central)",
-    "South America (São Paulo)",
-    "Europe (Ireland)",
-    "Europe (London)",
-    "Europe (Paris)",
-    "Europe (Frankfurt)"
-   ],
-   "region-index": 0
-  }
+  "providers": [
+   {
+    "id": "windows",
+    "name": "Windows",
+    "description": "The voices built into Windows. Free and offline; no setup needed. Add more under Windows Settings → Time & language → Speech.",
+    "connected": true,
+    "built-in": true,
+    "status": "3 voices installed",
+    "busy": false,
+    "error": "",
+    "key-label": "API key",
+    "key-placeholder": "",
+    "secret-label": "",
+    "region-options": [],
+    "region-index": 0,
+    "region-hint": "",
+    "keys-url": "",
+    "timing-note": ""
+   },
+   {
+    "id": "polly",
+    "name": "Amazon Polly",
+    "description": "Neural and generative voices from AWS.",
+    "connected": true,
+    "built-in": false,
+    "status": "US East (N. Virginia) · key AKIA…WXYZ",
+    "busy": false,
+    "error": "",
+    "key-label": "Access key ID",
+    "key-placeholder": "",
+    "secret-label": "Secret access key",
+    "region-options": [
+     "US East (N. Virginia)",
+     "US East (Ohio)",
+     "US West (N. California)",
+     "US West (Oregon)",
+     "Europe (Ireland)",
+     "Europe (London)"
+    ],
+    "region-index": 0,
+    "region-hint": "",
+    "keys-url": "https://example.com",
+    "timing-note": ""
+   },
+   {
+    "id": "azure",
+    "name": "Azure AI Speech",
+    "description": "Hundreds of neural voices in many languages. Create a Speech resource in the Azure portal and copy one of its keys and its region.",
+    "connected": false,
+    "built-in": false,
+    "status": "",
+    "busy": false,
+    "error": "",
+    "key-label": "Speech resource key",
+    "key-placeholder": "32-character key",
+    "secret-label": "",
+    "region-options": [
+     "East US",
+     "East US 2",
+     "West US",
+     "West Europe",
+     "North Europe",
+     "UK South"
+    ],
+    "region-index": 0,
+    "region-hint": "The region of your Speech resource (shown next to its keys).",
+    "keys-url": "https://example.com",
+    "timing-note": "Word highlighting is estimated for this service."
+   },
+   {
+    "id": "openai",
+    "name": "OpenAI",
+    "description": "Natural, expressive voices from OpenAI (gpt-4o-mini-tts). Paste an API key from your OpenAI account.",
+    "connected": false,
+    "built-in": false,
+    "status": "",
+    "busy": false,
+    "error": "OpenAI refused the request. Check the key in Settings → Voice providers.",
+    "key-label": "API key",
+    "key-placeholder": "sk-…",
+    "secret-label": "",
+    "region-options": [],
+    "region-index": 0,
+    "region-hint": "",
+    "keys-url": "https://example.com",
+    "timing-note": "Word highlighting is estimated for this service."
+   },
+   {
+    "id": "google",
+    "name": "Google Cloud",
+    "description": "Chirp 3 HD, Studio and Neural2 voices. Create an API key in a Google Cloud project with the Text-to-Speech API enabled.",
+    "connected": false,
+    "built-in": false,
+    "status": "",
+    "busy": false,
+    "error": "",
+    "key-label": "API key",
+    "key-placeholder": "AIza…",
+    "secret-label": "",
+    "region-options": [],
+    "region-index": 0,
+    "region-hint": "",
+    "keys-url": "https://example.com",
+    "timing-note": "Word highlighting is estimated for this service."
+   }
+  ]
  },
  "scroll-to": "providers"
 }

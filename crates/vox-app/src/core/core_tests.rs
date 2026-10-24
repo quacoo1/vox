@@ -858,7 +858,7 @@ fn toasts_before_the_ui_is_ready_are_published_and_routed_later() {
 #[test]
 fn app_info_reflects_the_runtime() {
     let kit = Kit::new(None, true);
-    let info = queries::build_app_info(&kit.core.services.runtime, &kit.core.services.settings, &kit.core.services.bridge, None, None);
+    let info = queries::build_app_info(&kit.core.services.runtime, &kit.core.services.settings, &kit.core.services.bridge, None, Vec::new());
     assert_eq!(info.name, "Vox");
     assert_eq!(info.build, "test");
     assert!(info.demo_mode && !info.is_packaged);

@@ -34,8 +34,13 @@ pub mod engine;
 pub mod error;
 mod jsval;
 pub mod mapping;
+pub mod azure;
+pub mod google;
 pub mod mock;
+pub mod openai;
 pub mod polly;
+pub mod providers;
+pub mod windows_voices;
 pub mod wav;
 
 pub use cancel::CancelToken;
@@ -43,3 +48,4 @@ pub use client::{user_agent, ClientConfig, ElevenLabsClient, KeySource, ProxyCon
 pub use engine::{EngineEvent, PlayCachedOptions, StartSessionOptions, TtsEngine, TtsSink};
 pub use error::TtsError;
 pub use polly::PollyClient;
+pub use providers::{connect as connect_provider, not_connected, SpeechProvider};

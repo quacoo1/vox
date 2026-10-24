@@ -255,9 +255,9 @@ export component MainWindow inherits Window {
     callback settings-open-key-form();
     callback settings-cancel-key-form();
     callback settings-remove-key();
-    callback settings-polly-connect(string, string, int);
-    callback settings-polly-disconnect();
-    callback settings-polly-edited();
+    callback settings-provider-connect(string, string, string, int);
+    callback settings-provider-disconnect(string);
+    callback settings-provider-edited(string);
     callback settings-get-key();
     callback settings-credits-retry();
     callback settings-test-voice();
@@ -682,9 +682,9 @@ export component MainWindow inherits Window {
                                     open-key-form => { root.settings-open-key-form(); }
                                     cancel-key-form => { root.settings-cancel-key-form(); }
                                     remove-key => { root.settings-remove-key(); }
-                                    polly-connect(a, s, r) => { root.settings-polly-connect(a, s, r); }
-                                    polly-disconnect => { root.settings-polly-disconnect(); }
-                                    polly-edited => { root.settings-polly-edited(); }
+                                    provider-connect(id, k, s, r) => { root.settings-provider-connect(id, k, s, r); }
+                                    provider-disconnect(id) => { root.settings-provider-disconnect(id); }
+                                    provider-edited(id) => { root.settings-provider-edited(id); }
                                     get-key => { root.settings-get-key(); }
                                     credits-retry => { root.settings-credits-retry(); }
                                     test-voice => { root.settings-test-voice(); }

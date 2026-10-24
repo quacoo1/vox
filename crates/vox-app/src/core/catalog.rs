@@ -34,8 +34,8 @@ use vox_core::read::eleven_messages;
 use vox_core::text16::utf16_len;
 use vox_core::tts::{AudioBytes, TtsChunk, TtsSessionDone, TtsSessionStart};
 use vox_core::voices::{ApiKeyResult, Voice};
-use vox_core::providers::{parse_polly_voice_id, provider_of, PollyCredentials, Provider};
-use vox_tts::{CancelToken, PollyClient};
+use vox_core::providers::{provider_of, split_voice_id, Provider, ProviderCredentials};
+use vox_tts::CancelToken;
 
 use super::reader::Reader;
 use super::{spawn_worker, system_proxy_config, Core};
@@ -149,15 +149,15 @@ impl Core {
         }
         self.maybe_recheck_proxy(false);
         let client = self.services.client.clone();
-        let polly = self.services.engine.polly();
+        let others = self.services.engine.providers();
         let has_key = self.services.settings.has_api_key();
         let core = self.handle.clone();
         let spawned = spawn_worker("vox-voices", move || {
             let result = catch_unwind(AssertUnwindSafe(|| {
-                // ElevenLabs when there is a key (or no other provider to show), Amazon Polly when connected.
-                let eleven = (has_key || polly.is_none()).then(|| client.list_voices(refresh).map_err(|e| e.message));
-                let polly = polly.map(|p| p.list_voices().map_err(|e| e.message));
-                merge_voice_lists(eleven, polly).map(Arc::new)
+                // ElevenLabs when there is a key (or no other provider to show), then every connected provider.
+                let eleven = (has_key || others.is_empty()).then(|| client.list_voices(refresh).map_err(|e| e.message));
+                let rest = others.iter().map(|p| (p.provider(), p.list_voices().map_err(|e| e.message))).collect();
+                merge_voice_lists(eleven, rest).map(Arc::new)
             }))
             .unwrap_or_else(|_| Err(SOMETHING_WENT_WRONG.to_string()));
             core.send(Command::Catalog(CatalogResult::Voices { generation, refresh, result }));
@@ -236,8 +236,8 @@ impl Core {
         if matches!(reading, PlayerStatus::Playing | PlayerStatus::Loading) {
             self.command(PlayerCommand::Pause);
         }
-        if provider_of(&voice_id) == Provider::Polly {
-            self.preview_polly_voice(voice_id);
+        if provider_of(&voice_id) != Provider::ElevenLabs {
+            self.preview_provider_voice(voice_id);
             return;
         }
         let known_url = self.voices.as_ref().and_then(|v| preview_url(v, &voice_id)).map(str::to_string);
@@ -270,23 +270,23 @@ impl Core {
         }
     }
 
-    /// The sample of a Polly voice: a short sentence synthesized on the spot (Polly has no sample files).
-    fn preview_polly_voice(&mut self, voice_id: String) {
+    /// The sample of a non-ElevenLabs voice: a short sentence synthesized on the spot (they have no sample files).
+    fn preview_provider_voice(&mut self, voice_id: String) {
         let cancel = CancelToken::new();
         self.preview = Some(PreviewState { voice_id: voice_id.clone(), session_id: None, playing: false, cancel: cancel.clone() });
         self.publish(UiUpdate::Preview(PreviewUpdate::Loading(voice_id.clone())));
-        let polly = self.services.engine.polly();
+        let client = self.services.engine.provider(provider_of(&voice_id));
         let name = self.voices.as_ref().and_then(|v| v.iter().find(|x| x.voice_id == voice_id)).map(|v| v.name.clone());
         let core = self.handle.clone();
         let id = voice_id.clone();
         let spawned = spawn_worker("vox-preview", move || {
             let fetched = catch_unwind(AssertUnwindSafe(|| {
-                let (Some(polly), Some(voice)) = (polly, parse_polly_voice_id(&id)) else {
-                    return Err(vox_tts::polly::not_connected().message);
+                let (Some(client), Some((provider, rest))) = (client, split_voice_id(&id)) else {
+                    return Err(vox_tts::not_connected(provider_of(&id)).message);
                 };
-                let who = name.map(|n| n.replace(" (Generative)", "")).unwrap_or_else(|| voice.voice.clone());
+                let who = name.map(|n| n.split(" (").next().unwrap_or(&n).to_string()).unwrap_or_else(|| provider.display_name().to_string());
                 let sample = format!("Hi, I’m {who}. This is how I sound when Vox reads to you.");
-                polly.synthesize(&sample, &voice, &cancel).map(|r| r.audio).map_err(|e| e.message)
+                client.synthesize(&sample, rest, &cancel).map(|r| r.audio).map_err(|e| e.message)
             }))
             .unwrap_or_else(|_| Err(SOMETHING_WENT_WRONG.to_string()));
             if cancel.is_cancelled() {
@@ -300,9 +300,13 @@ impl Core {
         }
     }
 
-    /// `ConnectPolly`: checks the fields at once, then the credentials (a voice listing) on a worker.
-    pub(super) fn connect_polly(&mut self, req: RequestId, creds: PollyCredentials) {
-        let creds = match creds.validated() {
+    /// `ConnectProvider`: checks the fields at once, then the credentials on a worker.
+    pub(super) fn connect_provider(&mut self, req: RequestId, provider: Provider, creds: ProviderCredentials) {
+        if !provider.needs_credentials() || provider == Provider::ElevenLabs {
+            self.publish(UiUpdate::Done { req, result: Ok(()) });
+            return;
+        }
+        let creds = match creds.validated(provider) {
             Ok(c) => c,
             Err(message) => {
                 self.publish(UiUpdate::Done { req, result: Err(message) });
@@ -311,43 +315,51 @@ impl Core {
         };
         self.maybe_recheck_proxy(false);
         let core = self.handle.clone();
-        let spawned = spawn_worker("vox-polly-check", move || {
-            let client = PollyClient::new(creds.clone(), system_proxy_config().as_ref(), &vox_tts::user_agent());
-            let result = catch_unwind(AssertUnwindSafe(|| client.validate().map_err(|e| e.message)))
-                .unwrap_or_else(|_| Err(SOMETHING_WENT_WRONG.to_string()));
-            core.send(Command::Catalog(CatalogResult::Polly { req, creds, result }));
+        let spawned = spawn_worker("vox-provider-check", move || {
+            let client = vox_tts::connect_provider(provider, creds.clone(), system_proxy_config().as_ref(), &vox_tts::user_agent());
+            let result = catch_unwind(AssertUnwindSafe(|| match client {
+                Some(c) => c.validate().map_err(|e| e.message),
+                None => Err(SOMETHING_WENT_WRONG.to_string()),
+            }))
+            .unwrap_or_else(|_| Err(SOMETHING_WENT_WRONG.to_string()));
+            core.send(Command::Catalog(CatalogResult::Provider { req, provider, creds, result }));
         });
         if !spawned {
             self.publish(UiUpdate::Done { req, result: Err(SOMETHING_WENT_WRONG.to_string()) });
         }
     }
 
-    fn on_polly_validated(&mut self, req: RequestId, creds: PollyCredentials, result: Result<usize, String>) {
+    fn on_provider_validated(&mut self, req: RequestId, provider: Provider, creds: ProviderCredentials, result: Result<usize, String>) {
+        let name = provider.display_name();
         if let Err(message) = result {
-            tracing::info!(target: "settings", "Amazon Polly credentials rejected");
+            tracing::info!(target: "settings", "{name} credentials rejected");
             self.publish(UiUpdate::Done { req, result: Err(message) });
             return;
         }
-        if let Err(e) = vox_store::provider_secrets::save_polly(&self.services.runtime.profile, &creds) {
-            tracing::warn!(target: "settings", "could not store the Amazon Polly credentials: {e}");
-            self.publish(UiUpdate::Done { req, result: Err("Couldn’t save the Amazon Polly credentials.".to_string()) });
+        if let Err(e) = vox_store::provider_secrets::save(&self.services.runtime.profile, provider, &creds) {
+            tracing::warn!(target: "settings", "could not store the {name} credentials: {e}");
+            self.publish(UiUpdate::Done { req, result: Err(format!("Couldn’t save the {name} credentials.")) });
             return;
         }
-        tracing::info!(target: "settings", "Amazon Polly connected ({})", creds.region);
-        let client = PollyClient::new(creds, system_proxy_config().as_ref(), &vox_tts::user_agent());
-        self.services.engine.set_polly(Some(client));
+        tracing::info!(target: "settings", "{name} connected");
+        let client = vox_tts::connect_provider(provider, creds, system_proxy_config().as_ref(), &vox_tts::user_agent());
+        self.services.engine.set_provider(provider, client);
         self.guarded("app info", |core| core.publish_app_info());
         self.fetch_voices(true);
         self.publish(UiUpdate::Done { req, result: Ok(()) });
     }
 
-    /// `DisconnectPolly`: forgets the credentials; Polly voices stop working until reconnected.
-    pub(super) fn disconnect_polly(&mut self, req: RequestId) {
-        if let Err(e) = vox_store::provider_secrets::clear_polly(&self.services.runtime.profile) {
-            tracing::warn!(target: "settings", "could not remove the Amazon Polly credentials: {e}");
+    /// `DisconnectProvider`: forgets the credentials; that provider's voices stop working until reconnected.
+    pub(super) fn disconnect_provider(&mut self, req: RequestId, provider: Provider) {
+        if !provider.needs_credentials() {
+            self.publish(UiUpdate::Done { req, result: Ok(()) });
+            return;
         }
-        self.services.engine.set_polly(None);
-        tracing::info!(target: "settings", "Amazon Polly disconnected");
+        if let Err(e) = vox_store::provider_secrets::clear(&self.services.runtime.profile, provider) {
+            tracing::warn!(target: "settings", "could not remove the {} credentials: {e}", provider.display_name());
+        }
+        self.services.engine.set_provider(provider, None);
+        tracing::info!(target: "settings", "{} disconnected", provider.display_name());
         self.guarded("app info", |core| core.publish_app_info());
         self.fetch_voices(true);
         self.publish(UiUpdate::Done { req, result: Ok(()) });
@@ -440,7 +452,7 @@ impl Core {
             }
             CatalogResult::ApiKey { req, key, result } => self.on_key_validated(req, &key, result),
             CatalogResult::Preview { voice_id, result } => self.on_preview_downloaded(voice_id, result),
-            CatalogResult::Polly { req, creds, result } => self.on_polly_validated(req, creds, result),
+            CatalogResult::Provider { req, provider, creds, result } => self.on_provider_validated(req, provider, creds, result),
         }
     }
 
@@ -500,26 +512,40 @@ impl Core {
     }
 }
 
-/// Combines the ElevenLabs list (`None` = not asked) with the Polly list (`None` = not connected): ElevenLabs voices
-/// first; one provider failing still shows the other; both failing (or the only one asked) reports its error.
-pub fn merge_voice_lists(eleven: Option<Result<Vec<Voice>, String>>, polly: Option<Result<Vec<Voice>, String>>) -> Result<Vec<Voice>, String> {
-    match (eleven, polly) {
-        (Some(Ok(mut e)), Some(Ok(p))) => {
-            e.extend(p);
-            Ok(e)
+/// Combines the ElevenLabs list (`None` = not asked) with the other providers' lists: ElevenLabs voices first, then
+/// each provider in order. A failing provider is skipped (and logged) as long as something else answered; when
+/// nothing succeeded, the first error is reported.
+pub fn merge_voice_lists(eleven: Option<Result<Vec<Voice>, String>>, others: Vec<(Provider, Result<Vec<Voice>, String>)>) -> Result<Vec<Voice>, String> {
+    let mut out = Vec::new();
+    let mut first_err = None;
+    let mut any_ok = false;
+    if let Some(r) = eleven {
+        match r {
+            Ok(v) => {
+                any_ok = true;
+                out.extend(v);
+            }
+            Err(e) => {
+                tracing::warn!(target: "tts", "ElevenLabs voices unavailable: {e}");
+                first_err = Some(e);
+            }
         }
-        (Some(Ok(e)), Some(Err(err))) => {
-            tracing::warn!(target: "tts", "Amazon Polly voices unavailable: {err}");
-            Ok(e)
+    }
+    for (provider, r) in others {
+        match r {
+            Ok(v) => {
+                any_ok = true;
+                out.extend(v);
+            }
+            Err(e) => {
+                tracing::warn!(target: "tts", "{} voices unavailable: {e}", provider.display_name());
+                first_err.get_or_insert(e);
+            }
         }
-        (Some(Ok(e)), None) => Ok(e),
-        (Some(Err(err)), Some(Ok(p))) => {
-            tracing::warn!(target: "tts", "ElevenLabs voices unavailable: {err}");
-            Ok(p)
-        }
-        (None, Some(Ok(p))) => Ok(p),
-        (Some(Err(err)), _) | (None, Some(Err(err))) => Err(err),
-        (None, None) => Ok(Vec::new()),
+    }
+    match (any_ok, first_err) {
+        (false, Some(e)) => Err(e),
+        _ => Ok(out),
     }
 }
 
