@@ -45,13 +45,10 @@ fn main() -> std::process::ExitCode {
 #[cfg(not(windows))]
 fn prefer_x11() {
     if std::env::var_os("VOX_WAYLAND").is_none() && std::env::var_os("DISPLAY").is_some() {
+        // The scale then comes from `Xft.dpi`: with Mutter's XWayland native scaling the X11 screen is the logical
+        // desktop × ceil(scale) (125 % → 2×) and Mutter shrinks X11 windows to fit, so `Xft.dpi` (192) is the right
+        // factor and Vox matches the size of Wayland apps.
         std::env::remove_var("WAYLAND_DISPLAY");
-        // Match the size of Wayland apps on fractional-scaling GNOME (winit and vox_win::window both read this).
-        if std::env::var_os("WINIT_X11_SCALE_FACTOR").is_none() {
-            if let Some(scale) = vox_win::window::gnome_native_x11_scale() {
-                std::env::set_var("WINIT_X11_SCALE_FACTOR", scale.to_string());
-            }
-        }
     }
 }
 

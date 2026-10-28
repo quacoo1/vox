@@ -103,7 +103,7 @@ How it differs from Windows:
 
 | Feature | Linux |
 |---|---|
-| Windows | X11 client (XWayland on Wayland), so the floating player can be placed and kept on top; `VOX_WAYLAND=1` opts out. On GNOME with fractional scaling the scale is read from Mutter |
+| Windows | X11 client (XWayland on Wayland), so the floating player can be placed and kept on top; `VOX_WAYLAND=1` opts out. |
 | Read selection (hotkey, tray, `--read-clipboard`…) | Reads the PRIMARY selection: select text anywhere, press the hotkey. The clipboard is not touched |
 | Global hotkeys | Registered as GNOME custom shortcuts (Settings → Keyboard → Custom Shortcuts, named "Vox: …") while Vox runs; they run `vox --vox-hotkey <action>`, which the running copy picks up |
 | Right-click chip, selection popup | Not available (no global mouse hook under Wayland) |
