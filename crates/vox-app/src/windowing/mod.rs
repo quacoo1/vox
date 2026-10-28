@@ -119,17 +119,13 @@ fn kind_of(attributes: &WindowAttributes) -> Option<WindowKind> {
 
 /// The attributes hook body (module docs): matches by `attributes.title` (`Vox`, `Vox Player`, `Vox Chip`).
 pub fn window_attributes(attributes: WindowAttributes, init: &AttributesInit) -> WindowAttributes {
-    use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
     match kind_of(&attributes) {
-        Some(WindowKind::Widget | WindowKind::Chip) => attributes
-            .with_active(false)
-            .with_skip_taskbar(true)
+        Some(WindowKind::Widget | WindowKind::Chip) => overlay_platform_attributes(attributes.with_active(false))
             .with_window_level(WindowLevel::AlwaysOnTop)
             .with_resizable(false)
             .with_enabled_buttons(WindowButtons::empty())
             .with_decorations(false)
             .with_transparent(true)
-            .with_undecorated_shadow(false)
             .with_position(PhysicalPosition::new(OFFSCREEN, OFFSCREEN)),
         Some(WindowKind::Main) => {
             let (rect, _maximized) = init.main_placement;
@@ -145,6 +141,21 @@ pub fn window_attributes(attributes: WindowAttributes, init: &AttributesInit) ->
     }
 }
 
+/// Windows: no taskbar button and no DWM shadow for the overlays.
+#[cfg(windows)]
+fn overlay_platform_attributes(attributes: WindowAttributes) -> WindowAttributes {
+    use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
+    attributes.with_skip_taskbar(true).with_undecorated_shadow(false)
+}
+
+/// X11: a utility window (no taskbar entry, kept by the window manager where it is put); skip-taskbar and keep-above
+/// are also set by `vox_win::window::install_overlay_subclass`.
+#[cfg(not(windows))]
+fn overlay_platform_attributes(attributes: WindowAttributes) -> WindowAttributes {
+    use slint::winit_030::winit::platform::x11::{WindowAttributesExtX11, WindowType};
+    attributes.with_x11_window_type(vec![WindowType::Utility]).with_name("vox", "Vox")
+}
+
 /// Installs the winit backend with the attributes hook (must run before any Slint window is created).
 pub fn install_backend(init: AttributesInit) -> anyhow::Result<()> {
     slint::BackendSelector::new()
@@ -154,13 +165,15 @@ pub fn install_backend(init: AttributesInit) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("could not start the winit backend: {e}"))
 }
 
-/// The window's HWND once the native window exists.
+/// The window's HWND (on Linux: its X11 window id) once the native window exists.
 pub fn hwnd_of(window: &slint::Window) -> Option<isize> {
     use slint::winit_030::winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use slint::winit_030::WinitWindowAccessor;
     window
         .with_winit_window(|w| match w.window_handle().map(|h| h.as_raw()) {
             Ok(RawWindowHandle::Win32(h)) => Some(h.hwnd.get()),
+            Ok(RawWindowHandle::Xlib(h)) => isize::try_from(h.window).ok(),
+            Ok(RawWindowHandle::Xcb(h)) => isize::try_from(h.window.get()).ok(),
             _ => None,
         })
         .flatten()

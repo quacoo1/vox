@@ -3,6 +3,7 @@
 //! no import library is needed at link time. Everything here is best effort: a failing call is logged at debug level
 //! and the caller carries on.
 
+#[cfg(windows)]
 #[link(name = "user32", kind = "raw-dylib")]
 extern "system" {
     fn PostMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
@@ -11,23 +12,27 @@ extern "system" {
     fn SetWindowRgn(hwnd: isize, region: isize, redraw: i32) -> i32;
 }
 
+#[cfg(windows)]
 #[link(name = "gdi32", kind = "raw-dylib")]
 extern "system" {
     fn CreateRoundRectRgn(left: i32, top: i32, right: i32, bottom: i32, width: i32, height: i32) -> isize;
     fn DeleteObject(object: isize) -> i32;
 }
 
+#[cfg(windows)]
 #[link(name = "kernel32", kind = "raw-dylib")]
 extern "system" {
     fn GetCurrentThreadId() -> u32;
 }
 
 /// `WM_NULL`.
+#[cfg(windows)]
 const WM_NULL: u32 = 0;
 /// The class of winit's per-thread event target window (winit 0.30 `platform_impl::windows::event_loop`).
 pub const WINIT_EVENT_TARGET_CLASS: &str = "Winit Thread Event Target";
 
 /// Posts `WM_NULL` to a window (shell.md §7.4: after `TrackPopupMenu`, so a dismissed tray menu behaves the next time).
+#[cfg(windows)]
 pub fn post_null(hwnd: isize) {
     if hwnd == 0 {
         return;
@@ -40,6 +45,7 @@ pub fn post_null(hwnd: isize) {
 
 /// The corner diameter of a rounded window region (pure; tested): twice the radius, at least 0, at most the shorter
 /// side (a pill).
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn region_diameter(width: i32, height: i32, radius: f64) -> i32 {
     let max = width.min(height).max(0);
     if !radius.is_finite() || radius <= 0.0 {
@@ -50,6 +56,7 @@ pub fn region_diameter(width: i32, height: i32, radius: f64) -> i32 {
 
 /// Clips a window to a rounded rectangle of `width`×`height` physical px with corner `radius` (`SetWindowRgn`; the
 /// window's own coordinates). The system owns the region afterwards.
+#[cfg(windows)]
 pub fn set_round_region(hwnd: isize, width: i32, height: i32, radius: f64) {
     if hwnd == 0 || width <= 0 || height <= 0 {
         return;
@@ -71,6 +78,7 @@ pub fn set_round_region(hwnd: isize, width: i32, height: i32, radius: f64) {
 }
 
 /// The top-level windows of the calling thread whose class name is `class` (e.g. winit's event target window).
+#[cfg(windows)]
 pub fn thread_windows_of_class(class: &str) -> Vec<isize> {
     struct Search {
         class: Vec<u16>,
@@ -95,12 +103,24 @@ pub fn thread_windows_of_class(class: &str) -> Vec<isize> {
     search.found
 }
 
+/// Linux: the overlays get a real per-pixel alpha surface from the compositor (ARGB visual), so no clip region is
+/// needed for rounded corners.
+#[cfg(not(windows))]
+pub fn set_round_region(_hwnd: isize, _width: i32, _height: i32, _radius: f64) {}
+
+/// Linux: winit has no per-thread event target window.
+#[cfg(not(windows))]
+pub fn thread_windows_of_class(_class: &str) -> Vec<isize> {
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn harmless_on_bad_handles() {
+        #[cfg(windows)]
         post_null(0);
         set_round_region(0, 10, 10, 2.0);
         assert_eq!(region_diameter(475, 248, 30.0), 60);

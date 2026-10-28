@@ -86,6 +86,34 @@ choose **More info → Run anyway**, or sign the exe and installer with a code-s
 Quit the old Electron Vox before installing or running this build: both use the same profile, and the Rust app
 refuses to start while the Electron one is running.
 
+## Linux
+
+Vox also builds and runs natively on Linux (tested on Ubuntu 26.04, GNOME on Wayland). The Windows-only layer
+(`crates/vox-win`) has a Linux implementation in `crates/vox-win/src/linux/` with the same API.
+
+```sh
+sudo apt install build-essential pkg-config clang libasound2-dev libfontconfig-dev libfreetype-dev \
+    libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+cargo build -p vox-app --release
+scripts/install-linux.sh          # ~/.local/opt/vox, `vox` on PATH, app launcher entry; --uninstall removes it
+VOX_DEMO=1 target/release/vox     # demo profile, mock voice
+```
+
+How it differs from Windows:
+
+| Feature | Linux |
+|---|---|
+| Windows | X11 client (XWayland on Wayland), so the floating player can be placed and kept on top; `VOX_WAYLAND=1` opts out. |
+| Read selection (hotkey, tray, `--read-clipboard`…) | Reads the PRIMARY selection: select text anywhere, press the hotkey. The clipboard is not touched |
+| Global hotkeys | Registered as GNOME custom shortcuts (Settings → Keyboard → Custom Shortcuts, named "Vox: …") while Vox runs; they run `vox --vox-hotkey <action>`, which the running copy picks up |
+| Right-click chip, selection popup | Not available (no global mouse hook under Wayland) |
+| Tray | StatusNotifierItem (Ubuntu's AppIndicator extension shows it in the top bar) |
+| API keys | AES-256-GCM, key in `~/.local/share/vox/master.key` (0600) instead of DPAPI |
+| Profile | `~/.config/Vox` (demo: `~/.config/Vox-Demo`) |
+| "Read with Vox" in the file manager | Nautilus script (right-click → Scripts → Read with Vox) |
+| Launch at login | `~/.config/autostart/vox.desktop` |
+| Windows voices, media keys | Not available |
+
 ## Browser extension
 
 Open `chrome://extensions` (or `edge://extensions`), turn on **Developer mode**, click **Load unpacked** and pick

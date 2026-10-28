@@ -28,20 +28,40 @@
 //! icon's and the overlay subclass's on the UI thread) and must only enqueue.
 //! Owner: the vox-win engineer.
 
-pub mod clipboard;
 pub mod error;
-pub mod foreground;
 pub mod gestures;
+
+#[cfg(windows)]
+pub mod clipboard;
+#[cfg(windows)]
+pub mod foreground;
+#[cfg(windows)]
 pub mod hook;
+#[cfg(windows)]
 pub mod hotkeys;
+#[cfg(windows)]
 pub mod keys;
+#[cfg(windows)]
 pub mod media;
+#[cfg(windows)]
 pub mod notify_icon;
+#[cfg(windows)]
 pub mod registry;
+#[cfg(windows)]
 pub mod selection;
+#[cfg(windows)]
 pub mod shell;
+#[cfg(windows)]
 pub mod single_instance;
+#[cfg(windows)]
 pub mod system;
+#[cfg(windows)]
 pub mod window;
+
+// Linux: the same API over X11 (XWayland), GNOME settings and freedesktop tools. See `linux/mod.rs`.
+#[cfg(not(windows))]
+mod linux;
+#[cfg(not(windows))]
+pub use linux::{clipboard, foreground, hotkeys, media, notify_icon, registry, selection, shell, single_instance, system, window};
 
 pub use error::WinError;

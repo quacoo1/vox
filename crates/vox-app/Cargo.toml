@@ -21,13 +21,19 @@ vox-win.workspace = true
 vox-bridge.workspace = true
 vox-art.workspace = true
 slint.workspace = true
-muda.workspace = true
 anyhow.workspace = true
 crossbeam-channel.workspace = true
 parking_lot.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+muda.workspace = true
+
+# The tray on Linux: a StatusNotifierItem (shown by GNOME's AppIndicator extension, KDE, …).
+[target.'cfg(not(windows))'.dependencies]
+ksni = { version = "0.3.7", features = ["blocking"] }
 
 [build-dependencies]
 slint-build.workspace = true

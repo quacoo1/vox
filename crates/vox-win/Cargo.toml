@@ -8,7 +8,6 @@ publish.workspace = true
 
 [dependencies]
 vox-core.workspace = true
-winreg.workspace = true
 parking_lot.workspace = true
 crossbeam-channel.workspace = true
 thiserror.workspace = true
@@ -17,7 +16,18 @@ serde_json.workspace = true
 # Unicode categories for the hotkey recorder's AltGr rule (`\p{C}`, `\p{L}`); already in the graph through vox-core.
 regex.workspace = true
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[target.'cfg(not(windows))'.dependencies]
+# X11 (the app runs on XWayland under GNOME so overlays can be placed and kept on top): window helpers, monitors,
+# pointer. arboard: the CLIPBOARD and PRIMARY selections. libc: locale and flock. signal-hook: SIGTERM → quit.
+x11rb = { version = "0.13", features = ["randr"] }
+arboard = { version = "3", default-features = false }
+libc = "0.2"
+signal-hook = "0.3"
+
+[target.'cfg(windows)'.dependencies.windows]
 workspace = true
 features = [
     "Data_Xml_Dom",

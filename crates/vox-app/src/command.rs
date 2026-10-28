@@ -57,6 +57,7 @@ pub enum TrayAction {
     Stop,
     OpenPage(AppPage),
     /// Checkbox items write the negation of the value seen when the menu was built.
+    #[cfg_attr(not(windows), allow(dead_code))]
     SetRightClickChip(bool),
     SetWidgetEnabled(bool),
     SetHotkeysEnabled(bool),
