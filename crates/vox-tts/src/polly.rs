@@ -11,6 +11,7 @@
 //! - Polly characters are billed by AWS, not ElevenLabs: results carry `character_cost = Some(0)` so they never count
 //!   against the ElevenLabs credits shown in the app.
 
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -37,6 +38,8 @@ const SAMPLE_RATE: &str = "24000";
 
 /// Credentials as entered are wrong or not allowed to use Polly.
 const MSG_UNAUTHORIZED: &str = "Amazon Polly refused the request. Check the access key, secret key and region in Settings → Voice providers.";
+const MSG_CLOCK: &str = "Your PC’s clock is wrong, so AWS rejects the request. Turn on “Set time automatically” in Windows Settings → Time & language → Date & time.";
+const MSG_SECRET: &str = "AWS says the secret access key doesn’t match this access key ID. Paste the secret key again (AWS shows it only once, when the key is created).";
 const MSG_DENIED: &str = "This AWS key is not allowed to use Amazon Polly. Give it the AmazonPollyReadOnlyAccess permission (or polly:SynthesizeSpeech and polly:DescribeVoices).";
 const MSG_THROTTLED: &str = "Amazon Polly is busy (too many requests). Try again in a moment.";
 const MSG_TOO_LONG: &str = "This text is too long for one Amazon Polly request.";
@@ -53,6 +56,9 @@ struct Inner {
     agent: ureq::Agent,
     /// Overridable for tests (`http://127.0.0.1:<port>`); production is `https://polly.<region>.amazonaws.com`.
     endpoint: String,
+    /// AWS's clock minus ours, in ms (learned from a "signature expired" answer, like the AWS SDKs' clock-skew
+    /// correction), so a PC whose clock is off still signs requests AWS accepts.
+    skew_ms: AtomicI64,
 }
 
 impl std::fmt::Debug for PollyClient {
@@ -69,7 +75,7 @@ impl PollyClient {
 
     /// [`PollyClient::new`] against another endpoint (tests).
     pub fn with_endpoint(creds: ProviderCredentials, proxy: Option<&ProxyConfig>, user_agent: &str, endpoint: String) -> Self {
-        Self { inner: Arc::new(Inner { creds, agent: build_agent(user_agent, proxy), endpoint }) }
+        Self { inner: Arc::new(Inner { creds, agent: build_agent(user_agent, proxy), endpoint, skew_ms: AtomicI64::new(0) }) }
     }
 
     pub fn credentials(&self) -> &ProviderCredentials {
@@ -143,33 +149,58 @@ impl PollyClient {
         self.request("POST", "/v1/speech", &[], &bytes, SYNTH_TIMEOUT)
     }
 
-    /// One signed request; the body on 2xx, a mapped error otherwise.
+    /// One signed request; the body on 2xx, a mapped error otherwise. A clock-skew rejection is retried once with
+    /// the time AWS reported.
     fn request(&self, method: &str, path: &str, query: &[(String, String)], body: &[u8], timeout: Duration) -> Result<Vec<u8>, TtsError> {
         let host = self.inner.endpoint.split_once("://").map_or(self.inner.endpoint.as_str(), |(_, h)| h).to_string();
         let content_type = if method == "POST" { Some("application/json") } else { None };
-        let signed = sign(&SignInput {
-            method,
-            host: &host,
-            path,
-            query,
-            content_type,
-            payload: body,
-            creds: &self.inner.creds,
-            service: SERVICE,
-            now: Utc::now(),
-        });
         let qs = canonical_query(query);
         let url = if qs.is_empty() { format!("{}{path}", self.inner.endpoint) } else { format!("{}{path}?{qs}", self.inner.endpoint) };
-        let mut headers = vec![("x-amz-date", signed.amz_date.clone()), ("authorization", signed.authorization.clone())];
-        if let Some(ct) = content_type {
-            headers.push(("content-type", ct.to_string()));
+        for attempt in 0..2 {
+            let skew = self.inner.skew_ms.load(Ordering::Relaxed);
+            let signed = sign(&SignInput {
+                method,
+                host: &host,
+                path,
+                query,
+                content_type,
+                payload: body,
+                creds: &self.inner.creds,
+                service: SERVICE,
+                now: Utc::now() + chrono::Duration::milliseconds(skew),
+            });
+            let mut headers = vec![("x-amz-date", signed.amz_date.clone()), ("authorization", signed.authorization.clone())];
+            if let Some(ct) = content_type {
+                headers.push(("content-type", ct.to_string()));
+            }
+            let reply = send(&self.inner.agent, "Amazon Polly", method, &url, &headers, (method == "POST").then_some(body), timeout)?;
+            if (200..300).contains(&reply.status) {
+                return Ok(reply.body);
+            }
+            let error = map_error(reply.status, reply.header("x-amzn-errortype"), &reply.body);
+            if attempt == 0 && is_clock_error(&error) {
+                if let Some(server) = reply.header("date").and_then(|d| DateTime::parse_from_rfc2822(d).ok()) {
+                    let offset = (server.with_timezone(&Utc) - Utc::now()).num_milliseconds();
+                    if (offset - skew).abs() > 60_000 {
+                        tracing::warn!(target: "tts", "the PC clock is {}s off AWS; correcting and retrying", offset / 1000);
+                        self.inner.skew_ms.store(offset, Ordering::Relaxed);
+                        continue;
+                    }
+                }
+            }
+            return Err(error);
         }
-        let reply = send(&self.inner.agent, "Amazon Polly", method, &url, &headers, (method == "POST").then_some(body), timeout)?;
-        if (200..300).contains(&reply.status) {
-            return Ok(reply.body);
-        }
-        Err(map_error(reply.status, reply.header("x-amzn-errortype"), &reply.body))
+        Err(TtsError::new(ReadErrorCode::Unauthorized, MSG_CLOCK))
     }
+}
+
+/// AWS rejected the request because our timestamp is too far from its clock.
+fn is_clock_error(e: &TtsError) -> bool {
+    let msg = e.api_message.as_deref().unwrap_or("").to_ascii_lowercase();
+    e.api_code.as_deref() == Some("RequestTimeTooSkewed")
+        || msg.contains("signature expired")
+        || msg.contains("signature not yet current")
+        || msg.contains("request time")
 }
 
 /// Maps a Polly error response to a user-facing [`TtsError`].
@@ -180,8 +211,12 @@ fn map_error(status: u16, error_type: Option<&str>, raw: &[u8]) -> TtsError {
         .or_else(|| body.get("__type").and_then(Value::as_str))
         .map(|t| t.split(':').next().unwrap_or(t).rsplit('#').next().unwrap_or(t).to_string())
         .unwrap_or_default();
+    let lower = api_message.as_deref().unwrap_or("").to_ascii_lowercase();
+    let clock = kind == "RequestTimeTooSkewed" || lower.contains("signature expired") || lower.contains("signature not yet current");
     let (code, message, retryable) = match (kind.as_str(), status) {
-        ("UnrecognizedClientException" | "InvalidSignatureException" | "IncompleteSignatureException" | "MissingAuthenticationTokenException" | "ExpiredTokenException", _) => {
+        _ if clock => (ReadErrorCode::Unauthorized, MSG_CLOCK, false),
+        ("InvalidSignatureException", _) => (ReadErrorCode::Unauthorized, MSG_SECRET, false),
+        ("UnrecognizedClientException" | "IncompleteSignatureException" | "MissingAuthenticationTokenException" | "ExpiredTokenException", _) => {
             (ReadErrorCode::Unauthorized, MSG_UNAUTHORIZED, false)
         }
         ("AccessDeniedException", _) => (ReadErrorCode::Unauthorized, MSG_DENIED, false),
@@ -191,7 +226,8 @@ fn map_error(status: u16, error_type: Option<&str>, raw: &[u8]) -> TtsError {
         (_, s) if s >= 500 => (ReadErrorCode::Unknown, MSG_GENERIC, true),
         _ => (ReadErrorCode::Unknown, MSG_GENERIC, false),
     };
-    tracing::warn!(target: "tts", "polly HTTP {status} {kind}");
+    // AWS's messages never contain the secret (at most the canonical request and the time), so they are safe to log.
+    tracing::warn!(target: "tts", "polly HTTP {status} {kind}: {}", api_message.as_deref().unwrap_or(""));
     let message = match (code, &api_message) {
         // Polly's own wording is the most useful detail for voice/engine/language problems.
         (ReadErrorCode::Unknown, Some(m)) if status == 400 => format!("{MSG_GENERIC} ({m})"),
@@ -542,6 +578,16 @@ mod tests {
         let voice = PollyVoiceRef { engine: "neural".into(), voice: "Joanna".into() };
         let e = client.synthesize_ref("Hello", &voice, &CancelToken::new()).unwrap_err();
         assert_eq!(e.code, ReadErrorCode::Unauthorized, "{e:?}");
+    }
+
+    #[test]
+    fn clock_and_secret_problems_get_their_own_messages() {
+        let expired = map_error(403, Some("InvalidSignatureException"), br#"{"message":"Signature expired: 20261025T001700Z is now earlier than 20261025T090212Z (20261025T090712Z - 5 min.)"}"#);
+        assert!(is_clock_error(&expired));
+        assert_eq!(expired.message, MSG_CLOCK);
+        let mismatch = map_error(403, Some("InvalidSignatureException"), br#"{"message":"The request signature we calculated does not match the signature you provided."}"#);
+        assert!(!is_clock_error(&mismatch));
+        assert_eq!(mismatch.message, MSG_SECRET);
     }
 
     #[test]

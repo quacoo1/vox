@@ -126,7 +126,7 @@ pub(crate) fn send(
     let headers = res
         .headers()
         .iter()
-        .filter(|(k, _)| k.as_str().starts_with("x-") || k.as_str() == "retry-after" || k.as_str() == "content-type")
+        .filter(|(k, _)| k.as_str().starts_with("x-") || matches!(k.as_str(), "retry-after" | "content-type" | "date"))
         .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.as_str().to_string(), v.to_string())))
         .collect();
     let mut body = Vec::new();
