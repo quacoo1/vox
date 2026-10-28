@@ -16,6 +16,10 @@
 //! compared as parsed JSON, not bytes (the `ReadResult` key order follows vox-core; clients ignore it). Owner: the
 //! vox-bridge engineer.
 
+#[cfg(windows)]
+mod net;
+#[cfg(unix)]
+#[path = "net_unix.rs"]
 mod net;
 pub mod pipeline;
 pub mod server;

@@ -1627,7 +1627,8 @@ impl AppUi {
     /// "Outside WM_CLOSE").
     fn catch_outside_close(&mut self) {
         let targets = windowing::native::thread_windows_of_class(windowing::native::WINIT_EVENT_TARGET_CLASS);
-        if targets.is_empty() {
+        // Linux: outside close requests arrive as SIGTERM (vox_win::system), not as a window message.
+        if targets.is_empty() && cfg!(windows) {
             tracing::warn!(target: "window", "winit's event target window was not found; an outside close request may not quit cleanly");
         }
         for hwnd in targets {
@@ -1679,14 +1680,24 @@ impl AppUi {
 /// 256 px, the pixels of `assets/vox-256.png` (both come from [`crate::tray::app_icon_rgba`], which generated the
 /// asset), so Windows only ever scales them down.
 fn set_window_icon(main: &MainWindow) {
+    #[cfg(windows)]
     use slint::winit_030::winit::platform::windows::WindowExtWindows;
     use slint::winit_030::winit::window::Icon;
     let icon = |px: u32| Icon::from_rgba(crate::tray::app_icon_rgba(px), px, px);
     match (icon(WINDOW_ICON_PX), icon(TASKBAR_ICON_PX)) {
         (Ok(small), Ok(big)) => {
             windowing::with_winit(main.window(), |w| {
-                w.set_window_icon(Some(small));
-                w.set_taskbar_icon(Some(big));
+                #[cfg(windows)]
+                {
+                    w.set_window_icon(Some(small));
+                    w.set_taskbar_icon(Some(big));
+                }
+                // X11: one `_NET_WM_ICON`; the big one scales down best.
+                #[cfg(not(windows))]
+                {
+                    drop(small);
+                    w.set_window_icon(Some(big));
+                }
             });
         }
         (Err(e), _) | (_, Err(e)) => tracing::debug!(target: "window", "window icon rejected: {e}"),

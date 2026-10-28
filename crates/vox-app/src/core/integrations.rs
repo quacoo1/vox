@@ -119,6 +119,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows path fixtures
     fn verb_spec_and_run_value_name() {
         let spec = explorer_spec(Path::new(r"C:\Program Files\Vox\vox.exe"));
         assert_eq!(spec.command, r#""C:\Program Files\Vox\vox.exe" --read-file "%1""#);

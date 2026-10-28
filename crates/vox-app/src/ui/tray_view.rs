@@ -57,6 +57,7 @@ impl TrayView {
         }
     }
     /// The menu rebuild key.
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn menu_key(&self) -> String {
         format!(
             "{}|{}|{}|{}|{:?}|{:?}|{:?}",

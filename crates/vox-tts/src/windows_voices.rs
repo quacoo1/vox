@@ -12,6 +12,7 @@ use crate::cancel::CancelToken;
 use crate::client::SynthesisResult;
 use crate::error::TtsError;
 use crate::mock::even_alignment;
+#[cfg_attr(not(windows), allow(unused_imports))]
 use crate::providers::{voice, SpeechProvider};
 use crate::wav::read_wav_info;
 

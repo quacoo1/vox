@@ -80,6 +80,11 @@ pub fn parse_cli_args<S: AsRef<str>>(argv: &[S]) -> CliArgs {
         };
         match name {
             "--hidden" => out.hidden = true,
+            // Linux GNOME shortcuts (vox-win `hotkeys`): handled by the hotkey service; never opens the main window.
+            "--vox-hotkey" => {
+                out.hidden = true;
+                let _ = value(&mut i);
+            }
             "--read-clipboard" => out.read_clipboard = true,
             "--read-file" => out.read_file = value(&mut i).filter(|v| !v.is_empty()),
             "--read-text" => out.read_text = value(&mut i).filter(|v| !v.is_empty()),
@@ -135,6 +140,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows path fixtures
     fn resolve() {
         assert_eq!(resolve_read_file(Path::new("C:\\work"), "a.txt"), PathBuf::from("C:\\work\\a.txt"));
         assert_eq!(resolve_read_file(Path::new("C:\\work"), "D:\\b.txt"), PathBuf::from("D:\\b.txt"));

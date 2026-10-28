@@ -269,16 +269,82 @@ pub fn dpapi_unprotect(blob: &[u8]) -> Result<Vec<u8>, SecretError> {
     }
 }
 
-/// `CryptProtectData` (current user, no entropy, UI forbidden).
+/// The Linux stand-in for DPAPI: AES-256-GCM with a per-user key kept outside the profile
+/// (`$XDG_DATA_HOME/vox/master.key`, mode 0600, created on first use). Blob: `VXL1` + 12-byte nonce + ciphertext.
 #[cfg(not(windows))]
-pub fn dpapi_protect(_plain: &[u8]) -> Result<Vec<u8>, SecretError> {
-    Err(SecretError::Dpapi("DPAPI is only available on Windows".into()))
+mod user_key {
+    use super::SecretError;
+    use std::io::Read;
+    use std::path::PathBuf;
+
+    pub(super) const MAGIC: &[u8] = b"VXL1";
+
+    fn key_path() -> Result<PathBuf, SecretError> {
+        let base = std::env::var_os("XDG_DATA_HOME")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
+            .ok_or_else(|| SecretError::Dpapi("cannot resolve the user data folder".into()))?;
+        Ok(base.join("vox").join("master.key"))
+    }
+
+    pub(super) fn random(buf: &mut [u8]) -> Result<(), SecretError> {
+        std::fs::File::open("/dev/urandom")
+            .and_then(|mut f| f.read_exact(buf))
+            .map_err(|e| SecretError::Dpapi(format!("no random source: {e}")))
+    }
+
+    pub(super) fn load_or_create() -> Result<[u8; 32], SecretError> {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let path = key_path()?;
+        if let Ok(bytes) = std::fs::read(&path) {
+            if let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice()) {
+                return Ok(key);
+            }
+        }
+        let dir = path.parent().expect("the key path has a folder");
+        std::fs::create_dir_all(dir).map_err(|e| SecretError::Dpapi(e.to_string()))?;
+        let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+        let mut key = [0u8; 32];
+        random(&mut key)?;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| SecretError::Dpapi(e.to_string()))?;
+        std::io::Write::write_all(&mut f, &key).map_err(|e| SecretError::Dpapi(e.to_string()))?;
+        Ok(key)
+    }
 }
 
-/// `CryptUnprotectData` (no entropy, UI forbidden).
+/// Encrypts with the per-user key (see `user_key`).
 #[cfg(not(windows))]
-pub fn dpapi_unprotect(_blob: &[u8]) -> Result<Vec<u8>, SecretError> {
-    Err(SecretError::Dpapi("DPAPI is only available on Windows".into()))
+pub fn dpapi_protect(plain: &[u8]) -> Result<Vec<u8>, SecretError> {
+    use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+    let key = user_key::load_or_create()?;
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| SecretError::Dpapi("bad key".into()))?;
+    let mut nonce = [0u8; 12];
+    user_key::random(&mut nonce)?;
+    let sealed = cipher.encrypt(Nonce::from_slice(&nonce), plain).map_err(|_| SecretError::Dpapi("encryption failed".into()))?;
+    let mut out = Vec::with_capacity(user_key::MAGIC.len() + nonce.len() + sealed.len());
+    out.extend_from_slice(user_key::MAGIC);
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+/// Decrypts a blob made by [`dpapi_protect`].
+#[cfg(not(windows))]
+pub fn dpapi_unprotect(blob: &[u8]) -> Result<Vec<u8>, SecretError> {
+    use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+    let rest = blob.strip_prefix(user_key::MAGIC).filter(|r| r.len() >= 12 + 16).ok_or_else(|| SecretError::Dpapi("not a Vox secret blob".into()))?;
+    let key = user_key::load_or_create()?;
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| SecretError::Dpapi("bad key".into()))?;
+    cipher.decrypt(Nonce::from_slice(&rest[..12]), &rest[12..]).map_err(|_| SecretError::Dpapi("the secret could not be decrypted".into()))
 }
 
 /// Extracts the DPAPI-wrapped AES key from `Local State` JSON text: base64-decode `os_crypt.encrypted_key` and strip

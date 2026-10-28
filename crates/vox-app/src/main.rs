@@ -26,6 +26,7 @@ mod update;
 mod windowing;
 
 fn main() -> std::process::ExitCode {
+    prefer_x11();
     // In shots mode: where this run's log lines start, before anything logs (`shots` docs "Console entries").
     shots::note_log_start_from_env();
     match app::run() {
@@ -37,6 +38,25 @@ fn main() -> std::process::ExitCode {
         }
     }
 }
+
+/// Linux: run as an X11 client (XWayland on a Wayland desktop), before any thread or window exists. Wayland lets no
+/// client position its own windows or keep them above others, which the floating player and the window placement
+/// need (`vox_win` Linux module docs). `VOX_WAYLAND=1` keeps a native Wayland window for testing.
+#[cfg(not(windows))]
+fn prefer_x11() {
+    if std::env::var_os("VOX_WAYLAND").is_none() && std::env::var_os("DISPLAY").is_some() {
+        std::env::remove_var("WAYLAND_DISPLAY");
+        // Match the size of Wayland apps on fractional-scaling GNOME (winit and vox_win::window both read this).
+        if std::env::var_os("WINIT_X11_SCALE_FACTOR").is_none() {
+            if let Some(scale) = vox_win::window::gnome_native_x11_scale() {
+                std::env::set_var("WINIT_X11_SCALE_FACTOR", scale.to_string());
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn prefer_x11() {}
 
 #[cfg(all(test, windows, target_env = "msvc"))]
 mod resource_tests {

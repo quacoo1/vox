@@ -34,17 +34,25 @@
 //! - `TaskbarCreated` (Explorer restart): `NotifyIcon` re-adds the icon.
 //! - Manual test: Win+B, arrow to Vox, Enter → the main window opens (not the menu).
 
+#[cfg(windows)]
 use std::cell::{Cell, RefCell};
+#[cfg(windows)]
 use std::rc::Rc;
 use std::sync::OnceLock;
 
+#[cfg(windows)]
 use muda::{CheckMenuItem, ContextMenu, Menu, MenuId, MenuItem, PredefinedMenuItem};
 use vox_core::app::AppPage;
 use vox_core::constants::APP_NAME;
-use vox_win::notify_icon::{NotifyIcon, NotifyIconEvent, TrayIconImage};
+#[cfg(windows)]
+use vox_win::notify_icon::{NotifyIcon, NotifyIconEvent};
+use vox_win::notify_icon::TrayIconImage;
 
 use crate::command::{Command, CoreHandle, TrayAction};
 use crate::ui::tray_view::{with_hint, TrayView};
+
+#[cfg(not(windows))]
+pub use linux::Tray;
 
 /// The sizes rendered for the notification area (`NotifyIcon` picks the one matching `SM_CXSMICON`).
 pub const TRAY_SIZES: [u32; 6] = [16, 20, 24, 32, 40, 48];
@@ -52,6 +60,7 @@ pub const TRAY_SIZES: [u32; 6] = [16, 20, 24, 32, 40, 48];
 #[cfg(test)]
 pub const APP_ICON_SIZES: [u32; 8] = [16, 20, 24, 32, 40, 48, 64, 256];
 
+#[cfg(windows)]
 /// The built menu and what each item does.
 struct BuiltMenu {
     menu: Menu,
@@ -60,12 +69,14 @@ struct BuiltMenu {
 }
 
 /// State shared with the icon's event handler (the handler runs on the UI thread, outside any `AppUi` borrow).
+#[cfg(windows)]
 #[derive(Default)]
 struct Shared {
     menu: RefCell<Option<BuiltMenu>>,
     hwnd: Cell<isize>,
 }
 
+#[cfg(windows)]
 /// The tray icon and its menu.
 pub struct Tray {
     shown: Option<TrayView>,
@@ -75,6 +86,7 @@ pub struct Tray {
     active: Option<bool>,
 }
 
+#[cfg(windows)]
 impl Tray {
     pub fn create(core: CoreHandle) -> anyhow::Result<Tray> {
         let shared = Rc::new(Shared::default());
@@ -143,12 +155,14 @@ impl Tray {
     }
 }
 
+#[cfg(windows)]
 impl Drop for Tray {
     fn drop(&mut self) {
         self.destroy();
     }
 }
 
+#[cfg(windows)]
 /// The icon's events (UI thread, no borrow of `AppUi` held).
 fn on_icon_event(shared: &Rc<Shared>, core: &CoreHandle, event: NotifyIconEvent) {
     match event {
@@ -197,6 +211,7 @@ fn run_action(core: &CoreHandle, action: TrayAction) {
     }
 }
 
+#[cfg(windows)]
 /// Builds the menu of shell.md §7.3 for a view (pure apart from muda).
 fn build_menu(view: &TrayView, hints: bool) -> muda::Result<BuiltMenu> {
     let hint = |h: &Option<String>| if hints { h.clone() } else { None };
@@ -501,10 +516,141 @@ fn encode_ico(images: &[(u32, Vec<u8>)]) -> Vec<u8> {
     out
 }
 
+/// The Linux tray: a StatusNotifierItem served by `ksni` on its own thread. Its callbacks run there, so window work
+/// (open, pages, quit) hops to the UI thread with `slint::invoke_from_event_loop`; the rest goes to the core.
+#[cfg(not(windows))]
+mod linux {
+    use ksni::blocking::TrayMethods;
+    use ksni::menu::{CheckmarkItem, StandardItem};
+    use ksni::MenuItem;
+
+    use super::*;
+
+    struct Sni {
+        core: CoreHandle,
+        view: Option<TrayView>,
+    }
+
+    fn dispatch(core: &CoreHandle, action: TrayAction) {
+        match action {
+            TrayAction::Open | TrayAction::OpenPage(_) | TrayAction::Quit => {
+                let core = core.clone();
+                if slint::invoke_from_event_loop(move || run_action(&core, action)).is_err() {
+                    tracing::debug!(target: "tray", "the event loop is gone; tray action dropped");
+                }
+            }
+            other => core.send(Command::Tray(other)),
+        }
+    }
+
+    fn item(label: String, enabled: bool, action: TrayAction) -> MenuItem<Sni> {
+        StandardItem { label, enabled, activate: Box::new(move |t: &mut Sni| dispatch(&t.core, action)), ..Default::default() }.into()
+    }
+
+    impl ksni::Tray for Sni {
+        fn id(&self) -> String {
+            "vox".into()
+        }
+
+        fn title(&self) -> String {
+            APP_NAME.into()
+        }
+
+        fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+            let active = self.view.as_ref().is_some_and(|v| v.active);
+            tray_images(active)
+                .into_iter()
+                .map(|img| {
+                    // RGBA → ARGB32 in network byte order.
+                    let data = img.rgba.chunks_exact(4).flat_map(|p| [p[3], p[0], p[1], p[2]]).collect();
+                    ksni::Icon { width: img.size as i32, height: img.size as i32, data }
+                })
+                .collect()
+        }
+
+        fn tool_tip(&self) -> ksni::ToolTip {
+            ksni::ToolTip { title: self.view.as_ref().map_or_else(|| APP_NAME.to_string(), |v| v.tooltip.clone()), ..Default::default() }
+        }
+
+        fn activate(&mut self, _x: i32, _y: i32) {
+            dispatch(&self.core, TrayAction::Open);
+        }
+
+        fn menu(&self) -> Vec<MenuItem<Self>> {
+            let Some(view) = self.view.as_ref() else {
+                return vec![item(format!("Open {APP_NAME}"), true, TrayAction::Open), item(format!("Quit {APP_NAME}"), true, TrayAction::Quit)];
+            };
+            let mut menu = vec![
+                item(with_hint("Read clipboard", view.hint_read_clipboard.as_deref()).replace('\t', "    "), true, TrayAction::ReadClipboard),
+                item(with_hint(view.pause_label(), view.hint_play_pause.as_deref()).replace('\t', "    "), view.pause_enabled(), TrayAction::TogglePause),
+                item(with_hint("Stop", view.hint_stop.as_deref()).replace('\t', "    "), view.stop_enabled(), TrayAction::Stop),
+                MenuItem::Separator,
+                item(format!("Open {APP_NAME}"), true, TrayAction::Open),
+                item("History".into(), true, TrayAction::OpenPage(AppPage::History)),
+                item("Analytics".into(), true, TrayAction::OpenPage(AppPage::Analytics)),
+                item("Settings".into(), true, TrayAction::OpenPage(AppPage::Settings)),
+                MenuItem::Separator,
+            ];
+            let checks = [
+                ("Floating widget", view.widget_enabled, TrayAction::SetWidgetEnabled(!view.widget_enabled)),
+                ("Hotkeys", view.hotkeys_enabled, TrayAction::SetHotkeysEnabled(!view.hotkeys_enabled)),
+            ];
+            for (label, checked, action) in checks {
+                menu.push(
+                    CheckmarkItem { label: label.into(), checked, activate: Box::new(move |t: &mut Sni| dispatch(&t.core, action)), ..Default::default() }.into(),
+                );
+            }
+            menu.push(MenuItem::Separator);
+            menu.push(item(format!("Quit {APP_NAME}"), true, TrayAction::Quit));
+            menu
+        }
+    }
+
+    /// The tray icon and its menu.
+    pub struct Tray {
+        handle: Option<ksni::blocking::Handle<Sni>>,
+        shown: Option<TrayView>,
+    }
+
+    impl Tray {
+        pub fn create(core: CoreHandle) -> anyhow::Result<Tray> {
+            let handle = Sni { core, view: None }.spawn().map_err(|e| anyhow::anyhow!("could not create the tray icon: {e}"))?;
+            Ok(Tray { handle: Some(handle), shown: None })
+        }
+
+        pub fn update(&mut self, view: TrayView) {
+            let Some(handle) = self.handle.as_ref() else { return };
+            if self.shown.as_ref() == Some(&view) {
+                return;
+            }
+            let next = view.clone();
+            handle.update(move |t| t.view = Some(next));
+            self.shown = Some(view);
+        }
+
+        pub fn refresh_dpi(&mut self) {}
+
+        pub fn destroy(&mut self) {
+            if let Some(handle) = self.handle.take() {
+                handle.shutdown().wait();
+            }
+            self.shown = None;
+        }
+    }
+
+    impl Drop for Tray {
+        fn drop(&mut self) {
+            self.destroy();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
     use vox_core::player::{PlayerState, PlayerStatus};
+    #[cfg(windows)]
     use vox_core::settings::Settings;
 
     fn alpha_at(rgba: &[u8], size: u32, x: u32, y: u32) -> u8 {
@@ -591,6 +737,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn menu_items_follow_the_view() {
         let mut s = Settings::default();
         s.triggers.hotkeys.read_clipboard = "Ctrl+Alt+V".into();

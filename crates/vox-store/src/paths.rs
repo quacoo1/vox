@@ -47,9 +47,13 @@ fn known_folder_roaming() -> Option<PathBuf> {
     }
 }
 
+/// `$XDG_CONFIG_HOME`, else `~/.config` (the Linux home of the profile folder).
 #[cfg(not(windows))]
 fn known_folder_roaming() -> Option<PathBuf> {
-    None
+    std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").filter(|v| !v.is_empty()).map(|h| PathBuf::from(h).join(".config")))
 }
 
 /// A resolved profile folder.
@@ -121,6 +125,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(windows)] // Windows path fixtures
     fn file_names() {
         let p = Profile::at("C:\\x\\Vox", false);
         assert!(p.secrets_dpapi_file().ends_with("secrets-dpapi.bin"));

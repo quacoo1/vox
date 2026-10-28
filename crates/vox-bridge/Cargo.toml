@@ -14,7 +14,10 @@ serde_json.workspace = true
 parking_lot.workspace = true
 tracing.workspace = true
 
-[dependencies.windows]
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies.windows]
 workspace = true
 # SO_EXCLUSIVEADDRUSE (socket2 has no setter for it) and the event-driven waits (WSAEventSelect,
 # WSAWaitForMultipleEvents).

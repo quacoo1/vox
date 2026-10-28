@@ -5,6 +5,7 @@
 #[error("{0}")]
 pub struct WinError(pub String);
 
+#[cfg(windows)]
 impl From<windows::core::Error> for WinError {
     fn from(e: windows::core::Error) -> Self {
         WinError(e.message().to_string())

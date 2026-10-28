@@ -106,6 +106,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(windows)] // Windows path fixtures
     fn instance_keys_and_paths() {
         let rt = |demo: bool| Runtime {
             flags: RuntimeFlags { demo, ..RuntimeFlags::default() },
