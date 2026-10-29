@@ -230,11 +230,21 @@ impl Core {
         }
     }
 
-    /// `app:reveal-path` (failures only logged).
+    /// `app:reveal-path` (failures only logged). The notices file is (re)written first and opened as a document.
     pub(super) fn reveal_path(&mut self, target: RevealTarget) {
         let path = match target {
             RevealTarget::UserData => self.services.runtime.profile.root().to_path_buf(),
             RevealTarget::Extension => self.services.runtime.extension_dir.clone(),
+            RevealTarget::Notices => {
+                let written = super::notices::write(self.services.runtime.profile.root());
+                match written.map(|p| catch_unwind(AssertUnwindSafe(|| vox_win::shell::open_external(&p.to_string_lossy())))) {
+                    Ok(Ok(Ok(()))) => {}
+                    Ok(Ok(Err(e))) => tracing::warn!(target: "app", "could not open the notices: {e}"),
+                    Ok(Err(_)) => tracing::warn!(target: "app", "could not open the notices (panicked)"),
+                    Err(e) => tracing::warn!(target: "app", "could not write the notices: {e}"),
+                }
+                return;
+            }
         };
         match catch_unwind(AssertUnwindSafe(|| vox_win::shell::reveal_path(&path))) {
             Ok(Ok(())) => {}

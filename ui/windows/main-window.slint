@@ -278,6 +278,7 @@ export component MainWindow inherits Window {
     callback settings-copy-text(string);
     callback settings-show-extension-folder();
     callback settings-open-data-folder();
+    callback settings-open-notices();
     callback settings-open-link(string);
     // ── Onboarding ──
     callback onboarding-go-to(int);
@@ -705,6 +706,7 @@ export component MainWindow inherits Window {
                                     copy-text(t) => { root.settings-copy-text(t); }
                                     show-extension-folder => { root.settings-show-extension-folder(); }
                                     open-data-folder => { root.settings-open-data-folder(); }
+                                    open-notices => { root.settings-open-notices(); }
                                     open-link(l) => { root.settings-open-link(l); }
                                 }
                             }

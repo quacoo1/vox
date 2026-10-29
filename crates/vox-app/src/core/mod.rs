@@ -48,6 +48,7 @@ pub mod hotkeys;
 pub mod integrations;
 pub mod lifecycle;
 pub mod media;
+pub mod notices;
 pub mod queries;
 pub mod reactions;
 pub mod reader;

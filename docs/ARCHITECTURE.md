@@ -228,7 +228,7 @@ thread at 30 Hz.
 | `media` | `MediaSession::{spawn(handler), set_enabled, update(MediaState), shutdown}`, `MediaAction`, `MediaState` | SMTC STA thread + hidden window | reader-playback.md §9; R-Media-keys |
 | `notify_icon` | `NotifyIcon::{new(tooltip, images, handler), set_images, refresh_dpi, set_tooltip, hwnd, destroy}`, `NotifyIconEvent::{Activate, ContextMenu}`, `TrayIconImage` | none (hidden window on the UI thread) | shell.md §7.3–§7.4; R-Tray; D-SH-18 |
 | `registry` | Explorer verb (`quote_windows_arg`, `build_verb_command`, `set_explorer_menu[_at]`, `explorer_menu_state[_at]`, `is_explorer_menu_installed[_at]`, `ExplorerMenuSpec`, `MenuState`), `apply_launch_at_login[_at]`, `run_command_matches`, `RegistryLocation` (test hive), `apps_use_light_theme`, `system_proxy`, `parse_proxy_server`, `SystemProxy` | caller's | integrations.md §3–§4, shell.md §5.6, D-NET-1 |
-| `single_instance` | `acquire(key) -> InstanceRole` (per-user mutex + first pipe instance), `InstanceServer::listen`, `InstanceListener::shutdown`, `forward_to_primary` (server SID check), `ForwardedArgs`, `electron_instance_running(profile_root)` | pipe server thread | shell.md §3.3; R-Do-not-run-both |
+| `single_instance` | `acquire(key) -> InstanceRole` (per-session mutex + first pipe instance), `InstanceServer::listen`, `InstanceListener::shutdown`, `forward_to_primary` (server SID and session check), `ForwardedArgs`, `electron_instance_running(profile_root)` | pipe server thread | shell.md §3.3; R-Do-not-run-both |
 | `system` | `SystemWatcher::{spawn(on_event, on_session_end), shutdown}`, `SystemEvent::{DisplaysChanged, ThemeChanged, LocaleChanged, ClockChanged, Resumed, CloseRequested, MotionChanged}`, `user_locale()` | watcher thread (hidden **top-level** window) | shell.md §3.6, §5.5, §5.6; D-FMT-1 |
 | `window` | `Hwnd`, `PhysRect`, `MonitorInfo{bounds, work_area, scale, primary, id}`, `install_overlay_subclass(hwnd, on_close)`, `OverlayCloseHandler`, `assert_topmost`, `is_visible`, `set_bounds` (one call), `window_rect`, `set_caption_theme`, `bring_to_front`, `cursor_pos`, `left_button_down`, `monitor_from_point`, `monitor_from_rect`, `primary_monitor`, `monitors`, `normal_placement`, `set_normal_placement`, `reduce_motion` | — | shell.md §6.1 |
 | `shell` | `open_external`, `reveal_path`, `show_notification` (silent ToastGeneric, `CreateToastNotifierWithId(APP_ID)`), `register_app_user_model`, `save_file_dialog(owner, …)`, `set_app_user_model_id`, `documents_folder`, `set_per_monitor_dpi_aware`, `message_box` | save dialog: dedicated STA thread | contracts.md §5.3 |
@@ -796,8 +796,8 @@ Native windows (D-SH-2/D-SH-3; `windowing` module docs):
 - **Bridge**: connection thread → `BridgeGlue::read(request, deadline)` sends `Command::Bridge(Read{request, reply})`
   and waits with `recv_deadline` (`None` → 504); `command` → `Command::Player`; `status` reads `playing: AtomicBool`
   (set by the core on every report).
-- **Second instance**: a later `vox.exe` → `forward_to_primary` (per-user named pipe, server SID checked, JSON `{argv,
-  cwd}`) → instance pipe thread (listening since right after the primary's `acquire`) →
+- **Second instance**: a later `vox.exe` → `forward_to_primary` (per-user, per-session named pipe, server SID and
+  session checked, JSON `{argv, cwd}`) → instance pipe thread (listening since right after the primary's `acquire`) →
   `Command::Cli{from_second_instance: true}`; the core defers CLI commands until its startup is done and handles them
   FIFO.
 - **CLI at startup**: `app::run` enqueues `Command::Cli{argv, cwd, false}` right after `acquire` (before the listener
@@ -990,9 +990,11 @@ first`, `ReadResult::clipboard_empty()`; else `read(ReadRequest::new(text, Clipb
 
 ### 4.8 Second instance argv forwarding
 
-Later launch → `acquire(instance_key)` = Secondary (per-user mutex `Local\<key>-<SID>`) → connect to
-`\\.\pipe\<key>-<SID>` (waits ≤ 5 s), check the server process's user SID, `AllowSetForegroundWindow(pid)`, forward
-`{argv, cwd}` → exit. The primary created that pipe instance inside `acquire` and started its listener right after,
+Later launch → `acquire(instance_key)` = Secondary (mutex `Local\<key>-<SID>`, per session like every `Local\`
+name) → connect to `\\.\pipe\<key>-<SID>-<session id>` (waits ≤ 5 s), check that the server process has our user SID
+and our session (`TokenSessionId`), `AllowSetForegroundWindow(pid)`, forward `{argv, cwd}` → exit. The session id
+gives the machine-wide pipe namespace the same scope as the mutex: a user with two interactive sessions (RDS,
+multi-session Windows) has one primary per session, and a launch reaches its own session's primary. The primary created that pipe instance inside `acquire` and started its listener right after,
 before opening any store, so a launch during a slow startup is buffered, not lost. Primary pipe thread →
 `Command::Cli{argv, cwd, from_second_instance: true}` → deferred until core startup finished (after the primary's own
 `Cli`) → handled like §4.7 step 2 (`cli_outcome`); if no read action was acted on and `--hidden` is absent →
@@ -1218,6 +1220,43 @@ shown, so the wrong theme never flashes). Later: the core resolves `resolve_them
 `set_caption_theme(hwnd, dark, backdrop rgb)`. The widget and the chip are always dark (`Theme.dark = true` set once;
 ui-settings-widget.md §1.9, D-USW-20). Appearance page: `set-choice("app.theme", value)` → `UpdateSettings`; header
 theme toggle → `UpdateSettings({app:{theme: dark ? "paper" : "night"}})` (D-UM-28).
+
+### 4.21 Voice providers (Polly, Azure, OpenAI, Google, Windows)
+
+Added after the port; the Electron build has no equivalent. ElevenLabs stays the main provider (key, models, credits,
+voice settings); the others add voices.
+
+- **Voice ids carry the provider** (`vox_core::providers`): ElevenLabs ids are unchanged; every other voice is
+  `<prefix>:<rest>` (`polly:neural:Joanna`, `azure:en-US-AvaNeural`, `openai:coral`, `google:<name>`,
+  `windows:<token id>`), so `settings.voiceId`, history records and cache manifests keep one string field and stay
+  readable by the Electron build. `provider_of(id)` / `split_voice_id(id)` route; `Provider::EXTRA` is the Voice
+  providers page order (Windows, Polly, Azure, OpenAI, Google), which the Voices page also groups by
+  (`sort_voices_for_page`: provider, then the ElevenLabs category rank, then name).
+- **Credentials** (`vox_store::provider_secrets`): `providers-dpapi.bin`, one DPAPI (current user) blob of
+  `{"<provider id>": {key, secret, region}}`, written atomically; missing or unreadable = nothing connected. Never
+  logged (`ProviderCredentials`' `Debug` masks the key). Windows voices need none.
+- **Clients** (`vox_tts::providers`): one `SpeechProvider` per connected service (`synthesize(text, rest,
+  word_timing, cancel)`, `list_voices`, `validate`, `summary`, `region`), built by `connect_provider` with the shared
+  HTTPS agent (platform certificates, system proxy). `app::run` connects every stored provider at startup;
+  `TtsEngine::set_provider` swaps one at runtime.
+- **Synthesis**: `TtsEngine::synthesize_chunk` sends a non-ElevenLabs voice to its client with the engine's usual
+  retry policy; ElevenLabs-only request fields (model, output format, voice settings, language, previous/next text)
+  are not sent. Results carry `character_cost: Some(0)`, so only ElevenLabs reads count as billed (Analytics labels
+  the total "billed by ElevenLabs"). Word timing: Polly from speech marks (a second billed request, made only when
+  `widget.highlightWords` is on; samples never ask for it), Windows from the OneCore word boundaries, Azure, OpenAI
+  and Google spread evenly over the real MP3 duration (`even_alignment`).
+- **Gates and errors**: `Reader::read` checks the ElevenLabs key only for ElevenLabs voices; another provider's voice
+  needs its client connected, else the toast `Connect <name> in Settings → Voice providers…` with an Open settings
+  action (`vox_tts::not_connected`).
+- **Catalog** (`core::catalog`): `fetch_voices` lists ElevenLabs (when there is a key, or no provider is connected)
+  plus every connected provider on one worker and merges them (`merge_voice_lists`); a provider's voices use its
+  display name as the category. Previews of provider voices synthesize a short sample through the client
+  (`word_timing = false`) and play it on the preview player. `ConnectProvider` validates the credentials on a worker
+  (`SpeechProvider::validate` = list the voices), then saves them, installs the client, republishes `AppInfo` and
+  refreshes the voices; `DisconnectProvider` clears them and removes the client.
+- **UI**: Settings → Voice providers (`ui/pages/settings/providers.slint`, one card per provider: key / secret /
+  region form, status line, timing note). Settings → Voice & model hides its ElevenLabs-only controls behind a notice
+  when the current voice is another provider's (`VoiceModelData.other-provider-*`).
 
 ---
 
@@ -2145,6 +2184,8 @@ structs. The 60 s tick and the wake (`ShellController::on_main_window_activity`)
 | `speaker-boost` | `bool` |  |
 | `reset-enabled` | `bool` |  |
 | `test-busy` | `bool` |  |
+| `other-provider-title` | `string` | The current voice is another provider's: the notice that replaces Model, Language, Audio quality and the voice settings (they only reach ElevenLabs). |
+| `other-provider-note` | `string` | Its body; empty = an ElevenLabs voice, every control shown. |
 
 **struct `PlaybackData`**
 
@@ -2562,6 +2603,7 @@ structs. The 60 s tick and the wake (`ShellController::on_main_window_activity`)
 | `copy-text` | `(string)` |  |
 | `show-extension-folder` | `()` |  |
 | `open-data-folder` | `()` | About |
+| `open-notices` | `()` |  |
 | `open-link` | `(string)` |  |
 
 **`AboutSection`** (`ui/pages/settings/about.slint`, inherits `Rectangle`) — Settings → About (ui-settings-widget.md §2.10). Placeholder visuals; keep the interface.
@@ -2573,6 +2615,7 @@ structs. The 60 s tick and the wake (`ShellController::on_main_window_activity`)
 | Callback | Args | Meaning |
 |---|---|---|
 | `open-data-folder` | `()` |  |
+| `open-notices` | `()` | Third-party notices → `RevealPath(Notices)`: `core::notices` writes `<profile>\third-party-notices.txt` and opens it in the text editor. The section also shows Slint's `AboutSlint` widget (the attribution its royalty-free licence asks for). |
 | `open-link` | `(string)` | "dashboard" \| "billing" \| "docs" |
 
 **`AccountSection`** (`ui/pages/settings/account.slint`, inherits `Rectangle`) — Settings → Account (ui-settings-widget.md §2.2). Placeholder visuals; keep the interface.
@@ -2883,6 +2926,7 @@ structs. The 60 s tick and the wake (`ShellController::on_main_window_activity`)
 | `settings-copy-text` | `(string)` |  |
 | `settings-show-extension-folder` | `()` |  |
 | `settings-open-data-folder` | `()` |  |
+| `settings-open-notices` | `()` |  |
 | `settings-open-link` | `(string)` |  |
 | `onboarding-go-to` | `(int)` | ── Onboarding ── |
 | `onboarding-next` | `()` |  |
@@ -3070,7 +3114,7 @@ structs. The 60 s tick and the wake (`ShellController::on_main_window_activity`)
 | D-SH-1 | Hidden top-level window in `vox_win::system` (session end, outside `WM_CLOSE`); `TaskbarCreated` is handled by `vox_win::notify_icon` (icon re-added) |
 | D-SH-2 | Floating windows: all `HTCLIENT`; moves start on pointer-down on a text handle via winit `drag_window` (= `ReleaseCapture` + `WM_NCLBUTTONDOWN(HTCAPTION)`), so hover/clicks are never lost. Styles are **enforced**, not applied once: winit 0.30's `WindowFlags::apply_diff` rewrites `GWL_STYLE`/`GWL_EXSTYLE` (adding `WS_SYSMENU`, dropping our extended bits) on every visibility/topmost/hit-test change, so `vox_win::window::install_overlay_subclass` handles `WM_STYLECHANGING` (re-adds `WS_EX_NOACTIVATE \| WS_EX_TOOLWINDOW \| WS_EX_TOPMOST`, strips `WS_SYSMENU`), makes a newly layered window render (`SetLayeredWindowAttributes`), answers `WM_MOUSEACTIVATE → MA_NOACTIVATE`, swallows the system menu and turns `WM_CLOSE` into `WindowEvent::CloseRequested`. Chip click-through = winit `set_cursor_hittest` (survives diffs) |
 | D-SH-3 | Overlays are created through the winit attributes hook with `with_active(false)` (every Slint `show()` then uses `SW_SHOWNOACTIVATE`), skip-taskbar, always-on-top; pre-created off-screen and subclassed before anyone can see them (`overlays_ready`). Visibility always goes through Slint; `assert_topmost(hwnd, raise)` re-asserts the z-order after each show (chip raised to the top of the topmost band) |
-| D-SH-5 | Single instance: per-user named mutex (`Local\<key>-<SID>`) + per-user named pipe (`\\.\pipe\<key>-<SID>`, DACL = user + SYSTEM, `PIPE_REJECT_REMOTE_CLIENTS`, first instance created inside `acquire`) carrying JSON `{argv, cwd}` (not `WM_COPYDATA`); the secondary verifies the server's user SID before `AllowSetForegroundWindow` and writing; demo and normal profiles have different keys; argv read lossily (`args_os`) |
+| D-SH-5 | Single instance: per-user named mutex (`Local\<key>-<SID>`) + per-user, per-session named pipe (`\\.\pipe\<key>-<SID>-<session id>`, DACL = user + SYSTEM, `PIPE_REJECT_REMOTE_CLIENTS`, first instance created inside `acquire`) carrying JSON `{argv, cwd}` (not `WM_COPYDATA`); the secondary verifies the server's user SID and session before `AllowSetForegroundWindow` and writing; demo and normal profiles have different keys; argv read lossily (`args_os`) |
 | D-SH-7 | `MOD_NOREPEAT` on; `Plus`/`+` keep Electron's implicit Shift (R-Hotkeys) |
 | D-SH-8 | A drag ends as "user moved" only if the window rect changed and > 500 ms after our own move |
 | D-SH-9 | Widget = `HWND_TOPMOST` (above normal windows, R-Widget-z-order); the Electron "just under the taskbar" nuance is dropped |
