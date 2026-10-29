@@ -85,7 +85,7 @@ impl SpeechProvider for GoogleClient {
         Provider::Google
     }
 
-    fn synthesize(&self, text: &str, rest: &str, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+    fn synthesize(&self, text: &str, rest: &str, _word_timing: bool, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
         if cancel.is_cancelled() {
             return Err(TtsError::cancelled());
         }

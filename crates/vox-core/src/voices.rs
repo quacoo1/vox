@@ -4,6 +4,7 @@ use serde::Serialize;
 
 use crate::js::{capitalize_first, js_trim};
 use crate::json::js_opt_f64;
+use crate::providers::{provider_of, Provider};
 
 /// A voice. `labels` keeps the API's key order (it matters for tag order).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -146,14 +147,24 @@ fn rank(v: &Voice) -> f64 {
     }
 }
 
-/// Voices-page order: own voices first (cloned, professional, generated, other, premade), then by name
-/// (case-insensitive; decision: plain lower-case compare instead of ICU `localeCompare`).
+/// Where a voice's provider sits on the Voices page: ElevenLabs first, then the other services in the order the
+/// Voice providers page lists them ([`Provider::EXTRA`]).
+fn provider_rank(v: &Voice) -> usize {
+    match provider_of(&v.voice_id) {
+        Provider::ElevenLabs => 0,
+        p => 1 + Provider::EXTRA.iter().position(|e| *e == p).unwrap_or(Provider::EXTRA.len()),
+    }
+}
+
+/// Voices-page order: grouped by provider (ElevenLabs first); within ElevenLabs, own voices first (cloned,
+/// professional, generated, other, premade); then by name (case-insensitive; decision: plain lower-case compare
+/// instead of ICU `localeCompare`).
 pub fn sort_voices_for_page(voices: &[Voice]) -> Vec<Voice> {
     let mut v = voices.to_vec();
     v.sort_by(|a, b| {
-        rank(a)
-            .partial_cmp(&rank(b))
-            .unwrap_or(std::cmp::Ordering::Equal)
+        provider_rank(a)
+            .cmp(&provider_rank(b))
+            .then_with(|| rank(a).partial_cmp(&rank(b)).unwrap_or(std::cmp::Ordering::Equal))
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
     v
@@ -353,6 +364,17 @@ mod tests {
         ];
         let sorted: Vec<String> = sort_voices_for_page(&vs).into_iter().map(|v| v.name).collect();
         assert_eq!(sorted, vec!["Anna", "bob", "zed"]);
+        // Other providers' voices follow ElevenLabs', one provider at a time (Voice providers page order).
+        let mixed = vec![
+            voice("polly:neural:Joanna", "Joanna", Some("Amazon Polly"), &[]),
+            voice("1", "zed", Some("premade"), &[]),
+            voice("windows:david", "David", Some("Windows"), &[]),
+            voice("azure:en-US-AvaNeural", "Ava", Some("Azure AI Speech"), &[]),
+            voice("2", "Anna", Some("cloned"), &[]),
+            voice("polly:neural:Amy", "Amy", Some("Amazon Polly"), &[]),
+        ];
+        let sorted: Vec<String> = sort_voices_for_page(&mixed).into_iter().map(|v| v.name).collect();
+        assert_eq!(sorted, vec!["Anna", "zed", "David", "Amy", "Joanna", "Ava"]);
         let f = VoiceFilter { gender: "female".into(), ..Default::default() };
         assert_eq!(filter_voices(&vs, &f).len(), 2);
         let q = VoiceFilter { query: "ghan ann".into(), ..Default::default() };

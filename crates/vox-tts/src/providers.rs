@@ -23,8 +23,10 @@ use crate::mock::even_alignment;
 /// One connected speech provider.
 pub trait SpeechProvider: Send + Sync {
     fn provider(&self) -> Provider;
-    /// Synthesizes `text` with the voice `rest` (the voice id without its provider prefix).
-    fn synthesize(&self, text: &str, rest: &str, cancel: &CancelToken) -> Result<SynthesisResult, TtsError>;
+    /// Synthesizes `text` with the voice `rest` (the voice id without its provider prefix). `word_timing` = false when
+    /// nothing will highlight from the alignment (word highlighting off, voice samples): a provider that pays for
+    /// timing with a separate request (Polly's speech marks) skips it and spreads the timing evenly.
+    fn synthesize(&self, text: &str, rest: &str, word_timing: bool, cancel: &CancelToken) -> Result<SynthesisResult, TtsError>;
     /// Every voice, as Vox voices (ids with the provider prefix, category = the provider's display name).
     fn list_voices(&self) -> Result<Vec<Voice>, TtsError>;
     /// Checks the credentials; `Ok(voice count)`.

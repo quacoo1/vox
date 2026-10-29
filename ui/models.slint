@@ -570,6 +570,10 @@ export struct VoiceModelData {
     speaker-boost: bool,
     reset-enabled: bool,
     test-busy: bool,
+    // The current voice is from another provider: why Model, Language, Audio quality and the voice settings are
+    // hidden (they only reach ElevenLabs). Empty = an ElevenLabs voice, every control shown.
+    other-provider-title: string,
+    other-provider-note: string,
 }
 
 export struct PlaybackData {

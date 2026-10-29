@@ -101,6 +101,23 @@ const KEY_HINT: &str = "Needs Text to Speech access. Add \u{201C}User: read\u{20
 const KEY_EMPTY: &str = "Paste your ElevenLabs API key first.";
 const KEY_REJECTED: &str = "ElevenLabs rejected that key.";
 const MODEL_FALLBACK_DESCRIPTION: &str = "Which ElevenLabs model synthesizes speech.";
+
+/// Voice & model's notice for another provider's voice: Model, Language, Audio quality and the voice settings only
+/// reach ElevenLabs (other providers synthesize with the voice alone), so they are hidden. `("", "")` for an
+/// ElevenLabs voice.
+pub(crate) fn other_provider_notice(voice_id: &str) -> (String, String) {
+    match vox_core::providers::provider_of(voice_id) {
+        vox_core::providers::Provider::ElevenLabs => (String::new(), String::new()),
+        p => (
+            format!("{} voice", p.display_name()),
+            format!(
+                "Model, language, audio quality and the voice settings only reach ElevenLabs. {} speaks with its \
+                 own defaults; set the reading speed in Playback.",
+                p.display_name()
+            ),
+        ),
+    }
+}
 const PORT_INVALID: &str = "Use a port between 1024 and 65535.";
 const DEFAULT_CACHE_SLIDER_MAX: u32 = 5000;
 
@@ -1325,6 +1342,7 @@ impl SettingsController {
             .collect();
         let lang_opts = vs::language_options(models, &view.model_id, &view.language_code);
         let v = &view.voice;
+        let (other_title, other_note) = other_provider_notice(&view.voice_id);
         VoiceModelData {
             voice_name: view.voice_name.as_str().into(),
             voice_art: cx.art.image(&view.voice_id, ArtSize::Large),
@@ -1362,6 +1380,8 @@ impl SettingsController {
             speaker_boost: v.use_speaker_boost,
             reset_enabled: !v.is_default(),
             test_busy: self.test_req.is_some(),
+            other_provider_title: other_title.into(),
+            other_provider_note: other_note.into(),
         }
     }
 
@@ -2079,6 +2099,18 @@ mod tests {
         // The same value again writes nothing.
         c.set_number(&mut w.cx(), "volume", 0.8f32 + f32::EPSILON);
         assert!(writes(&w.sent()).is_empty());
+    }
+
+    #[test]
+    fn other_providers_hide_the_elevenlabs_controls() {
+        let (mut w, mut c) = entered();
+        let d = c.build(&mut w.cx());
+        assert_eq!((d.voice.other_provider_title.as_str(), d.voice.other_provider_note.as_str()), ("", ""));
+        w.settings = Arc::new(w.settings.apply_patch(&json!({ "voiceId": "polly:neural:Joanna", "voiceName": "Joanna" })));
+        { let u = UiUpdate::Settings(w.settings.clone()); c.on_update(&mut w.cx(), &u) };
+        let d = c.build(&mut w.cx());
+        assert_eq!(d.voice.other_provider_title, "Amazon Polly voice");
+        assert!(d.voice.other_provider_note.contains("only reach ElevenLabs. Amazon Polly speaks with its own defaults"));
     }
 
     #[test]

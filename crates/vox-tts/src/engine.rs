@@ -403,7 +403,7 @@ impl EngineInner {
             let (Some(client), Some((_, rest))) = (client, split_voice_id(&job.voice_id)) else {
                 return Err(crate::providers::not_connected(provider));
             };
-            return self.with_retries(s, i, || client.synthesize(&chunk.text, rest, &s.cancel));
+            return self.with_retries(s, i, || client.synthesize(&chunk.text, rest, job.settings.widget.highlight_words, &s.cancel));
         }
         let req = SynthesisRequest {
             text: chunk.text.clone(),

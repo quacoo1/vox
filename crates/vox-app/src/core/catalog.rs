@@ -286,7 +286,7 @@ impl Core {
                 };
                 let who = name.map(|n| n.split(" (").next().unwrap_or(&n).to_string()).unwrap_or_else(|| provider.display_name().to_string());
                 let sample = format!("Hi, I’m {who}. This is how I sound when Vox reads to you.");
-                client.synthesize(&sample, rest, &cancel).map(|r| r.audio).map_err(|e| e.message)
+                client.synthesize(&sample, rest, false, &cancel).map(|r| r.audio).map_err(|e| e.message)
             }))
             .unwrap_or_else(|_| Err(SOMETHING_WENT_WRONG.to_string()));
             if cancel.is_cancelled() {

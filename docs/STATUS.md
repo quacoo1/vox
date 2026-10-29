@@ -72,8 +72,6 @@ These cannot be checked headlessly. ARCHITECTURE.md §9 has the full manual chec
 - On mixed-DPI setups the widget can briefly show a stale frame when it appears on a monitor whose scale differs from
   the off-screen parking spot.
 - No installer yet (out of scope for this milestone): the portable layout is `vox.exe` + `browser-extension\`.
-- Analytics' "Days active" meter reads its visible text to screen readers; a dedicated spoken value needs a new UI
-  field.
 - `docs/ARCHITECTURE.md` lags the code in a few places (list stabilisation in `ui/stable.rs`, window regions and the
   first-frame parking, the per-session instance pipe name).
 

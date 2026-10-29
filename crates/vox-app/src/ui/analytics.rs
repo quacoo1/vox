@@ -684,7 +684,9 @@ pub(crate) fn build_data<Tz: TimeZone>(
     d.top_voices = model(top_voices);
     d.top_voices_summary = voices_summary.into();
 
-    d.billed = format!("{} billed", format_compact(t.characters_billed as f64)).into();
+    // Only ElevenLabs bills through Vox (every other provider reports a cost of 0), so the footer under the credits
+    // names it.
+    d.billed = format!("{} billed by ElevenLabs", format_compact(t.characters_billed as f64)).into();
     d
 }
 
@@ -807,7 +809,7 @@ mod tests {
             assert_eq!(d.sources_summary, "Reads by source: no reads yet.");
             assert_eq!(d.top_apps_summary, "Top apps by listening time: no data yet.");
             assert_eq!(d.top_voices_summary, "Top voices by listening time: no data yet.");
-            assert_eq!(d.billed, "0 billed");
+            assert_eq!(d.billed, "0 billed by ElevenLabs");
             let words = d.kpis.row_data(0).unwrap();
             assert_eq!((words.value.as_str(), words.sub.as_str()), ("0", "Across every read"));
             let reads = d.kpis.row_data(1).unwrap();
@@ -858,7 +860,7 @@ mod tests {
             assert_eq!(d.days_active_accessible, "24 of 30 days");
             assert!((d.days_active_fraction - 0.8).abs() < 1e-6);
             assert_eq!(d.audio_generated, "6h 59m of audio generated");
-            assert_eq!(d.billed, "368.2K billed");
+            assert_eq!(d.billed, "368.2K billed by ElevenLabs");
             let k: Vec<KpiData> = d.kpis.iter().collect();
             assert_eq!(k.len(), 4);
             assert_eq!((k[0].value.as_str(), k[0].value_accessible.as_str()), ("72.2K", "72,187 words"));

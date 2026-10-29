@@ -3,7 +3,8 @@
 //! - Synthesis: `POST /v1/speech` twice per chunk, run in parallel: once for MP3 audio (24 kHz) and once for word
 //!   speech marks (`OutputFormat: json`, `SpeechMarkTypes: ["word"]`). The marks become the per-UTF-16-unit
 //!   [`Alignment`] the player highlights from; when the marks request fails the chunk still plays, with evenly spread
-//!   timing. The last aligned end is the MP3's real duration (frame walk), so the engine's duration rule
+//!   timing. AWS bills both requests, so the marks are skipped (evenly spread timing, half the cost) when nothing
+//!   highlights: word highlighting off, or a voice sample. The last aligned end is the MP3's real duration (frame walk), so the engine's duration rule
 //!   (`chunk_duration`: alignment end first) stays exact.
 //! - Voices: `GET /v1/voices` (paginated). Each voice is offered once per useful engine: `neural` (or `standard`
 //!   when there is no neural version) plus `generative` when available; ids are `polly:<engine>:<VoiceId>`.
@@ -82,8 +83,8 @@ impl PollyClient {
         &self.inner.creds
     }
 
-    /// Synthesizes `text` with `voice`: MP3 audio plus word timing.
-    pub fn synthesize_ref(&self, text: &str, voice: &PollyVoiceRef, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+    /// Synthesizes `text` with `voice`: MP3 audio, plus word timing from speech marks when `word_timing`.
+    pub fn synthesize_ref(&self, text: &str, voice: &PollyVoiceRef, word_timing: bool, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
         if cancel.is_cancelled() {
             return Err(TtsError::cancelled());
         }
@@ -95,11 +96,15 @@ impl PollyClient {
             "Engine": voice.engine, "OutputFormat": "json", "SpeechMarkTypes": ["word"],
             "Text": text, "TextType": "text", "VoiceId": voice.voice,
         });
-        let (audio, marks) = std::thread::scope(|scope| {
-            let marks = scope.spawn(|| self.post_speech(&marks_body));
-            let audio = self.post_speech(&audio_body);
-            (audio, marks.join().unwrap_or_else(|_| Err(TtsError::new(ReadErrorCode::Unknown, MSG_GENERIC))))
-        });
+        let (audio, marks) = if word_timing {
+            std::thread::scope(|scope| {
+                let marks = scope.spawn(|| self.post_speech(&marks_body));
+                let audio = self.post_speech(&audio_body);
+                (audio, Some(marks.join().unwrap_or_else(|_| Err(TtsError::new(ReadErrorCode::Unknown, MSG_GENERIC)))))
+            })
+        } else {
+            (self.post_speech(&audio_body), None)
+        };
         if cancel.is_cancelled() {
             return Err(TtsError::cancelled());
         }
@@ -109,8 +114,9 @@ impl PollyClient {
         }
         let duration = mp3_duration_sec(&audio).unwrap_or_else(|| utf16_len(text) as f64 / 15.0);
         let alignment = match marks {
-            Ok(raw) => alignment_from_marks(text, &parse_word_marks(&raw), duration),
-            Err(e) => {
+            None => None,
+            Some(Ok(raw)) => alignment_from_marks(text, &parse_word_marks(&raw), duration),
+            Some(Err(e)) => {
                 tracing::warn!(target: "tts", "polly speech marks failed ({}); spreading the timing evenly", e.code.as_str());
                 None
             }
@@ -290,9 +296,9 @@ impl SpeechProvider for PollyClient {
     fn provider(&self) -> Provider {
         Provider::Polly
     }
-    fn synthesize(&self, text: &str, rest: &str, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+    fn synthesize(&self, text: &str, rest: &str, word_timing: bool, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
         let voice = parse_polly_rest(rest).ok_or_else(|| TtsError::new(ReadErrorCode::Unknown, MSG_GENERIC))?;
-        self.synthesize_ref(text, &voice, cancel)
+        self.synthesize_ref(text, &voice, word_timing, cancel)
     }
     fn list_voices(&self) -> Result<Vec<Voice>, TtsError> {
         PollyClient::list_voices(self)
@@ -576,8 +582,34 @@ mod tests {
         let e = PollyClient::list_voices(&client).unwrap_err();
         assert_eq!(e.code, ReadErrorCode::Unauthorized, "{e:?}");
         let voice = PollyVoiceRef { engine: "neural".into(), voice: "Joanna".into() };
-        let e = client.synthesize_ref("Hello", &voice, &CancelToken::new()).unwrap_err();
+        let e = client.synthesize_ref("Hello", &voice, true, &CancelToken::new()).unwrap_err();
         assert_eq!(e.code, ReadErrorCode::Unauthorized, "{e:?}");
+    }
+
+    /// Speech marks cost a second billed request, so they are only fetched when something highlights from them.
+    #[test]
+    fn speech_marks_only_with_word_timing() {
+        use crate::client::test_support::{MockServer, Reply};
+        let server = MockServer::start(|req, _| {
+            if req.json()["OutputFormat"] == "json" {
+                Reply::raw(200, r#"{"time":0,"type":"word","start":0,"end":5,"value":"Hello"}"#)
+            } else {
+                Reply::raw(200, "not really mp3")
+            }
+        });
+        let client = PollyClient::with_endpoint(creds("secret", "us-east-1"), None, "Vox-test", server.base_url.clone());
+        let voice = PollyVoiceRef { engine: "neural".into(), voice: "Joanna".into() };
+
+        let r = client.synthesize_ref("Hello there", &voice, false, &CancelToken::new()).unwrap();
+        let formats: Vec<String> = server.seen().iter().map(|s| s.json()["OutputFormat"].as_str().unwrap_or("").to_string()).collect();
+        assert_eq!(formats, ["mp3"]);
+        assert_eq!(r.alignment, even_alignment("Hello there", utf16_len("Hello there") as f64 / 15.0));
+
+        let r = client.synthesize_ref("Hello there", &voice, true, &CancelToken::new()).unwrap();
+        let mut formats: Vec<String> = server.seen().iter().map(|s| s.json()["OutputFormat"].as_str().unwrap_or("").to_string()).collect();
+        formats.sort();
+        assert_eq!(formats, ["json", "mp3", "mp3"]);
+        assert_ne!(r.alignment, even_alignment("Hello there", utf16_len("Hello there") as f64 / 15.0));
     }
 
     #[test]
