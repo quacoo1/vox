@@ -157,6 +157,8 @@ BASE = {
         "speaker-boost": True,
         "reset-enabled": False,
         "test-busy": False,
+        "other-provider-title": "",
+        "other-provider-note": "",
     },
     "playback": {
         "rate-options": [choice("0.75", "0.75\u00d7", "0.75 times speed"), choice("1", "1\u00d7", "1 times speed"),
@@ -359,6 +361,12 @@ page("voice-error", variant(**{
     "voice__model-badges": [], "voice__voice-tags": ["ElevenLabs voice"],
     "voice__model-options": [choice("eleven_flash_v2_5", "Flash v2.5")],
     "voice__model-description": "Which ElevenLabs model synthesizes speech."}), "voice")
+# Another provider's voice: the ElevenLabs-only controls collapse behind a notice.
+page("voice-other-provider", variant(**{
+    "voice__voice-name": "Joanna", "voice__voice-tags": ["Female", "US English", "Neural"],
+    "voice__other-provider-title": "Amazon Polly voice",
+    "voice__other-provider-note": "Model, language, audio quality and the voice settings only reach ElevenLabs. Amazon "
+                                  "Polly speaks with its own defaults; set the reading speed in Playback."}), "voice")
 
 # ── Playback (a rate set elsewhere joins the presets) ──
 page("playback", variant(**{

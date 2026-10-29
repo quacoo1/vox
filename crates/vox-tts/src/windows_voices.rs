@@ -161,7 +161,7 @@ impl SpeechProvider for WindowsVoices {
         Provider::Windows
     }
 
-    fn synthesize(&self, text: &str, rest: &str, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
+    fn synthesize(&self, text: &str, rest: &str, _word_timing: bool, cancel: &CancelToken) -> Result<SynthesisResult, TtsError> {
         if cancel.is_cancelled() {
             return Err(TtsError::cancelled());
         }
@@ -228,7 +228,7 @@ mod tests {
         println!("{} voices: {:?}", voices.len(), voices.iter().map(|v| v.name.as_str()).collect::<Vec<_>>());
         let first = voices.first().expect("at least one voice");
         let (_, rest) = vox_core::providers::split_voice_id(&first.voice_id).unwrap();
-        let r = w.synthesize("Hello from the voices built into Windows.", rest, &CancelToken::new()).unwrap();
+        let r = w.synthesize("Hello from the voices built into Windows.", rest, true, &CancelToken::new()).unwrap();
         let a = r.alignment.unwrap();
         println!("{} bytes, ends at {:.2}s", r.audio.len(), a.last_end());
         assert!(r.audio.len() > 1000 && a.last_end() > 0.5);

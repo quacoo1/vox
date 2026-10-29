@@ -205,7 +205,9 @@
    "speed-text": "1.08×",
    "speaker-boost": true,
    "reset-enabled": true,
-   "test-busy": true
+   "test-busy": true,
+   "other-provider-title": "",
+   "other-provider-note": ""
   },
   "playback": {
    "rate-options": [
