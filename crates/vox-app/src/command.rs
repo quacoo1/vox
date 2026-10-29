@@ -37,11 +37,13 @@ use vox_win::system::SystemEvent;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct RequestId(pub u64);
 
-/// Which folder to open in Explorer.
+/// What `RevealPath` opens: a folder in the file manager, or the notices file in the text editor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RevealTarget {
     UserData,
     Extension,
+    /// Settings → About → Third-party notices: written into the profile folder, then opened in the text editor.
+    Notices,
 }
 
 /// Tray menu actions (shell.md §7.3). `Open` and `OpenPage` are handled **on the UI thread** inside the tray event

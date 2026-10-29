@@ -1,6 +1,9 @@
 // Settings → About (ui-settings-widget.md §2.10; R-Copy: the app version and the build hash replace "Electron").
 // Header badge "Demo mode" (demo only); a small hero (mark, product name, tagline); Version / Runtime / Build rows; the
-// data folder with Open (disabled until known); the demo-data note; the ElevenLabs links; the fine print.
+// data folder with Open (disabled until known); the demo-data note; the ElevenLabs links; the fine print; Third-party
+// notices with Open (the licences file); the AboutSlint widget, which Slint's royalty-free licence asks to be shown in
+// the app's About screen (its logo follows Theme.dark through the std-widgets Palette).
+import { AboutSlint, Palette } from "std-widgets.slint";
 import { Theme, Icons, Icon, Button, ButtonKind, ButtonSize, Badge, BadgeKind, BadgeDot, Divider, Tip }
     from "../../design/index.slint";
 import { AboutData, Brand } from "../../models.slint";
@@ -49,8 +52,16 @@ export component AboutSection inherits Rectangle {
     in property <AboutData> data;
 
     callback open-data-folder();
+    callback open-notices();
     // "dashboard" | "billing" | "docs"
     callback open-link(string);
+
+    property <bool> dark: Theme.dark;
+    function sync-palette() {
+        Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+    }
+    init => { root.sync-palette(); }
+    changed dark => { root.sync-palette(); }
 
     // Pinned horizontal size info: the conditional demo row takes the section's width explicitly (see parts.slint).
     min-width: 0px;
@@ -186,6 +197,28 @@ export component AboutSection inherits Rectangle {
                     + "and billed to your ElevenLabs account.";
                 text-color: Theme.text-muted;
                 size: Theme.size-caption;
+            }
+        }
+
+        // ── Licences ──
+        Row {
+            title: "Third-party notices";
+            description: "Licences for Slint, the Lucide icons and the English word list used to clean up text.";
+
+            Button {
+                text: "Open";
+                size: ButtonSize.sm;
+                trailing-icon: Icons.arrow-up-right;
+                accessible-text: "Open the third-party notices";
+                clicked => { root.open-notices(); }
+            }
+        }
+        // AboutSlint pads itself by 12 px; the negative offset lines its logo up with the section's left edge.
+        Rectangle {
+            height: about-slint.preferred-height;
+            about-slint := AboutSlint {
+                x: -12px;
+                width: 184px;
             }
         }
     }

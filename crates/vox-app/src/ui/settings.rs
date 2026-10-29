@@ -1106,6 +1106,9 @@ impl SettingsController {
     pub fn open_data_folder(&mut self, cx: &mut UiCtx) {
         cx.core.send(Command::RevealPath(RevealTarget::UserData));
     }
+    pub fn open_notices(&mut self, cx: &mut UiCtx) {
+        cx.core.send(Command::RevealPath(RevealTarget::Notices));
+    }
     pub fn open_link(&mut self, cx: &mut UiCtx, which: &str) {
         let url = match which {
             "dashboard" => ELEVENLABS_DASHBOARD_URL,

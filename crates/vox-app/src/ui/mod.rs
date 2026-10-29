@@ -1837,6 +1837,7 @@ fn wire_main(m: &MainWindow) {
     on!(m, on_settings_copy_text, settings_cb, |c, cx, text| c.copy_text(cx, &text));
     on!(m, on_settings_show_extension_folder, settings_cb, |c, cx| c.show_extension_folder(cx));
     on!(m, on_settings_open_data_folder, settings_cb, |c, cx| c.open_data_folder(cx));
+    on!(m, on_settings_open_notices, settings_cb, |c, cx| c.open_notices(cx));
     on!(m, on_settings_open_link, settings_cb, |c, cx, which| c.open_link(cx, &which));
 
     // ── onboarding ──

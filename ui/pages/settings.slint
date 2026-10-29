@@ -169,6 +169,7 @@ export component SettingsPage inherits Rectangle {
     callback show-extension-folder();
     // About
     callback open-data-folder();
+    callback open-notices();
     callback open-link(string);
 
     // ── Layout ──
@@ -649,6 +650,7 @@ export component SettingsPage inherits Rectangle {
                         s-about := AboutSection {
                             data: root.data.about;
                             open-data-folder => { root.open-data-folder(); }
+                            open-notices => { root.open-notices(); }
                             open-link(l) => { root.open-link(l); }
                         }
                     }
