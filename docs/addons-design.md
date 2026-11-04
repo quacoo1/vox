@@ -420,11 +420,12 @@ The normative spec goes in `docs/addons-protocol.md`; the Rust types live in `vo
 - **Windows containment:**
   - `creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)`, because Vox is a GUI-subsystem process (main.rs:16).
   - Immediately after spawn, `AssignProcessToJobObject` puts the child in its own job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION`.
-  - `HelperGuard` owns the job handle. Dropping it or calling `kill_tree()` (TerminateJobObject) kills the whole tree, and so does any Vox exit, `process::exit` included.
+  - `ContainedChild` owns the job handle. Dropping it or calling `kill_tree()` (TerminateJobObject) kills the whole tree, and so does any Vox exit, `process::exit` included.
 - **Linux containment:**
   - `process_group(0)`.
   - `pre_exec`: `prctl(PR_SET_PDEATHSIG, SIGKILL)`, then `_exit(1)` if `getppid()` is not the pid captured before the fork. Only async-signal-safe calls are made there.
-  - `kill_tree()` is `killpg(pgid, SIGKILL)` followed by a reap. libc is already a vox-win dependency.
+  - `kill_tree()` is `killpg(pgid, SIGKILL)`, then SIGKILL to the helper itself (in case it left the group), then a reap. libc is already a vox-win dependency.
+  - `try_exit_status()` reads the helper's exit with `waitid(WNOWAIT)` and does not reap it: the zombie keeps the process group id reserved, so a later `kill_tree()` cannot signal a reused group. The host must never reap the helper any other way. For the same reason the first `Spawner::global()` resets an inherited `SIGCHLD` = `SIG_IGN` (or `SA_NOCLDWAIT`), which survives `execve` and would make the kernel reap helpers by itself; if a wait still fails, the child is marked lost and is never signalled again.
 - **Helper rules (normative):**
   1. Write only protocol lines to stdout; logs go to stderr.
   2. Write nothing before `hello` arrives.
@@ -529,8 +530,10 @@ Waiting is a loop:
 - **Crash budget:** 3 crashes, violations or timeouts within 10 minutes mark the runtime **Broken**. Further calls fail immediately, not retryable, with "KittenTTS Lite keeps stopping. Repair it on the Voices page." The host notifies the core, which republishes the row. Repair (an Install of the same version), a reinstall or a restart clears it.
 - **Spawn errors** (`vox_win::process::classify_spawn_error`), all not retryable:
   - NotFound: "KittenTTS Lite is incomplete. Repair it on the Voices page." (Broken)
-  - Windows raw OS error 5, 225, 1260 or 4551: "Windows blocked KittenTTS Lite from starting."
-  - Linux EACCES or EPERM: "Your system blocked KittenTTS Lite from starting. Is the add-ons folder on a noexec drive?"
+  - Blocked (Windows raw OS error 5, 225, 1260 or 4551): "Windows blocked KittenTTS Lite from starting."
+  - Blocked (Linux EPERM): "Your system blocked KittenTTS Lite from starting."
+  - NoExec (Linux EACCES or ENOEXEC): "Your system blocked KittenTTS Lite from starting. Is the add-ons folder on a noexec drive?"
+  - NoExec (Windows 193 or 216): "KittenTTS Lite isn't built for this PC."
 - **Idle reaper:** the core timer `TimerId::AddonIdle` (every 60 s) calls `host.reap_idle(now)`. It uses `try_lock` and quits helpers idle longer than `idle_exit_sec` to free model RAM.
 - **Shutdown:** `("addons", Box::new(move || host.shutdown(Duration::from_millis(400))))` joins the `run_bounded` list (lifecycle.rs:151-164). It quits every helper, waits, then calls `kill_tree`. The job, PDEATHSIG and stdin EOF cover the hard-exit paths.
 
@@ -593,12 +596,12 @@ Waiting is a loop:
 
 ### vox-win
 
-- **NEW src/process.rs** (Windows) and **src/linux/process.rs**, re-exported from lib.rs (:31-67) in the existing twin pattern:
+- **NEW src/process/** (built in PR 2): `mod.rs` holds the shared API, `win.rs` and `linux.rs` the containment, `tests.rs` the re-exec tests. One module rather than the src/linux twin, because the Spawner, the child wrapper and the classifier are the same on both:
   - `pub struct Spawner` (`Spawner::global()`, which starts the `vox-addons-spawn` thread on first use);
-  - `pub fn spawn(&self, cmd: Command) -> io::Result<(Child, HelperGuard)>`;
-  - `impl HelperGuard { pub fn kill_tree(&self) }`, with Drop doing the same;
+  - `pub fn spawn(&self, cmd: Command) -> io::Result<ContainedChild>`;
+  - `ContainedChild`: `id()`, `take_stdin/stdout/stderr()`, `try_exit_status()` and `wait_timeout()` (neither reaps), `kill_tree()` (kills, reaps, returns the status; idempotent), and Drop doing the same. It wraps the `Child` so nothing can reap the helper before its tree is killed;
   - `pub fn classify_spawn_error(e: &io::Error) -> SpawnBlock { NotFound, Blocked, NoExec, Other }`.
-- **NEW src/disk.rs** and **src/linux/disk.rs:** `pub fn free_bytes(path: &Path) -> Option<u64>`.
+- **NEW src/disk.rs:** `pub fn free_bytes(path: &Path) -> Option<u64>`, measured at the nearest existing parent when `path` does not exist yet.
 - **Cargo.toml:** add the windows feature `"Win32_System_JobObjects"`.
 
 ### NEW crate crates/vox-addons
@@ -837,7 +840,7 @@ Locally: `~/.cargo/bin/cargo test --workspace` and `~/.cargo/bin/cargo clippy --
 |---|---|
 | vox-core unit | id and key grammar (DOS names, 32/64 limits, `--`, ':'); `addon_voice_id`/parse round-trip; `addon_voice_name`; `provider_of("addon:x:y") == Addon` with nothing registered; ROUTED/from_id round-trip; EXTRA unchanged; Version ordering; `parse_catalogue` dropping bad entries (http URL, bad hash, bad id, duplicates) and handling schema 2; `pick_release` (protocol, min_vox, platform); `parse_manifest` clamps and rejections (env keys, exe outside the dir); sort grouping of two add-ons that share names |
 | vox-tts unit | `engine_tests.rs` FakeProvider routing with mock = false (WAV chunk, alignment, Complete with billed 0); the `https_agent` defaults equal the old build_agent |
-| vox-win unit | the test binary re-execs itself as a child and grandchild: `kill_tree` kills both; spawning from a short-lived thread through the Spawner leaves the child alive after that thread exits (the PDEATHSIG trap); classify_spawn_error |
+| vox-win unit | the test binary re-execs itself as a child and grandchild: `kill_tree` and Drop kill both; spawning from a short-lived thread through the Spawner leaves the child alive after that thread exits (the PDEATHSIG trap); a stand-in Vox that calls `process::exit` takes its helper with it; the exit status is read without reaping; classify_spawn_error, a missing program, and (Linux) a file without the execute bit |
 | vox-addons `tests/protocol.rs` + unit | line reader caps, CRLF, truncated lines; a 10k-iteration deterministic pseudo-random input loop never panics or allocates beyond the caps |
 | vox-addons `tests/helper.rs` | handshake (normal, `protocol:2` gives Incompatible, `no-hello`/`slow-hello` time out, `banner` is a violation, `exit-at-start` crashes); synthesize gives a valid WAV, MIME_WAV, `Some(0.0)`, and a consistent alignment of length == len16 on "héllo 👋 wörld" in all three offset units; `@bad-offsets`/`@no-words` fall back to even_alignment; `@crash` is retryable, then a respawn (count-file); 3 crashes give Broken with no further spawn; `@hang` times out at the idle deadline and the process is gone; `@slow` with heartbeats outlives idle_ms and succeeds; cancel during `@slow` returns cancelled within the grace and the next call works; `@ignore-cancel` is killed and respawned; `@garbage`/`@huge` violate the protocol and kill; `@bad-wav` gives an audio error and the helper is kept; `@stale` replies are discarded; `stderr-flood` does not deadlock; 3 threads calling synthesize are serialised in FIFO order (log-file); stdin EOF ends the process within 2 s; `spawn-grandchild` then `kill_tree` leaves no grandchild |
 | vox-addons `tests/host.rs` | two add-ons `fake-a`/`fake-b` with identical voice keys: 4 voices, distinct ids `addon:fake-a:alpha` and `addon:fake-b:alpha`, categories, and names "Alpha (Fake A)"; routing reaches the right process (tone or log); list_voices and summary never spawn (count-file empty); voices.json fallback; unknown id gives the "isn't installed" copy with code Unknown; `voice_aliases` resolve; reap_idle; shutdown; `replace` while a `@slow` request runs (the old one finishes, then the old process exits) |
