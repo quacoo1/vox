@@ -1229,9 +1229,17 @@ voice settings); the others add voices.
 - **Voice ids carry the provider** (`vox_core::providers`): ElevenLabs ids are unchanged; every other voice is
   `<prefix>:<rest>` (`polly:neural:Joanna`, `azure:en-US-AvaNeural`, `openai:coral`, `google:<name>`,
   `windows:<token id>`), so `settings.voiceId`, history records and cache manifests keep one string field and stay
-  readable by the Electron build. `provider_of(id)` / `split_voice_id(id)` route; `Provider::EXTRA` is the Voice
-  providers page order (Windows, Polly, Azure, OpenAI, Google), which the Voices page also groups by
-  (`sort_voices_for_page`: provider, then the ElevenLabs category rank, then name).
+  readable by the Electron build. `provider_of(id)` / `split_voice_id(id)` route over `Provider::ROUTED`.
+  `Provider::EXTRA` is the Voice providers page order (Windows, Polly, Azure, OpenAI, Google) and the list of
+  credential cards; `ROUTED` is EXTRA plus `Provider::Addon`, so the Voices page groups by it (`sort_voices_for_page`:
+  provider, then one group per add-on, then the ElevenLabs category rank, then name).
+- **Offline voice add-ons** (`vox_core::addons`; in progress, docs/addons-design.md): one `Provider::Addon` for every
+  add-on installed at runtime, with the add-on inside the voice id: `addon:<add-on id>:<voice key>` (add-on id
+  `[a-z0-9-]`, 1–32, no `--`, not a DOS device name; voice key `[A-Za-z0-9._-]`, 1–64), so `addon:kittentts-lite:bella`
+  and `addon:kittentts-2:bella` stay apart. The add-on host takes the single `Provider::Addon` slot in the engine and
+  routes by the add-on id; it has no credentials, no card, and is left out of `AppInfo.providers`
+  (`provider_statuses`). An add-on voice that cannot be read fails with `ReadErrorCode::Unknown` and an Open Voices
+  action, never `NoApiKey` (whose copy is about the ElevenLabs key).
 - **Credentials** (`vox_store::provider_secrets`): `providers-dpapi.bin`, one DPAPI (current user) blob of
   `{"<provider id>": {key, secret, region}}`, written atomically; missing or unreadable = nothing connected. Never
   logged (`ProviderCredentials`' `Debug` masks the key). Windows voices need none.
@@ -1245,8 +1253,9 @@ voice settings); the others add voices.
   the total "billed by ElevenLabs"). Word timing: Polly from speech marks (a second billed request, made only when
   `widget.highlightWords` is on; samples never ask for it), Windows from the OneCore word boundaries, Azure, OpenAI
   and Google spread evenly over the real MP3 duration (`even_alignment`).
-- **Gates and errors**: `Reader::read` checks the ElevenLabs key only for ElevenLabs voices; another provider's voice
-  needs its client connected, else the toast `Connect <name> in Settings → Voice providers…` with an Open settings
+- **Gates and errors**: `Reader::read` gates on the voice the read uses (the request's override voice, else the
+  selected one). It checks the ElevenLabs key only for ElevenLabs voices; another provider's voice needs its client
+  connected, else the toast `Connect <name> in Settings → Voice providers…` with an Open settings
   action (`vox_tts::not_connected`).
 - **Catalog** (`core::catalog`): `fetch_voices` lists ElevenLabs (when there is a key, or no provider is connected)
   plus every connected provider on one worker and merges them (`merge_voice_lists`); a provider's voices use its

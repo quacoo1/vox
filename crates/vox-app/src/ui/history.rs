@@ -802,8 +802,10 @@ impl Inner {
         if result.ok {
             return;
         }
-        let nothing_left = matches!(result.code, Some(ReadErrorCode::NotCached))
-            || (matches!(result.code, Some(ReadErrorCode::Unknown) | None) && result.read_id.is_none());
+        // `toasted`: the core's voice gate already showed the failure (with its own action).
+        let nothing_left = !result.toasted
+            && (matches!(result.code, Some(ReadErrorCode::NotCached))
+                || (matches!(result.code, Some(ReadErrorCode::Unknown) | None) && result.read_id.is_none()));
         if nothing_left {
             let msg = result.error.clone().filter(|e| !e.is_empty()).unwrap_or_else(|| "That read can\u{2019}t be replayed".into());
             toasts.push(Toast::error(msg).with_id(format!("replay-{id}")), None);
@@ -1658,6 +1660,11 @@ mod tests {
         st.replays.insert(req, "r0".into());
         st.on_read_started(req, &ReadResult::failed_with_id("new", ReadErrorCode::Network, "x"), &mut toasts);
         assert_eq!(toasts.pushes.len(), 2, "a failed re-synthesis is toasted by the core");
+        // The voice gate (an uninstalled add-on) toasted with its own Open Voices action: no second toast.
+        let req = c.request_id();
+        st.replays.insert(req, "r0".into());
+        st.on_read_started(req, &ReadResult::failed(ReadErrorCode::Unknown, "x").toasted(), &mut toasts);
+        assert_eq!(toasts.pushes.len(), 2, "the gate's toast is the only one");
     }
 
     #[test]

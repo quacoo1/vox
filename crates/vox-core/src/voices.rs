@@ -148,22 +148,31 @@ fn rank(v: &Voice) -> f64 {
 }
 
 /// Where a voice's provider sits on the Voices page: ElevenLabs first, then the other services in the order the
-/// Voice providers page lists them ([`Provider::EXTRA`]).
+/// Voice providers page lists them, then the add-ons ([`Provider::ROUTED`]).
 fn provider_rank(v: &Voice) -> usize {
     match provider_of(&v.voice_id) {
         Provider::ElevenLabs => 0,
-        p => 1 + Provider::EXTRA.iter().position(|e| *e == p).unwrap_or(Provider::EXTRA.len()),
+        p => 1 + Provider::ROUTED.iter().position(|e| *e == p).unwrap_or(Provider::ROUTED.len()),
     }
 }
 
-/// Voices-page order: grouped by provider (ElevenLabs first); within ElevenLabs, own voices first (cloned,
-/// professional, generated, other, premade); then by name (case-insensitive; decision: plain lower-case compare
-/// instead of ICU `localeCompare`).
+/// Within the add-ons block, one group per add-on: its category (the add-on's name). Empty for everything else.
+fn addon_group(v: &Voice) -> String {
+    match provider_of(&v.voice_id) {
+        Provider::Addon => v.category.as_deref().unwrap_or("").to_lowercase(),
+        _ => String::new(),
+    }
+}
+
+/// Voices-page order: grouped by provider (ElevenLabs first, add-ons last, one group per add-on); within ElevenLabs,
+/// own voices first (cloned, professional, generated, other, premade); then by name (case-insensitive; decision: plain
+/// lower-case compare instead of ICU `localeCompare`).
 pub fn sort_voices_for_page(voices: &[Voice]) -> Vec<Voice> {
     let mut v = voices.to_vec();
     v.sort_by(|a, b| {
         provider_rank(a)
             .cmp(&provider_rank(b))
+            .then_with(|| addon_group(a).cmp(&addon_group(b)))
             .then_with(|| rank(a).partial_cmp(&rank(b)).unwrap_or(std::cmp::Ordering::Equal))
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
@@ -372,9 +381,28 @@ mod tests {
             voice("azure:en-US-AvaNeural", "Ava", Some("Azure AI Speech"), &[]),
             voice("2", "Anna", Some("cloned"), &[]),
             voice("polly:neural:Amy", "Amy", Some("Amazon Polly"), &[]),
+            // Add-ons last, one group per add-on, even when their voices share names.
+            voice("addon:kittentts-lite:bella", "Bella (KittenTTS Lite)", Some("KittenTTS Lite"), &[]),
+            voice("addon:kittentts-2:bella", "Bella (KittenTTS 2)", Some("KittenTTS 2"), &[]),
+            voice("addon:kittentts-lite:alfie", "Alfie (KittenTTS Lite)", Some("KittenTTS Lite"), &[]),
+            voice("addon:kittentts-2:zara", "Zara (KittenTTS 2)", Some("KittenTTS 2"), &[]),
         ];
         let sorted: Vec<String> = sort_voices_for_page(&mixed).into_iter().map(|v| v.name).collect();
-        assert_eq!(sorted, vec!["Anna", "zed", "David", "Amy", "Joanna", "Ava"]);
+        assert_eq!(
+            sorted,
+            vec![
+                "Anna",
+                "zed",
+                "David",
+                "Amy",
+                "Joanna",
+                "Ava",
+                "Bella (KittenTTS 2)",
+                "Zara (KittenTTS 2)",
+                "Alfie (KittenTTS Lite)",
+                "Bella (KittenTTS Lite)"
+            ]
+        );
         let f = VoiceFilter { gender: "female".into(), ..Default::default() };
         assert_eq!(filter_voices(&vs, &f).len(), 2);
         let q = VoiceFilter { query: "ghan ann".into(), ..Default::default() };

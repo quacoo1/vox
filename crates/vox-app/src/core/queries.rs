@@ -85,10 +85,12 @@ pub fn build_app_info(
 }
 
 /// What the UI may know about every connected provider (no secrets).
+/// The connected services (Settings → Voice providers). The add-on host is not one: add-ons have their own state.
 pub fn provider_statuses(engine: &vox_tts::TtsEngine) -> Vec<vox_core::providers::ProviderStatus> {
     engine
         .providers()
         .into_iter()
+        .filter(|p| p.provider() != vox_core::providers::Provider::Addon)
         .map(|p| vox_core::providers::ProviderStatus { provider: p.provider(), summary: p.summary(), region: p.region() })
         .collect()
 }

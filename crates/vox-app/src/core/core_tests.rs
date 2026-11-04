@@ -281,6 +281,119 @@ fn no_key_reads_toast_and_create_no_record() {
     assert_eq!(action.route, Some(AppRoute::settings("account")));
 }
 
+fn read_with_voice(kit: &mut Kit, id: &str) -> vox_core::read::ReadResult {
+    let mut req = ReadRequest::new("Hello there.", ReadSource::Manual);
+    req.voice = Some(vox_core::read::VoiceOverride { id: id.into(), name: "Override".into() });
+    kit.core.read(req)
+}
+
+#[test]
+fn the_gate_checks_the_voice_the_read_uses_not_only_the_selected_one() {
+    // A key exists, so the selected ElevenLabs voice would pass; the override voice decides.
+    let mut kit = Kit::new(Some("sk_test"), false);
+    let result = read_with_voice(&mut kit, "polly:neural:Joanna");
+    assert_eq!(result.code, Some(ReadErrorCode::NoApiKey));
+    assert!(kit.core.services.history.is_empty());
+    let shown = toasts(&kit.updates());
+    assert_eq!(shown.len(), 1);
+    assert!(shown[0].message.contains("Connect Amazon Polly"), "{}", shown[0].message);
+    assert_eq!(shown[0].action.clone().unwrap().route, Some(AppRoute::settings("providers")));
+
+    // An ElevenLabs override voice without a key is gated like the selected one.
+    let mut kit = Kit::new(None, false);
+    kit.core.services.settings.update(&serde_json::json!({ "voiceId": "polly:neural:Joanna" }));
+    let result = read_with_voice(&mut kit, "21m00Tcm4TlvDq8ikWAM");
+    assert_eq!(result.code, Some(ReadErrorCode::NoApiKey));
+    assert_eq!(toasts(&kit.updates()).last().unwrap().message, vox_core::copy::ADD_KEY_TO_READ);
+}
+
+#[test]
+fn an_add_on_voice_without_its_add_on_is_refused_without_elevenlabs_copy() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    let result = read_with_voice(&mut kit, "addon:kittentts-2:bella");
+    assert_eq!(result.code, Some(ReadErrorCode::Unknown));
+    assert!(result.toasted, "the replay pages must not add a second toast");
+    assert!(kit.core.services.history.is_empty());
+    let toasts = toasts(&kit.updates());
+    assert_eq!(toasts.len(), 1);
+    assert_eq!(toasts[0].message, vox_tts::providers::ADDON_NOT_INSTALLED);
+    let action = toasts[0].action.clone().expect("Open Voices");
+    assert_eq!(action.label, "Open Voices");
+    assert_eq!(action.route, Some(AppRoute::page(vox_core::app::AppPage::Voices)));
+}
+
+#[test]
+fn a_malformed_add_on_id_is_refused_even_with_a_host() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    kit.core.services.engine.set_provider(vox_core::providers::Provider::Addon, Some(Arc::new(AddonHostStub)));
+    let result = read_with_voice(&mut kit, "addon:Bad:x");
+    assert_eq!(result.code, Some(ReadErrorCode::Unknown));
+    assert!(result.toasted);
+    assert!(kit.core.services.history.is_empty());
+    // A well-formed id gets past the gate to the host.
+    assert!(read_with_voice(&mut kit, "addon:kittentts-2:bella").ok);
+    assert_eq!(kit.core.services.history.len(), 1);
+}
+
+/// Stands in for the add-on host (vox-app builds the real one).
+struct AddonHostStub;
+
+impl vox_tts::SpeechProvider for AddonHostStub {
+    fn provider(&self) -> vox_core::providers::Provider {
+        vox_core::providers::Provider::Addon
+    }
+    fn synthesize(&self, _: &str, _: &str, _: bool, _: &vox_tts::CancelToken) -> Result<vox_tts::SynthesisResult, TtsError> {
+        Err(TtsError::cancelled())
+    }
+    fn list_voices(&self) -> Result<Vec<vox_core::voices::Voice>, TtsError> {
+        Ok(Vec::new())
+    }
+    fn summary(&self) -> String {
+        "1 add-on".into()
+    }
+}
+
+#[test]
+fn the_add_on_host_is_not_a_connected_service() {
+    let kit = Kit::new(Some("sk_test"), false);
+    let engine = &kit.core.services.engine;
+    engine.set_provider(
+        vox_core::providers::Provider::Windows,
+        vox_tts::connect_provider(vox_core::providers::Provider::Windows, Default::default(), None, "test"),
+    );
+    engine.set_provider(vox_core::providers::Provider::Addon, Some(Arc::new(AddonHostStub)));
+    assert_eq!(engine.providers().len(), 2);
+    let statuses = super::queries::provider_statuses(engine);
+    assert_eq!(statuses.iter().map(|s| s.provider).collect::<Vec<_>>(), [vox_core::providers::Provider::Windows]);
+}
+
+#[test]
+fn a_connected_override_voice_passes_the_gate() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    // The Windows voices are connected (always, with no credentials); the read gets past the gate and starts.
+    kit.core.services.engine.set_provider(
+        vox_core::providers::Provider::Windows,
+        vox_tts::connect_provider(vox_core::providers::Provider::Windows, Default::default(), None, "test"),
+    );
+    let result = read_with_voice(&mut kit, "windows:test-voice");
+    assert!(result.ok, "{result:?}");
+    assert_eq!(kit.core.services.history.len(), 1);
+}
+
+#[test]
+fn a_working_override_voice_is_not_blocked_by_a_disconnected_selected_voice() {
+    let mut kit = Kit::new(None, false);
+    // The selected voice's provider is not connected (and there is no ElevenLabs key either).
+    kit.core.services.settings.update(&serde_json::json!({ "voiceId": "polly:neural:Joanna" }));
+    kit.core.services.engine.set_provider(
+        vox_core::providers::Provider::Windows,
+        vox_tts::connect_provider(vox_core::providers::Provider::Windows, Default::default(), None, "test"),
+    );
+    let result = read_with_voice(&mut kit, "windows:test-voice");
+    assert!(result.ok, "{result:?}");
+    assert!(toasts(&kit.updates()).is_empty());
+}
+
 #[test]
 fn empty_text_is_refused_with_a_toast() {
     let mut kit = Kit::new(None, true);

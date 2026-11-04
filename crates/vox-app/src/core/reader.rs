@@ -57,7 +57,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use vox_core::app::{AppRoute, Toast};
+use vox_core::app::{AppPage, AppRoute, Toast};
 use vox_core::constants::{
     CREDITS_AFTER_READ_MS, PARTIAL_READ_ERROR, PREVIEW_CHARS, RAW_CUT_FACTOR, RAW_CUT_MIN, READ_FILE_EXTRA_CHARS, SOURCE_TITLE_MAX,
     TITLE_CHARS,
@@ -150,20 +150,31 @@ impl Reader for Core {
     fn read(&mut self, req: ReadRequest) -> ReadResult {
         self.maybe_recheck_proxy(false);
         let settings = self.settings();
-        // 2. API key gate (skipped in mock-TTS mode).
+        // The voice this read uses: the request's (a replay, a preview of another voice) or the selected one.
+        let voice_id = req.voice.as_ref().map(|v| v.id.clone()).filter(|v| !v.is_empty()).unwrap_or_else(|| settings.voice_id.clone());
+        // 2. API key gate on that voice (skipped in mock-TTS mode).
         if !self.services.engine.is_mock() {
-            match vox_core::providers::provider_of(&settings.voice_id) {
+            match vox_core::providers::provider_of(&voice_id) {
                 vox_core::providers::Provider::ElevenLabs => {
                     if !self.services.settings.has_api_key() {
                         self.toast(Toast::error(copy::ADD_KEY_TO_READ).with_action(copy::ADD_KEY_ACTION, Some(AppRoute::settings("account"))));
-                        return ReadResult::no_api_key();
+                        return ReadResult::no_api_key().toasted();
+                    }
+                }
+                // Not `NoApiKey`: that code titles the error "Add your ElevenLabs API key" (docs/addons-design.md D4).
+                vox_core::providers::Provider::Addon => {
+                    let host = self.services.engine.provider(vox_core::providers::Provider::Addon);
+                    if host.is_none() || vox_core::addons::parse_addon_voice_id(&voice_id).is_none() {
+                        let message = vox_tts::not_connected(vox_core::providers::Provider::Addon).message;
+                        self.toast(Toast::error(message.clone()).with_action("Open Voices", Some(AppRoute::page(AppPage::Voices))));
+                        return ReadResult::failed(vox_core::read::ReadErrorCode::Unknown, &message).toasted();
                     }
                 }
                 provider => {
                     if self.services.engine.provider(provider).is_none() {
                         let message = vox_tts::not_connected(provider).message;
                         self.toast(Toast::error(message.clone()).with_action("Open settings", Some(AppRoute::settings("providers"))));
-                        return ReadResult::failed(vox_core::read::ReadErrorCode::NoApiKey, &message);
+                        return ReadResult::failed(vox_core::read::ReadErrorCode::NoApiKey, &message).toasted();
                     }
                 }
             }
@@ -189,7 +200,6 @@ impl Reader for Core {
         }
         // 7–9. The record exists before the engine starts.
         let read_id = new_uuid();
-        let voice_id = req.voice.as_ref().map(|v| v.id.clone()).filter(|v| !v.is_empty()).unwrap_or_else(|| settings.voice_id.clone());
         let voice_name =
             req.voice.as_ref().map(|v| v.name.clone()).filter(|v| !v.is_empty()).unwrap_or_else(|| settings.voice_name.clone());
         let record_saved = settings.library.save_history;
@@ -523,7 +533,8 @@ impl Core {
         match origin {
             ReplayOrigin::Request => self.answer_read(req, result),
             ReplayOrigin::TogglePlayback => {
-                if !result.ok {
+                // A gate refusal already explained itself; "Nothing is playing" would hide the cause.
+                if !result.ok && !result.toasted {
                     self.toast_nothing_playing();
                 }
             }

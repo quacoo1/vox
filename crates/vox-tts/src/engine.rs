@@ -707,10 +707,10 @@ impl TtsEngine {
         self.inner.providers.read().get(&provider).cloned()
     }
 
-    /// Every connected provider, in `Provider::EXTRA` order.
+    /// Every connected provider, in `Provider::ROUTED` order (the add-on host last).
     pub fn providers(&self) -> Vec<Arc<dyn SpeechProvider>> {
         let map = self.inner.providers.read();
-        Provider::EXTRA.iter().filter_map(|p| map.get(p).cloned()).collect()
+        Provider::ROUTED.iter().filter_map(|p| map.get(p).cloned()).collect()
     }
 
     pub fn is_mock(&self) -> bool {

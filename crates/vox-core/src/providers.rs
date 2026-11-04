@@ -11,6 +11,11 @@
 //! | OpenAI | `openai:coral` | voice name |
 //! | Google Cloud | `google:en-US-Chirp3-HD-Achernar` | voice name |
 //! | Windows | `windows:<token id>` | the OneCore voice id |
+//! | Offline voice add-on | `addon:kittentts-lite:bella` | `<add-on id>:<voice key>` ([`crate::addons`]) |
+//!
+//! Add-ons are installed at runtime, so they share one variant, [`Provider::Addon`]; the add-on is named inside the
+//! voice id. [`Provider::EXTRA`] stays the list of services with a card on the Voice providers page;
+//! [`Provider::ROUTED`] (EXTRA plus Addon) is what voice ids are routed over.
 
 use serde::{Deserialize, Serialize};
 
@@ -23,11 +28,17 @@ pub enum Provider {
     OpenAi,
     Google,
     Windows,
+    /// Every installed offline voice add-on (one host routes by the add-on id inside the voice id).
+    Addon,
 }
 
 impl Provider {
     /// Every provider other than ElevenLabs, in the order the Voice providers page lists them.
     pub const EXTRA: [Provider; 5] = [Provider::Windows, Provider::Polly, Provider::Azure, Provider::OpenAi, Provider::Google];
+
+    /// Every provider other than ElevenLabs that voice ids are routed to: [`Provider::EXTRA`] plus the add-ons.
+    pub const ROUTED: [Provider; 6] =
+        [Provider::Windows, Provider::Polly, Provider::Azure, Provider::OpenAi, Provider::Google, Provider::Addon];
 
     /// The name shown in the UI (and used as the voice category on the Voices page).
     pub fn display_name(self) -> &'static str {
@@ -38,6 +49,7 @@ impl Provider {
             Provider::OpenAi => "OpenAI",
             Provider::Google => "Google Cloud",
             Provider::Windows => "Windows",
+            Provider::Addon => "Offline voices",
         }
     }
 
@@ -50,16 +62,17 @@ impl Provider {
             Provider::OpenAi => "openai",
             Provider::Google => "google",
             Provider::Windows => "windows",
+            Provider::Addon => "addon",
         }
     }
 
     pub fn from_id(id: &str) -> Option<Provider> {
-        [Provider::ElevenLabs].into_iter().chain(Provider::EXTRA).find(|p| p.id() == id)
+        [Provider::ElevenLabs].into_iter().chain(Provider::ROUTED).find(|p| p.id() == id)
     }
 
-    /// True when the provider needs credentials (everything but the built-in Windows voices).
+    /// True when the provider needs credentials (everything but the built-in Windows voices and the add-ons).
     pub fn needs_credentials(self) -> bool {
-        !matches!(self, Provider::Windows)
+        !matches!(self, Provider::Windows | Provider::Addon)
     }
 
     /// The setup form and help text for the Voice providers page.
@@ -115,6 +128,17 @@ impl Provider {
                 keys_url: "",
                 exact_timing: true,
             },
+            // Never rendered: add-ons have no card on the Voice providers page (they are not in `EXTRA`).
+            Provider::Addon => ProviderSpec {
+                description: "",
+                key_label: "",
+                key_placeholder: "",
+                secret_label: "",
+                regions: &[],
+                region_hint: "",
+                keys_url: "",
+                exact_timing: false,
+            },
             Provider::ElevenLabs => ProviderSpec {
                 description: "",
                 key_label: "API key",
@@ -136,6 +160,7 @@ impl Provider {
             Provider::OpenAi => "openai:",
             Provider::Google => "google:",
             Provider::Windows => "windows:",
+            Provider::Addon => "addon:",
         }
     }
 }
@@ -158,7 +183,7 @@ pub struct ProviderSpec {
 
 /// The provider of `voice_id` (anything without a known prefix is an ElevenLabs id).
 pub fn provider_of(voice_id: &str) -> Provider {
-    Provider::EXTRA.into_iter().find(|p| voice_id.starts_with(p.prefix())).unwrap_or(Provider::ElevenLabs)
+    Provider::ROUTED.into_iter().find(|p| voice_id.starts_with(p.prefix())).unwrap_or(Provider::ElevenLabs)
 }
 
 /// `(provider, rest)` for a non-ElevenLabs voice id with a non-empty rest.
@@ -361,6 +386,19 @@ mod tests {
         for p in Provider::EXTRA {
             assert_eq!(Provider::from_id(p.id()), Some(p));
         }
+    }
+
+    #[test]
+    fn add_on_voices_route_to_the_one_add_on_slot() {
+        for p in Provider::ROUTED {
+            assert_eq!(Provider::from_id(p.id()), Some(p));
+        }
+        assert_eq!(&Provider::ROUTED[..5], &Provider::EXTRA[..], "EXTRA (the credential cards) stays a prefix of ROUTED");
+        assert_eq!(provider_of("addon:kittentts-lite:bella"), Provider::Addon);
+        assert_eq!(split_voice_id("addon:kittentts-2:bella"), Some((Provider::Addon, "kittentts-2:bella")));
+        assert_eq!(split_voice_id("addon:"), None);
+        assert!(!Provider::Addon.needs_credentials());
+        assert!(!Provider::EXTRA.contains(&Provider::Addon));
     }
 
     #[test]

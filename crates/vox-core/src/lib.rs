@@ -14,6 +14,7 @@
 //! - Local-time computations are generic over [`chrono::TimeZone`] so they can be tested with fixed offsets;
 //!   production code passes [`chrono::Local`].
 
+pub mod addons;
 pub mod analytics;
 pub mod app;
 pub mod cache;

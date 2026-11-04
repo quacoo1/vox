@@ -822,3 +822,75 @@ fn dropping_the_engine_ends_the_worker() {
     assert_eq!(rec.chunk_count(), 3);
     assert!(rec.events().is_empty());
 }
+
+// ───────────── provider routing (not mock mode) ─────────────
+
+/// A local provider that records what the engine asked for and answers with a short WAV.
+#[derive(Default)]
+struct FakeProvider {
+    calls: parking_lot::Mutex<Vec<(String, String, bool)>>,
+}
+
+impl SpeechProvider for FakeProvider {
+    fn provider(&self) -> Provider {
+        Provider::Addon
+    }
+    fn synthesize(&self, text: &str, rest: &str, word_timing: bool, _cancel: &crate::cancel::CancelToken) -> Result<SynthesisResult, TtsError> {
+        self.calls.lock().push((text.to_string(), rest.to_string(), word_timing));
+        let audio = crate::wav::encode_wav(&vec![0.0; 2400], 24_000);
+        Ok(SynthesisResult {
+            audio: Arc::from(audio),
+            mime: vox_core::tts::MIME_WAV.to_string(),
+            alignment: crate::mock::even_alignment(text, 0.1),
+            request_id: None,
+            character_cost: Some(0.0),
+        })
+    }
+    fn list_voices(&self) -> Result<Vec<vox_core::voices::Voice>, TtsError> {
+        Ok(Vec::new())
+    }
+    fn summary(&self) -> String {
+        String::new()
+    }
+}
+
+#[test]
+fn add_on_voices_route_to_the_add_on_provider() {
+    // Not mock mode: an ElevenLabs request would hit the dead client, so any audio came from the provider.
+    let (engine, rec) = engine_with(offline_client(), false, 0.01);
+    let fake = Arc::new(FakeProvider::default());
+    engine.set_provider(Provider::Addon, Some(fake.clone()));
+    assert_eq!(engine.providers().len(), 1);
+    let mut o = opts("r1", "Hello from an offline voice.");
+    o.voice_id = "addon:fake-a:alpha".into();
+    o.settings.widget.highlight_words = false;
+    engine.start(o);
+    assert!(rec.wait_for(has_complete));
+    assert_eq!(*fake.calls.lock(), [("Hello from an offline voice.".to_string(), "fake-a:alpha".to_string(), false)]);
+    let chunks = rec.chunks();
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].mime, "audio/wav");
+    let complete = rec.events().into_iter().find_map(|e| match e {
+        EngineEvent::Complete { characters_billed, .. } => Some(characters_billed),
+        _ => None,
+    });
+    assert_eq!(complete, Some(0.0), "add-on voices are never billed");
+    engine.stop();
+}
+
+#[test]
+fn an_add_on_voice_without_a_host_fails_without_the_elevenlabs_key_copy() {
+    let (engine, rec) = engine_with(offline_client(), false, 0.01);
+    let mut o = opts("r1", "Hello.");
+    o.voice_id = "addon:kittentts-2:bella".into();
+    engine.start(o);
+    assert!(rec.wait_for(|e| e.iter().any(|x| matches!(x, Entry::Error(_)))));
+    let err = rec.entries().into_iter().find_map(|e| match e {
+        Entry::Error(err) => Some(err),
+        _ => None,
+    });
+    let err = err.unwrap();
+    assert_eq!(err.code, ReadErrorCode::Unknown);
+    assert_eq!(err.message, crate::providers::ADDON_NOT_INSTALLED);
+    engine.stop();
+}
