@@ -41,6 +41,7 @@ pieces meet; §5 (audio), §6 (files) and §7 (UI contract) are the deep dives f
 | `vox-tts` | lib | ElevenLabs client (system proxy, Windows cert store), error model, mapping, memo caches, key validation, preview download; `TtsEngine` (sessions, look-ahead, retries, billing, cached playback); mock synthesiser; WAV helper. | vox-core, vox-text | ureq (rustls + `platform-verifier`, gzip), icu_collator, sha2, hex, base64, url |
 | `vox-audio` | lib | The `Player`: decode (MP3/WAV), WSOLA time-stretch, resample, WASAPI output, output warmer, timeline/position/listening maths, gapless chunk joins, failure recovery. | vox-core | symphonia, cpal, rubato, rtrb |
 | `vox-win` | lib | Everything Win32 except audio/DPAPI/Slint windows: input hook, gesture machine, selection service + clipboard round trip, foreground info, UIPI probe, hotkeys, SMTC media keys, the tray icon (`notify_icon`, version 4), registry (Explorer verb, autostart, theme, proxy), single instance + Electron detection, system events, locale, window/monitor helpers (overlay subclass), shell helpers (notifications + AUMID registration). | vox-core | windows 0.62, winreg |
+| `vox-addons` | lib | Offline voice add-ons (addons-design.md, addons-protocol.md): the helper protocol, the contained helper client (one process per add-on, JSON lines over stdio, idle and absolute deadlines, cancel, crash budget), `AddonRuntime` (an add-on folder loaded), `AddonHost` (the `Provider::Addon` speech provider), and the `vox-addon-fake` test helper. | vox-core, vox-tts, vox-win | serde_json, base64, crossbeam-channel |
 | `vox-bridge` | lib | Localhost HTTP bridge for the unchanged browser extension: request pipeline (pure) + its own listener (accept loop, per-connection threads; D-INT-16). | vox-core | httparse, socket2, windows (WinSock) |
 | `vox-art` | lib (**done**) | Procedural silk thumbnails/backdrop: `Art {width, height, rgba}`, `thumbnail(seed,w,h)`, `backdrop(w,h,dark)`, `accent(seed)`, `palette_for(seed)`. | — | tiny-skia |
 | `vox-app` | bin `vox.exe` | Bootstrap, the core thread (read controller + orchestration), Slint UI glue and page controllers, native window treatment, tray, screenshot harness. | all | slint =1.18.1, muda 0.21 (tray menu; the icon is `vox_win::notify_icon`, D-SH-18), anyhow |
@@ -49,7 +50,8 @@ pieces meet; §5 (audio), §6 (files) and §7 (UI contract) are the deep dives f
 Deviations from BRIEF's crate list (each with its reason in §8): the bridge does not use `tiny_http` (D-INT-16: no access to accepted sockets, no header cap, `Connection` dropped; tiny_http stays as the vox-tts test server); the tray icon is not `tray-icon` (D-SH-18: no `NOTIFYICON_VERSION_4`, so keyboard selection cannot open the window), its `muda` menus stay.
 
 Rules:
-- Library crates never depend on each other except `vox-tts → vox-text`, and everything → `vox-core`. Only vox-app
+- Library crates never depend on each other except `vox-tts → vox-text`, `vox-addons → vox-tts, vox-win` (an add-on is
+  a speech provider whose helper is a contained process; addons-design.md D6), and everything → `vox-core`. Only vox-app
   depends on Slint. Every library crate builds and tests alone: `cargo test -p vox-text` etc.
 - Errors: `thiserror` enums in libraries (`StoreError`, `SecretError`, `ExtractError`, `TtsError`, `DecodeError`,
   `OutputError`, `WinError`), `anyhow` in vox-app. vox-core has no error type except `json::LenientParseError`;
@@ -232,6 +234,8 @@ thread at 30 Hz.
 | `system` | `SystemWatcher::{spawn(on_event, on_session_end), shutdown}`, `SystemEvent::{DisplaysChanged, ThemeChanged, LocaleChanged, ClockChanged, Resumed, CloseRequested, MotionChanged}`, `user_locale()` | watcher thread (hidden **top-level** window) | shell.md §3.6, §5.5, §5.6; D-FMT-1 |
 | `window` | `Hwnd`, `PhysRect`, `MonitorInfo{bounds, work_area, scale, primary, id}`, `install_overlay_subclass(hwnd, on_close)`, `OverlayCloseHandler`, `assert_topmost`, `is_visible`, `set_bounds` (one call), `window_rect`, `set_caption_theme`, `bring_to_front`, `cursor_pos`, `left_button_down`, `monitor_from_point`, `monitor_from_rect`, `primary_monitor`, `monitors`, `normal_placement`, `set_normal_placement`, `reduce_motion` | — | shell.md §6.1 |
 | `shell` | `open_external`, `reveal_path`, `show_notification` (silent ToastGeneric, `CreateToastNotifierWithId(APP_ID)`), `register_app_user_model`, `save_file_dialog(owner, …)`, `set_app_user_model_id`, `documents_folder`, `set_per_monitor_dpi_aware`, `message_box` | save dialog: dedicated STA thread | contracts.md §5.3 |
+| `process` | `Spawner::global().spawn(cmd) -> ContainedChild` (`id`, `take_stdin/stdout/stderr`, `try_exit_status`, `wait_timeout`, `kill_tree`; Drop kills the tree), `classify_spawn_error -> SpawnBlock`. Windows: a job object per child (kill on close, no WER dialogs), no console. Linux: own process group + `PR_SET_PDEATHSIG` | `vox-addons-spawn` (never exits: the Linux death signal follows the spawning thread) | addons-design.md "Process model" |
+| `disk` | `free_bytes(path)` (nearest existing parent) | — | addons-design.md "Install pipeline" |
 | `error` | `WinError(String)` | — | — |
 
 Callbacks given to vox-win services (`SelectionEvents`, `HotkeyHandler`, `MediaHandler`, `ForwardHandler`,

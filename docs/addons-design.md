@@ -512,8 +512,8 @@ Helper → Vox:
 |---|---|
 | spawn → `hello` reply | `start_ms` |
 | `voices` | 10 s |
-| `synthesize`, idle | no frame for `idle_ms`. Any frame for the pending id resets it. The first request after a spawn adds `load_ms` to its first idle window. |
-| `synthesize`, absolute | `synth_max_ms` (+ `load_ms` on the first request) |
+| `synthesize`, idle | no frame for `idle_ms`. Any frame for the pending id resets it. Until the helper has returned audio once since it started, `load_ms` is added to the first idle window. |
+| `synthesize`, absolute | `synth_max_ms` (+ `load_ms` until the helper has returned audio once) |
 | cancel grace | 2 s |
 | quit grace | 400 ms on shutdown, 2 s on remove or smoke test |
 

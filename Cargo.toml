@@ -9,6 +9,7 @@ members = [
     "crates/vox-tts",
     "crates/vox-audio",
     "crates/vox-win",
+    "crates/vox-addons",
     "crates/vox-bridge",
     "crates/vox-app",
 ]
@@ -31,6 +32,7 @@ vox-store = { path = "crates/vox-store" }
 vox-tts = { path = "crates/vox-tts" }
 vox-audio = { path = "crates/vox-audio" }
 vox-win = { path = "crates/vox-win" }
+vox-addons = { path = "crates/vox-addons" }
 vox-bridge = { path = "crates/vox-bridge" }
 vox-art = { path = "crates/vox-art" }
 

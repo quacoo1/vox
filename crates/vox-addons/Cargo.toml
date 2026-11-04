@@ -1,0 +1,30 @@
+[package]
+name = "vox-addons"
+description = "Vox offline voice add-ons: the helper protocol, the contained helper client (timeouts, cancel, crash budget), AddonHost (the add-on speech provider) and the fake helper used by its tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+vox-core.workspace = true
+vox-tts.workspace = true
+vox-win.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+tracing.workspace = true
+
+# The fake helper the integration tests drive (`CARGO_BIN_EXE_vox-addon-fake`); never packaged.
+[[bin]]
+name = "vox-addon-fake"
+path = "src/bin/vox-addon-fake.rs"
+test = false
+doc = false
+
+[dev-dependencies]
+tempfile.workspace = true
+# tests/engine.rs: a local ElevenLabs stand-in that must never be hit by an add-on read.
+tiny_http.workspace = true
