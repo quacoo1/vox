@@ -286,6 +286,27 @@ pub const WINDOW_TITLE_MAX: usize = 300;
 /// Max excluded apps kept by the settings sanitizer.
 pub const EXCLUDED_APPS_MAX: usize = 200;
 
+// ───────────────────────────── voice add-ons ─────────────────────────────
+
+/// The helper protocol majors this Vox speaks (docs/addons-protocol.md).
+pub const ADDON_PROTOCOL_MIN: u32 = 1;
+pub const ADDON_PROTOCOL_MAX: u32 = 1;
+/// Cap on one helper → Vox line (a base64 WAV of a long chunk is about 4 MB).
+pub const ADDON_MAX_LINE: usize = 96 << 20;
+/// Cap on one Vox → helper line.
+pub const ADDON_MAX_REQUEST_LINE: usize = 64 << 10;
+/// This many crashes, protocol violations or timeouts within the window mark an add-on Broken until it is repaired,
+/// reinstalled or Vox restarts.
+pub const ADDON_CRASH_LIMIT: usize = 3;
+pub const ADDON_CRASH_WINDOW_SEC: u64 = 600;
+/// How long a cancelled request may take to wind down before its helper is killed.
+pub const ADDON_CANCEL_GRACE_MS: u64 = 2_000;
+/// How long a helper may take to exit after `quit` on shutdown; on remove it gets [`ADDON_REMOVE_GRACE_MS`].
+pub const ADDON_QUIT_GRACE_MS: u64 = 400;
+pub const ADDON_REMOVE_GRACE_MS: u64 = 2_000;
+/// Deadline of a `voices` request.
+pub const ADDON_VOICES_TIMEOUT_MS: u64 = 10_000;
+
 // ───────────────────────────── shell ─────────────────────────────
 
 /// Explorer verb file types, in registry order.
