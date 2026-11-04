@@ -5,6 +5,8 @@
 //!
 //! | Module | Spec |
 //! |---|---|
+//! | [`process`] | addons-design.md "Process model" — contained add-on helpers: the `vox-addons-spawn` thread, a job object per helper (Linux: process group + `PR_SET_PDEATHSIG`), `kill_tree`, spawn-error classes |
+//! | [`disk`] | addons-design.md "Install pipeline" — free space on a volume (`GetDiskFreeSpaceExW`; Linux `statvfs`) |
 //! | [`gestures`] | selection.md §5 — the pure gesture state machine (unit-tested with the §5.8 scenarios) |
 //! | [`hook`] | selection.md §4, §14 — `WH_MOUSE_LL`/`WH_KEYBOARD_LL` thread (hook procs only enqueue; `catch_unwind`) |
 //! | [`selection`] | selection.md §2, §6, §8 — the selection service (hint/chip decisions, capture pipeline, restores) |
@@ -28,8 +30,10 @@
 //! icon's and the overlay subclass's on the UI thread) and must only enqueue.
 //! Owner: the vox-win engineer.
 
+pub mod disk;
 pub mod error;
 pub mod gestures;
+pub mod process;
 
 #[cfg(windows)]
 pub mod clipboard;
