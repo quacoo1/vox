@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use common::*;
-use vox_addons::{BrokenReason, HelperClient, HelperError, HelperHealth, HelperSpec};
+use vox_addons::{BrokenReason, HelperClient, HelperError, HelperHealth};
 use vox_core::read::ReadErrorCode;
 use vox_core::text16::utf16_len;
 use vox_core::tts::MIME_WAV;
@@ -727,7 +727,7 @@ fn the_helper_gets_the_add_on_environment_and_no_vox_variables() {
     let s = Scratch::new();
     let env_file = s.file("env.txt");
     let fake = fake_spec(&s, &[]);
-    let mut spec = HelperSpec::new("fake-a", "Fake A", "1.0.0", "/bin/sh".into(), s.path().to_path_buf());
+    let mut spec = vox_addons::HelperSpec::new("fake-a", "Fake A", "1.0.0", "/bin/sh".into(), s.path().to_path_buf());
     spec.args = vec!["-c".into(), r#"env > "$1"; shift; exec "$@""#.into(), "sh".into(), env_file.to_string_lossy().into_owned()];
     spec.args.push(FAKE.into());
     spec.args.extend(fake.args);
