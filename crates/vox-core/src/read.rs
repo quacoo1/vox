@@ -141,17 +141,25 @@ pub struct ReadResult {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<ReadErrorCode>,
+    /// The core already showed this failure in a toast (the voice gate), so a caller must not add its own: the replay
+    /// pages' "the core stayed silent" toast, the play/pause replay's "Nothing is playing". In-process only.
+    #[serde(skip)]
+    pub toasted: bool,
 }
 
 impl ReadResult {
     pub fn started(read_id: impl Into<String>) -> Self {
-        Self { ok: true, read_id: Some(read_id.into()), error: None, code: None }
+        Self { ok: true, read_id: Some(read_id.into()), error: None, code: None, toasted: false }
     }
     pub fn failed(code: ReadErrorCode, error: impl Into<String>) -> Self {
-        Self { ok: false, read_id: None, error: Some(error.into()), code: Some(code) }
+        Self { ok: false, read_id: None, error: Some(error.into()), code: Some(code), toasted: false }
     }
     pub fn failed_with_id(read_id: impl Into<String>, code: ReadErrorCode, error: impl Into<String>) -> Self {
-        Self { ok: false, read_id: Some(read_id.into()), error: Some(error.into()), code: Some(code) }
+        Self { ok: false, read_id: Some(read_id.into()), error: Some(error.into()), code: Some(code), toasted: false }
+    }
+    /// Marks the failure as already toasted by the core ([`ReadResult::toasted`]).
+    pub fn toasted(self) -> Self {
+        Self { toasted: true, ..self }
     }
     /// The canonical failure results (contracts.md §5.3).
     pub fn no_api_key() -> Self {

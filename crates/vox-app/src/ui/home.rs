@@ -271,9 +271,10 @@ fn send_query(core: &CoreHandle, pending: &Cell<Option<RequestId>>) {
 
 /// `replayRead`'s extra failure toast (ui-main.md §1.6): `not-cached`, or `unknown` without a read id (the record
 /// vanished, or the core's panic answer) → error toast `res.error ?? "That read can’t be replayed"`, id
-/// `replay-{readId}`. A failed re-synthesis carries its new read id and the core toasts it.
+/// `replay-{readId}`. A failed re-synthesis carries its new read id and the core toasts it; so does the voice gate
+/// (`ReadResult::toasted`).
 pub(crate) fn replay_failure_toast(read_id: &str, result: &ReadResult) -> Option<Toast> {
-    if result.ok {
+    if result.ok || result.toasted {
         return None;
     }
     let silent = match result.code {
@@ -895,6 +896,8 @@ mod tests {
         // A failed re-synthesis carries its new read id: the core toasts it.
         assert_eq!(replay_failure_toast("a", &ReadResult::failed_with_id("b", ReadErrorCode::Unknown, "x")), None);
         assert_eq!(replay_failure_toast("a", &ReadResult::no_api_key()), None);
+        // The voice gate already toasted (an uninstalled add-on: `Unknown`, no read id).
+        assert_eq!(replay_failure_toast("a", &ReadResult::failed(ReadErrorCode::Unknown, "x").toasted()), None);
         let t = replay_failure_toast("a", &ReadResult::failed(ReadErrorCode::NotCached, "")).expect("toast");
         assert_eq!(t.message, "That read can\u{2019}t be replayed");
     }

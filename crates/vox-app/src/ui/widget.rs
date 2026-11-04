@@ -489,11 +489,12 @@ impl WidgetController {
 
     /// The answer to a Try-again replay: not-ok with `unknown` / `not-cached` (e.g. not in history because history is
     /// off) → read the session text again directly with the same `sourceApp` and no source. Other failures do nothing
-    /// more (the core toasts read failures).
+    /// more (the core toasts read failures). Neither does a voice-gate refusal (`toasted`): the replay's voice cannot be
+    /// used, and re-reading without it would switch to the selected voice.
     fn on_read_started(&mut self, core: &CoreHandle, req: RequestId, result: &ReadResult) {
         let Some(i) = self.retries.iter().position(|r| r.req == req) else { return };
         let retry = self.retries.remove(i);
-        if result.ok || !matches!(result.code, Some(ReadErrorCode::Unknown | ReadErrorCode::NotCached)) {
+        if result.ok || result.toasted || !matches!(result.code, Some(ReadErrorCode::Unknown | ReadErrorCode::NotCached)) {
             return;
         }
         if retry.text.trim().is_empty() {
@@ -954,6 +955,15 @@ mod tests {
             _ => panic!("expected a replay"),
         };
         let _ = w.on_update(&core, &UiUpdate::ReadStarted { req, result: ReadResult::no_api_key() }, &err, &settings, 0.0);
+        assert!(rx.try_recv().is_err());
+        // A voice-gate refusal (an add-on that is not installed) is not re-read in the selected voice.
+        w.error_action(&core, &err);
+        let req = match rx.try_recv() {
+            Ok(Command::Replay { req: Some(req), .. }) => req,
+            _ => panic!("expected a replay"),
+        };
+        let refused = ReadResult::failed(ReadErrorCode::Unknown, "not installed").toasted();
+        let _ = w.on_update(&core, &UiUpdate::ReadStarted { req, result: refused }, &err, &settings, 0.0);
         assert!(rx.try_recv().is_err());
         // Codes without a button do nothing.
         err.state.error_code = Some(ReadErrorCode::EmptyText);

@@ -41,7 +41,8 @@ pub trait SpeechProvider: Send + Sync {
     }
 }
 
-/// Builds the client for `provider` from validated credentials (Windows needs none).
+/// Builds the client for `provider` from validated credentials (Windows needs none). ElevenLabs has its own client and
+/// the add-ons one host that vox-app builds, so both are `None`.
 pub fn connect(provider: Provider, creds: ProviderCredentials, proxy: Option<&ProxyConfig>, user_agent: &str) -> Option<Arc<dyn SpeechProvider>> {
     let p: Arc<dyn SpeechProvider> = match provider {
         Provider::Polly => Arc::new(crate::polly::PollyClient::new(creds, proxy, user_agent)),
@@ -49,15 +50,22 @@ pub fn connect(provider: Provider, creds: ProviderCredentials, proxy: Option<&Pr
         Provider::OpenAi => Arc::new(crate::openai::OpenAiClient::new(creds, proxy, user_agent)),
         Provider::Google => Arc::new(crate::google::GoogleClient::new(creds, proxy, user_agent)),
         Provider::Windows => Arc::new(crate::windows_voices::WindowsVoices::new()),
-        Provider::ElevenLabs => return None,
+        Provider::ElevenLabs | Provider::Addon => return None,
     };
     Some(p)
 }
 
-/// The error for a voice whose provider is not connected.
+/// The error for a voice whose provider is not connected. An add-on voice gets `Unknown`, not `NoApiKey`: that code
+/// titles the error "Add your ElevenLabs API key" and offers Settings → Account (`error_needs_settings`).
 pub fn not_connected(provider: Provider) -> TtsError {
-    TtsError::new(ReadErrorCode::NoApiKey, format!("Connect {} in Settings → Voice providers to use this voice.", provider.display_name()))
+    match provider {
+        Provider::Addon => TtsError::new(ReadErrorCode::Unknown, ADDON_NOT_INSTALLED),
+        p => TtsError::new(ReadErrorCode::NoApiKey, format!("Connect {} in Settings → Voice providers to use this voice.", p.display_name())),
+    }
 }
+
+/// [`not_connected`] for an add-on voice whose add-on is not installed.
+pub const ADDON_NOT_INSTALLED: &str = "This offline voice isn’t installed. Install it on the Voices page.";
 
 pub(crate) const SYNTH_TIMEOUT: Duration = Duration::from_secs(45);
 pub(crate) const LIST_TIMEOUT: Duration = Duration::from_secs(20);

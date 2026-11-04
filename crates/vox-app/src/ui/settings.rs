@@ -108,6 +108,12 @@ const MODEL_FALLBACK_DESCRIPTION: &str = "Which ElevenLabs model synthesizes spe
 pub(crate) fn other_provider_notice(voice_id: &str) -> (String, String) {
     match vox_core::providers::provider_of(voice_id) {
         vox_core::providers::Provider::ElevenLabs => (String::new(), String::new()),
+        vox_core::providers::Provider::Addon => (
+            "Offline voice".to_string(),
+            "Model, language, audio quality and the voice settings only reach ElevenLabs. This offline voice speaks \
+             with its own defaults; set the reading speed in Playback."
+                .to_string(),
+        ),
         p => (
             format!("{} voice", p.display_name()),
             format!(
@@ -2102,6 +2108,14 @@ mod tests {
         // The same value again writes nothing.
         c.set_number(&mut w.cx(), "volume", 0.8f32 + f32::EPSILON);
         assert!(writes(&w.sent()).is_empty());
+    }
+
+    #[test]
+    fn an_add_on_voice_gets_its_own_notice() {
+        let (title, note) = other_provider_notice("addon:kittentts-2:bella");
+        assert_eq!(title, "Offline voice");
+        assert!(note.contains("This offline voice speaks with its own defaults"), "{note}");
+        assert!(!note.contains("Offline voices"), "{note}");
     }
 
     #[test]
