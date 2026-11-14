@@ -238,7 +238,8 @@ impl Core {
             RevealTarget::UserData => self.services.runtime.profile.root().to_path_buf(),
             RevealTarget::Extension => self.services.runtime.extension_dir.clone(),
             RevealTarget::Notices => {
-                let written = super::notices::write(self.services.runtime.profile.root());
+                let addons = self.services.addons.as_ref().map(|a| a.host.runtimes()).unwrap_or_default();
+                let written = super::notices::write(self.services.runtime.profile.root(), &addons);
                 match written.map(|p| catch_unwind(AssertUnwindSafe(|| vox_win::shell::open_external(&p.to_string_lossy())))) {
                     Ok(Ok(Ok(()))) => {}
                     Ok(Ok(Err(e))) => tracing::warn!(target: "app", "could not open the notices: {e}"),

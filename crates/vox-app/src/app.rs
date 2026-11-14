@@ -37,7 +37,8 @@
 //!    rest → core); `HotkeyService` (`None` on failure: every hotkey then reports `InUse`); `MediaSession` (`None` on
 //!    failure, logged); `SystemWatcher` (events → core; session end → `Command::SessionEnd(reply)`, wait ≤ 5 s; after
 //!    2.5 s without a reply the handler calls `settings.flush_sync()` + `history.flush_sync()` itself — it holds clones
-//!    of both stores); `BridgeServer` (handler = `core::bridge::BridgeGlue`).
+//!    of both stores); `BridgeServer` (handler = `core::bridge::BridgeGlue`); `core::addons::AddonServices` (not in demo
+//!    or shots mode: the add-ons folder scanned, no helper started) registered as `Provider::Addon`.
 //! 8. Spawn the core thread (`core::Core::spawn`). Its startup work, in order (`Core::spawn` docs): publish
 //!    `Settings`, `Theme`, `Motion`, `AppInfo`; send `Rate{playbackRate}` and `Volume{volume}` to the reading player
 //!    once; `cache.remove_orphans(all history ids)`; register hotkeys and start the selection service (not in shots
@@ -85,6 +86,7 @@ use vox_win::single_instance::{ForwardedArgs, InstanceListener, InstanceRole};
 use vox_win::system::SystemWatcher;
 
 use crate::command::{Command, CoreHandle};
+use crate::core::addons::AddonServices;
 use crate::core::bridge::BridgeGlue;
 use crate::core::engine_sink::{engine_events, player_events, preview_events, PlayerSink};
 use crate::core::{queries, retention, Core, Services};
@@ -196,6 +198,12 @@ pub fn run() -> anyhow::Result<ExitCode> {
             engine.set_provider(provider, vox_tts::connect_provider(provider, creds, proxy.as_ref(), &ua));
         }
     }
+    // Offline voice add-ons: whatever is installed (no helper starts until a voice is used). Demo and shots mode never
+    // touch the real folder.
+    let addons = AddonServices::for_app(&runtime.flags);
+    if let Some(addons) = &addons {
+        engine.set_provider(vox_core::providers::Provider::Addon, Some(addons.host.clone()));
+    }
     let selection = {
         let sink = ui_sink.clone();
         let core = core.clone();
@@ -281,6 +289,7 @@ pub fn run() -> anyhow::Result<ExitCode> {
         media,
         bridge,
         bridge_playing,
+        addons,
     };
     let core_thread = Core::try_spawn(services, rx, core.clone(), ui_sink.clone()).map_err(|e| anyhow::anyhow!("cannot start the core thread: {e}"))?;
 

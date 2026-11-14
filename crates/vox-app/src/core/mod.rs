@@ -3,8 +3,8 @@
 //! catalog requests, key validation, previews, exports, clipboard reads and file extraction run on short-lived worker
 //! threads that report back with commands; audio-cache saves, loads and deletions run on the cache's own I/O worker
 //! (`AudioCache::{save_async, load_async}`, index-only removals). Timers (retention, hotkey-suspension safety,
-//! credits, the history-changed throttle, the retention-change debounce, the output preload) live in
-//! [`timers::Timers`] and drive the loop's `select!` timeout.
+//! credits, the history-changed throttle, the retention-change debounce, the output preload, the add-on idle tick)
+//! live in [`timers::Timers`] and drive the loop's `select!` timeout.
 //!
 //! Core-owned state besides the services (each module documents its part): the reader state and tracked sessions,
 //! the credits state machine (+ wake throttle), the toast router (`SurfaceState`, `ui_ready`, deferred routes), the
@@ -39,7 +39,9 @@
 //! | [`queries`] | history list/export/clear, analytics, cache stats/clear, app info |
 //! | [`lifecycle`] | shell.md §3.5–§3.7: quit sequence, session end, close requests, `persistPlayback` |
 //! | [`timers`] | the deadline heap |
+//! | [`addons`] | addons-design.md "Vox integration": the add-ons found at startup, the read gate's question, sweep, idle tick |
 
+pub mod addons;
 pub mod bridge;
 pub mod catalog;
 pub mod credits;
@@ -113,6 +115,8 @@ pub struct Services {
     pub bridge: Arc<BridgeServer>,
     /// The `/health` "playing" flag shared with [`bridge::BridgeGlue`] (set on every reading-player report).
     pub bridge_playing: Arc<AtomicBool>,
+    /// Offline voice add-ons; `None` in demo and shots mode, or when no data folder could be resolved.
+    pub addons: Option<addons::AddonServices>,
 }
 
 /// The core's state.
@@ -242,6 +246,7 @@ impl Core {
         self.guarded("explorer menu", |core| core.sync_explorer_menu(false));
         self.guarded("launch at login", Core::apply_launch_at_login);
         self.guarded("credits", |core| core.refresh_credits(false));
+        self.guarded("add-ons", Core::start_addons);
         self.guarded("timers", |core| {
             let now = core.mono_ms();
             core.retention.start(now);
@@ -463,6 +468,7 @@ impl Core {
             }
             TimerId::MediaTick => self.media_tick(),
             TimerId::PreloadOutput => self.services.player.preload_output(),
+            TimerId::AddonIdle => self.on_addon_idle(),
         }
     }
 

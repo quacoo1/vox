@@ -24,6 +24,8 @@ pub enum TimerId {
     MediaTick,
     /// 1 s after core startup (whatever the window visibility; not with `null_output`): `player.preload_output()`.
     PreloadOutput,
+    /// Every 60 s while an add-on is installed: quit idle helpers.
+    AddonIdle,
 }
 
 /// The heap.

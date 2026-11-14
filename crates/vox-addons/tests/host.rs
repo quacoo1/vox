@@ -802,3 +802,16 @@ fn list_voices_skips_an_add_on_whose_helper_cannot_list_them() {
     assert_eq!(ids, ["addon:fake-b:alpha", "addon:fake-b:beta"]);
     assert_eq!(spawns(&s, "fake-b-count.txt"), 0);
 }
+
+#[test]
+fn an_incompatible_add_on_is_reported_as_needing_an_update() {
+    let scratch = Scratch::new();
+    let mut addon = fake("fake-a", "Fake A");
+    addon.args = vec!["--mode".into(), "protocol:2".into()];
+    let host = AddonHost::new(|_| {});
+    let runtime = live(&addon, &scratch);
+    let helper_started = runtime.helper.start();
+    assert!(helper_started.is_err());
+    host.replace(runtime);
+    assert_eq!(host.unavailable("fake-a").as_deref(), Some("Fake A needs an update."));
+}

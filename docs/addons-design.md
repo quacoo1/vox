@@ -285,7 +285,7 @@ Validation (`parse_manifest`), at install time and again at every scan:
   "installed_at": "2026-11-04T10:00:00Z", "source": "catalogue" }
 ```
 
-- `source` is `"catalogue"` or `"local"`. A local install is placed by hand by a helper author. It is loaded but never offered updates.
+- `source` is `"catalogue"` or `"local"`. A local install is placed by hand by a helper author and needs only `schema`, `version`, `dir` and `source`. It is loaded but never offered updates or swept, and its `addon.json` may have moved on from the `version` here.
 
 ---
 
@@ -378,13 +378,15 @@ If the selected voice belongs to the removed add-on, it stays in settings, and t
 ### Startup
 
 - **Scan.** In app.rs, right after the Windows registration (:194-196): `AddonsRoot::open(root).scan()`.
-  - It reads only small JSON files: current.json, addon.json and voices.json.
+  - It reads only small JSON files: current.json, addon.json and voices.json, each a regular file of at most 1 MiB (a pipe or device is refused before it is opened).
   - Invalid entries are logged and shown as "Failed: reinstall it". Their current.json is kept, so Repair is possible.
   - Then `engine.set_provider(Provider::Addon, Some(host.clone()))`. **No helper is spawned.**
-- **Sweep.** After the core starts, a worker (`vox-addons-sweep`) deletes:
+- **Sweep.** After the core starts, a worker (`vox-addons-sweep`) deletes only what Vox could have made itself, because `VOX_ADDONS_DIR` can point at a helper author's working folder:
   - everything in `.staging/` except resumable parts younger than 7 days that have a matching `.part.json`;
-  - every `<id>/<dir>` not named by current.json (except `data/`);
-  - every `<id>/` that has no current.json.
+  - every `<id>/<ver>-<rand8>/` not named by a catalogue install's current.json (never `data/`, nor a folder of any other name);
+  - every `<id>/` that has no current.json, holds at least one `<ver>-<rand8>/` folder and nothing else but `data/` (the folders one by one, then `<id>/` itself only if it is empty by then). An empty `<id>/` or one with only `data/` stays: nothing proves it is Vox's.
+  - It never follows links. An add-on with an unreadable current.json, a current.json naming a missing folder, or `source: "local"` is left alone entirely.
+  - It must not run alongside an install (it would take the staging files for leftovers), so the add-on manager starts installs only after `Swept`.
 
 ### A read in progress during update or remove
 

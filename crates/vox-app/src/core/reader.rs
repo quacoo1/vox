@@ -163,9 +163,7 @@ impl Reader for Core {
                 }
                 // Not `NoApiKey`: that code titles the error "Add your ElevenLabs API key" (docs/addons-design.md D4).
                 vox_core::providers::Provider::Addon => {
-                    let host = self.services.engine.provider(vox_core::providers::Provider::Addon);
-                    if host.is_none() || vox_core::addons::parse_addon_voice_id(&voice_id).is_none() {
-                        let message = vox_tts::not_connected(vox_core::providers::Provider::Addon).message;
+                    if let Some(message) = self.addon_refusal(&voice_id) {
                         self.toast(Toast::error(message.clone()).with_action("Open Voices", Some(AppRoute::page(AppPage::Voices))));
                         return ReadResult::failed(vox_core::read::ReadErrorCode::Unknown, &message).toasted();
                     }

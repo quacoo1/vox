@@ -136,6 +136,7 @@ impl Kit {
             media: None,
             bridge,
             bridge_playing,
+            addons: None,
         };
         let ui = UiSink::new(|_| {});
         let core = Core::new(services, rx, handle, ui.clone());
@@ -322,17 +323,173 @@ fn an_add_on_voice_without_its_add_on_is_refused_without_elevenlabs_copy() {
     assert_eq!(action.route, Some(AppRoute::page(vox_core::app::AppPage::Voices)));
 }
 
+/// An add-ons folder holding one hand-placed add-on, `fake-a`, whose program is never run here.
+fn addons_fixture(kit: &Kit) -> PathBuf {
+    let root = kit.dir.join("addons");
+    let dir = root.join("fake-a").join("1.0.0");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("helper.exe"), "not a program").unwrap();
+    std::fs::write(dir.join("NOTICE.txt"), "Fake notice text.").unwrap();
+    let manifest = serde_json::json!({
+        "schema": 1, "id": "fake-a", "version": "1.0.0", "name": "Fake A", "protocol": {"min": 1, "max": 1},
+        "exe": "helper.exe", "credit": "Powered by Fakes", "notices": ["NOTICE.txt"],
+        "voices": [{"key": "alpha", "name": "Alpha", "gender": "female", "language": "en-US", "accent": "American"}],
+    });
+    std::fs::write(dir.join("addon.json"), manifest.to_string()).unwrap();
+    let pointer = serde_json::json!({"schema": 1, "version": "1.0.0", "dir": "1.0.0", "source": "local"});
+    std::fs::write(root.join("fake-a").join("current.json"), pointer.to_string()).unwrap();
+    root
+}
+
+/// Registers the add-ons in `root` the way `app::run` does.
+fn open_addons(kit: &mut Kit, root: PathBuf) {
+    let addons = addons::AddonServices::open(root);
+    kit.core.services.engine.set_provider(vox_core::providers::Provider::Addon, Some(addons.host.clone()));
+    kit.core.services.addons = Some(addons);
+}
+
 #[test]
-fn a_malformed_add_on_id_is_refused_even_with_a_host() {
+fn a_host_with_nothing_installed_still_refuses_at_the_gate() {
     let mut kit = Kit::new(Some("sk_test"), false);
-    kit.core.services.engine.set_provider(vox_core::providers::Provider::Addon, Some(Arc::new(AddonHostStub)));
+    let empty = kit.dir.join("addons");
+    open_addons(&mut kit, empty);
+    let result = read_with_voice(&mut kit, "addon:kittentts-2:bella");
+    assert_eq!(result.code, Some(ReadErrorCode::Unknown));
+    assert!(result.toasted, "the replay pages must not add a second toast");
+    assert!(kit.core.services.history.is_empty());
+    let toasts = toasts(&kit.updates());
+    assert_eq!(toasts.len(), 1);
+    assert_eq!(toasts[0].message, "kittentts-2 isn’t installed. Install it on the Voices page.");
+    let action = toasts[0].action.clone().expect("Open Voices");
+    assert_eq!(action.route, Some(AppRoute::page(vox_core::app::AppPage::Voices)));
+}
+
+#[test]
+fn a_malformed_add_on_id_is_refused_even_with_the_add_on_installed() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    let root = addons_fixture(&kit);
+    open_addons(&mut kit, root);
     let result = read_with_voice(&mut kit, "addon:Bad:x");
     assert_eq!(result.code, Some(ReadErrorCode::Unknown));
     assert!(result.toasted);
     assert!(kit.core.services.history.is_empty());
-    // A well-formed id gets past the gate to the host.
-    assert!(read_with_voice(&mut kit, "addon:kittentts-2:bella").ok);
+}
+
+#[test]
+fn a_voice_of_an_installed_add_on_gets_past_the_gate() {
+    let mut kit = Kit::new(None, false);
+    let root = addons_fixture(&kit);
+    open_addons(&mut kit, root);
+    // A key the add-on does not have: the read starts and then fails in the host, without running the fixture.
+    let result = read_with_voice(&mut kit, "addon:fake-a:nobody");
+    assert!(result.ok, "{result:?}");
     assert_eq!(kit.core.services.history.len(), 1);
+}
+
+#[test]
+fn a_broken_add_on_is_refused_at_the_gate_and_says_why() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    let root = addons_fixture(&kit);
+    let program = root.join("fake-a").join("1.0.0").join("helper.exe");
+    open_addons(&mut kit, root);
+    std::fs::remove_file(program).unwrap();
+    let runtime = kit.core.services.addons.as_ref().unwrap().host.runtime("fake-a").unwrap();
+    assert!(runtime.helper.start().is_err());
+    let result = read_with_voice(&mut kit, "addon:fake-a:alpha");
+    assert_eq!(result.code, Some(ReadErrorCode::Unknown));
+    assert!(result.toasted);
+    assert!(kit.core.services.history.is_empty());
+    assert_eq!(toasts(&kit.updates())[0].message, "Fake A is incomplete. Repair it on the Voices page.");
+}
+
+#[test]
+fn the_startup_scan_registers_voices_without_running_anything() {
+    let mut kit = Kit::new(None, false);
+    let root = addons_fixture(&kit);
+    let program = root.join("fake-a").join("1.0.0").join("helper.exe");
+    open_addons(&mut kit, root);
+    // Any attempt to start the helper from here on would find no program and mark the add-on incomplete.
+    std::fs::remove_file(program).unwrap();
+    let host = kit.core.services.engine.provider(vox_core::providers::Provider::Addon).expect("registered");
+    let voices = host.list_voices().unwrap();
+    assert_eq!(voices.len(), 1);
+    assert_eq!(voices[0].voice_id, "addon:fake-a:alpha");
+    assert_eq!(voices[0].name, "Alpha (Fake A)");
+    let runtime = kit.core.services.addons.as_ref().unwrap().host.runtime("fake-a").unwrap();
+    assert_eq!(runtime.helper.health(), vox_addons::HelperHealth::Ready, "nothing tried to start the helper");
+    assert_eq!(runtime.helper.spawn_count(), 0);
+}
+
+#[test]
+fn demo_and_shots_mode_never_open_the_real_add_ons_folder() {
+    let mut flags = vox_core::app::RuntimeFlags { demo: true, mock_tts: false, shots_dir: None, debug: false };
+    assert!(addons::AddonServices::for_app(&flags).is_none());
+    flags.demo = false;
+    flags.shots_dir = Some(PathBuf::from("shots"));
+    assert!(addons::AddonServices::for_app(&flags).is_none());
+}
+
+#[test]
+fn an_add_on_that_did_not_load_says_so_at_the_gate() {
+    let mut kit = Kit::new(Some("sk_test"), false);
+    let root = addons_fixture(&kit);
+    std::fs::write(root.join("fake-a").join("1.0.0").join("addon.json"), "[]").unwrap();
+    open_addons(&mut kit, root);
+    assert!(kit.core.services.addons.as_ref().unwrap().failed.contains_key("fake-a"));
+    let result = read_with_voice(&mut kit, "addon:fake-a:alpha");
+    assert_eq!(result.code, Some(ReadErrorCode::Unknown));
+    assert!(result.toasted);
+    assert_eq!(toasts(&kit.updates())[0].message, "fake-a couldn’t be loaded. Reinstall it on the Voices page.");
+}
+
+#[test]
+fn an_empty_add_on_host_is_not_asked_for_voices() {
+    let mut kit = Kit::new(None, false);
+    kit.core.services.engine.set_provider(vox_core::providers::Provider::Addon, Some(Arc::new(AddonHostStub)));
+    let all = kit.core.services.engine.providers();
+    assert_eq!(all.len(), 1);
+    assert_eq!(catalog::voice_sources(all.clone(), true).len(), 1);
+    assert!(catalog::voice_sources(all, false).is_empty());
+    // The core's own answer follows what is installed.
+    assert!(!kit.core.has_addons());
+    let empty = kit.dir.join("addons");
+    open_addons(&mut kit, empty);
+    assert!(!kit.core.has_addons());
+    let root = addons_fixture(&kit);
+    open_addons(&mut kit, root);
+    assert!(kit.core.has_addons());
+}
+
+#[test]
+fn the_idle_tick_runs_only_while_an_add_on_is_installed_and_stops_at_quit() {
+    let mut kit = Kit::new(None, false);
+    kit.core.start_addons();
+    assert!(!kit.core.timers.is_set(TimerId::AddonIdle), "no add-on services");
+    // An empty root of its own: the sweep worker started here must not race the fixture written below.
+    let empty = kit.dir.join("empty-addons");
+    open_addons(&mut kit, empty);
+    kit.core.start_addons();
+    assert!(!kit.core.timers.is_set(TimerId::AddonIdle), "nothing installed");
+    let root = addons_fixture(&kit);
+    open_addons(&mut kit, root);
+    kit.core.start_addons();
+    assert!(kit.core.timers.is_set(TimerId::AddonIdle));
+    kit.core.timers.cancel(TimerId::AddonIdle);
+    kit.core.on_timer(TimerId::AddonIdle);
+    assert!(kit.core.timers.is_set(TimerId::AddonIdle), "the tick re-arms");
+    kit.core.shutdown();
+    assert!(!kit.core.timers.is_set(TimerId::AddonIdle));
+}
+
+#[test]
+fn installed_add_ons_are_credited_in_the_third_party_notices() {
+    let mut kit = Kit::new(None, false);
+    let root = addons_fixture(&kit);
+    open_addons(&mut kit, root);
+    let text = notices::text(&kit.core.services.addons.as_ref().unwrap().host.runtimes());
+    for needle in ["Offline voice add-ons", "Fake A 1.0.0", "Powered by Fakes", "--- NOTICE.txt ---", "Fake notice text."] {
+        assert!(text.contains(needle), "missing {needle}");
+    }
 }
 
 /// Stands in for the add-on host (vox-app builds the real one).

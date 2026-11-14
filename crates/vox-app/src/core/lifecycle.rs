@@ -13,7 +13,8 @@
 //!    commands already queued (`rx.try_iter()`), dispatching only `Command::Engine(..)` and dropping the rest, so the
 //!    billing known at stop time reaches the record (quit mid-synthesis keeps `charactersBilled`).
 //! 5. In parallel, bounded by `SHUTDOWN_BUDGET` (3 s): `settings.flush()`, `history.flush()`, `selection.flush()`,
-//!    `cache.flush()`, `bridge.stop()` (never waits for in-flight `/read`s).
+//!    `cache.flush()`, `bridge.stop()` (never waits for in-flight `/read`s), `addons.host.shutdown` (helpers get
+//!    `ADDON_QUIT_GRACE_MS` to exit, then are killed).
 //! 6. Publish `UiUpdate::Quit` (the UI saves `window-state.json` itself, hides the windows, destroys the tray, arms its
 //!    4 s hard exit and leaves the event loop). The core no longer saves the window state (it has no HWND; a
 //!    `SaveWindowState` sent after the quit started would be dropped).
@@ -121,6 +122,7 @@ impl Core {
             TimerId::MediaTick,
             TimerId::Midnight,
             TimerId::HistoryChangedThrottle,
+            TimerId::AddonIdle,
         ] {
             self.timers.cancel(id);
         }
@@ -147,7 +149,6 @@ impl Core {
         let selection = self.services.selection.clone();
         let cache = self.services.cache.clone();
         let bridge = self.services.bridge.clone();
-        #[allow(unused_mut)] // tests add a hung step
         let mut tasks: Vec<ShutdownTask> = vec![
             ("settings", Box::new(move || settings.flush())),
             ("history", Box::new(move || history.flush())),
@@ -159,6 +160,11 @@ impl Core {
             })),
             ("bridge", Box::new(move || bridge.stop())),
         ];
+        if let Some(addons) = &self.services.addons {
+            let host = addons.host.clone();
+            let grace = Duration::from_millis(vox_core::constants::ADDON_QUIT_GRACE_MS);
+            tasks.push(("addons", Box::new(move || host.shutdown(grace))));
+        }
         #[cfg(test)]
         tasks.extend(super::core_tests::take_extra_shutdown_tasks());
         let late = run_bounded(tasks, SHUTDOWN_BUDGET);

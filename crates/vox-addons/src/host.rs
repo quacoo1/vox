@@ -14,7 +14,7 @@ use vox_core::voices::Voice;
 use vox_tts::providers::ADDON_NOT_INSTALLED;
 use vox_tts::{CancelToken, SpeechProvider, SynthesisResult, TtsError};
 
-use crate::helper::{BrokenReason, HelperHealth};
+use crate::helper::{BrokenReason, HelperError, HelperHealth};
 use crate::runtime::AddonRuntime;
 
 /// What the host knows about one add-on id.
@@ -88,6 +88,19 @@ impl AddonHost {
             Some(HelperHealth::Broken(r)) => RuntimeStatus::Broken(r),
             Some(HelperHealth::Incompatible) => RuntimeStatus::Incompatible,
         }
+    }
+
+    /// Why voices of add-on `id` cannot read right now, as the message for the user; `None` when they can, as far as
+    /// is known. Never starts a helper.
+    pub fn unavailable(&self, id: &str) -> Option<String> {
+        let Some(runtime) = self.runtime(id) else { return Some(self.not_installed(id).message) };
+        let reason = match runtime.helper.health() {
+            HelperHealth::Ready => return None,
+            HelperHealth::Removed => return Some(self.not_installed(id).message),
+            HelperHealth::Broken(r) => HelperError::Broken(r),
+            HelperHealth::Incompatible => HelperError::Incompatible,
+        };
+        Some(reason.into_tts(&runtime.manifest.name, runtime.manifest.version.as_str()).message)
     }
 
     /// Names of add-ons that may not be installed (from the catalogue).

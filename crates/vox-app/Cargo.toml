@@ -18,6 +18,7 @@ vox-store.workspace = true
 vox-tts.workspace = true
 vox-audio.workspace = true
 vox-win.workspace = true
+vox-addons.workspace = true
 vox-bridge.workspace = true
 vox-art.workspace = true
 slint.workspace = true

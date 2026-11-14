@@ -7,8 +7,12 @@
 //! - Lucide icons (`ui/icons`): ISC, with the MIT notice of the Feather-derived icons.
 //! - The SCOWL-derived word list used by text clean-up (`vox_text::clean::word_list_notice`).
 //! - The browser extension's fonts ship their OFL files next to them in `browser-extension\fonts`.
+//! - Each installed voice add-on: its name, version, credit and the notice files it lists.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use vox_addons::AddonRuntime;
 
 const SLINT_LICENSE: &str = include_str!("../../assets/licenses/LicenseRef-Slint-Royalty-free-2.0.md");
 const LUCIDE_LICENSE: &str = include_str!("../../../../ui/icons/LICENSE-lucide.txt");
@@ -17,18 +21,24 @@ const LUCIDE_LICENSE: &str = include_str!("../../../../ui/icons/LICENSE-lucide.t
 pub const FILE_NAME: &str = "third-party-notices.txt";
 
 /// The whole notices text, one section per component.
-pub fn text() -> String {
-    let sections = [
-        ("Slint 1.18 (user interface toolkit)", SLINT_LICENSE.trim().to_string()),
-        ("Lucide icons", LUCIDE_LICENSE.trim().to_string()),
-        ("English word list (text clean-up)", vox_text::clean::word_list_notice()),
+pub fn text(addons: &[Arc<AddonRuntime>]) -> String {
+    let mut sections = vec![
+        ("Slint 1.18 (user interface toolkit)".to_string(), SLINT_LICENSE.trim().to_string()),
+        ("Lucide icons".to_string(), LUCIDE_LICENSE.trim().to_string()),
+        ("English word list (text clean-up)".to_string(), vox_text::clean::word_list_notice()),
         (
-            "Browser extension fonts",
+            "Browser extension fonts".to_string(),
             "Space Grotesk and Doto are licensed under the SIL Open Font License 1.1. The licence files are in the \
              browser-extension\\fonts folder next to the program."
                 .to_string(),
         ),
     ];
+    if !addons.is_empty() {
+        sections.push(("Offline voice add-ons".to_string(), addons.iter().map(|a| addon_notice(a)).collect::<Vec<_>>().join("
+
+
+")));
+    }
     let mut out = String::from("Third-party notices for Vox\n\nVox includes the following third-party software.\n");
     for (title, body) in sections {
         out.push_str(&format!("\n\n{title}\n{}\n\n{body}\n", "=".repeat(title.chars().count())));
@@ -36,11 +46,28 @@ pub fn text() -> String {
     out
 }
 
+fn addon_notice(addon: &AddonRuntime) -> String {
+    let manifest = &addon.manifest;
+    let mut out = format!("{} {}", manifest.name, manifest.version);
+    if !manifest.credit.is_empty() {
+        out.push_str(&format!("
+{}", manifest.credit));
+    }
+    for (file, text) in addon.read_notices() {
+        out.push_str(&format!("
+
+--- {file} ---
+
+{}", text.trim()));
+    }
+    out
+}
+
 /// Writes the notices into `folder` (Windows line endings, so Notepad on older Windows shows them right) and returns
 /// the file's path.
-pub fn write(folder: &Path) -> std::io::Result<PathBuf> {
+pub fn write(folder: &Path, addons: &[Arc<AddonRuntime>]) -> std::io::Result<PathBuf> {
     let path = folder.join(FILE_NAME);
-    let body = text().replace("\r\n", "\n");
+    let body = text(addons).replace("\r\n", "\n");
     let body = if cfg!(windows) { body.replace('\n', "\r\n") } else { body };
     std::fs::write(&path, body)?;
     Ok(path)
@@ -52,7 +79,8 @@ mod tests {
 
     #[test]
     fn every_component_is_credited() {
-        let t = text();
+        let t = text(&[]);
+        assert!(!t.contains("Offline voice add-ons"));
         for needle in ["Slint Royalty-free Desktop", "AboutSlint", "Lucide Icons and Contributors", "Cole Bemis", "SCOWL", "Kevin Atkinson", "SIL Open Font License"] {
             assert!(t.contains(needle), "missing {needle}");
         }
@@ -62,7 +90,7 @@ mod tests {
     fn writes_the_file_into_the_folder() {
         let dir = std::env::temp_dir().join(format!("vox-notices-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let path = write(&dir).unwrap();
+        let path = write(&dir, &[]).unwrap();
         assert_eq!(path, dir.join(FILE_NAME));
         let written = std::fs::read_to_string(&path).unwrap();
         assert!(written.starts_with("Third-party notices for Vox"));

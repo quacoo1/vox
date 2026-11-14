@@ -84,6 +84,21 @@ Vox stores a voice as `addon:<add-on id>:<voice key>` in settings, history, anal
 
 ---
 
+### 1.3 Trying an add-on by hand
+
+Vox looks for add-ons in `%LOCALAPPDATA%\Vox\addons` on Windows and `~/.local/share/vox/addons` on Linux. Set
+`VOX_ADDONS_DIR` to use another folder. Put your add-on in `<folder>/<id>/<any folder name>/` and tell Vox about it
+with `<folder>/<id>/current.json`:
+
+```json
+{ "schema": 1, "version": "1.0.0", "dir": "dev", "source": "local" }
+```
+
+Restart Vox and the voices appear on the Voices page. `addon.json` is read at startup, so restart after changing it.
+Vox never updates or tidies an add-on marked `local`. An add-on that does not load (a bad `addon.json`, a folder
+name that is not its id) is refused at read time with "couldn’t be loaded", and the reason is logged to `main.log`
+under the `addons` target.
+
 ## 2. The process
 
 - Vox starts at most one helper per add-on, the first time one of its voices is used (a read or a preview). It is never

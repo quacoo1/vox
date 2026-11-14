@@ -354,6 +354,66 @@ pub fn parse_manifest(bytes: &[u8]) -> Result<AddonManifest, String> {
     })
 }
 
+// ───────────────────────────── current.json ─────────────────────────────
+
+/// Where an installed add-on came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallSource {
+    /// Installed from the signed catalogue: Vox owns its folders.
+    Catalogue,
+    /// Placed by hand by a helper author: loaded, but never updated or cleaned up.
+    Local,
+}
+
+/// `<root>/<id>/current.json` (schema 1), the only thing that makes an add-on installed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstalledPointer {
+    pub version: Version,
+    /// The version folder inside `<root>/<id>/`: one path part, never `data`.
+    pub dir: String,
+    pub source: InstallSource,
+    /// Lower-case hex; empty for a [`InstallSource::Local`] install.
+    pub sha256: String,
+    pub size: u64,
+    pub installed_at: String,
+}
+
+/// Parses and validates `current.json`; the error says what is wrong (for the log). A catalogue install must say what
+/// was installed (`sha256`, `size`, `installed_at`); a hand-placed one needs only `schema`, `version`, `dir`, `source`.
+pub fn parse_installed_pointer(bytes: &[u8]) -> Result<InstalledPointer, String> {
+    let v: Value = serde_json::from_slice(bytes).map_err(|e| format!("not JSON: {e}"))?;
+    let Value::Object(m) = &v else { return Err("not a JSON object".into()) };
+    if m.get("schema").and_then(Value::as_u64) != Some(1) {
+        return Err("schema is not 1".into());
+    }
+    let version = Version::parse(req_str(m, "version")?).ok_or("bad version")?;
+    let dir = req_str(m, "dir")?;
+    if !is_safe_relative_path(dir) || dir.contains('/') || dir.eq_ignore_ascii_case("data") {
+        return Err(format!("bad dir {dir:?}"));
+    }
+    let source = match req_str(m, "source")? {
+        "catalogue" => InstallSource::Catalogue,
+        "local" => InstallSource::Local,
+        other => return Err(format!("unknown source {other:?}")),
+    };
+    let (sha256, size, installed_at) = match source {
+        InstallSource::Local => (String::new(), 0, String::new()),
+        InstallSource::Catalogue => {
+            let sha256 = req_str(m, "sha256")?;
+            if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                return Err("bad sha256".into());
+            }
+            let size = m.get("size").and_then(Value::as_u64).ok_or("bad size")?;
+            let installed_at = req_str(m, "installed_at")?;
+            if installed_at.is_empty() || installed_at.len() > 64 {
+                return Err("bad installed_at".into());
+            }
+            (sha256.to_string(), size, installed_at.to_string())
+        }
+    };
+    Ok(InstalledPointer { version, dir: dir.to_string(), source, sha256, size, installed_at })
+}
+
 /// A voice list: `addon.json` `voices`, `voices.json` `voices`, or a helper's `voices` reply. At most 1000, with valid
 /// and unique keys and 1–60-character names.
 pub fn parse_voices(v: &Value) -> Result<Vec<ManifestVoice>, String> {
@@ -585,5 +645,42 @@ mod tests {
             assert!(Version::parse(bad).is_none(), "{bad}");
         }
         assert_eq!(v("2.0.0").to_string(), "2.0.0");
+    }
+
+    const SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    fn catalogue_pointer(change: impl FnOnce(&mut serde_json::Map<String, Value>)) -> Result<InstalledPointer, String> {
+        let mut v = serde_json::json!({
+            "schema": 1, "version": "2.0.0", "dir": "2.0.0-k3j9az1q", "sha256": SHA, "size": 930,
+            "installed_at": "2026-11-04T10:00:00Z", "source": "catalogue"
+        });
+        change(v.as_object_mut().unwrap());
+        parse_installed_pointer(v.to_string().as_bytes())
+    }
+
+    #[test]
+    fn a_catalogue_pointer_says_what_was_installed() {
+        let p = catalogue_pointer(|_| {}).unwrap();
+        assert_eq!((p.version.as_str(), p.dir.as_str(), p.source), ("2.0.0", "2.0.0-k3j9az1q", InstallSource::Catalogue));
+        assert_eq!((p.sha256.as_str(), p.size), (SHA, 930));
+        for missing in ["sha256", "size", "installed_at", "version", "dir", "source", "schema"] {
+            assert!(catalogue_pointer(|m| drop(m.remove(missing))).is_err(), "{missing}");
+        }
+        assert!(catalogue_pointer(|m| drop(m.insert("sha256".into(), "ABC".into()))).is_err());
+        assert!(catalogue_pointer(|m| drop(m.insert("source".into(), "elsewhere".into()))).is_err());
+        assert!(catalogue_pointer(|m| drop(m.insert("schema".into(), 2.into()))).is_err());
+    }
+
+    #[test]
+    fn a_hand_placed_pointer_needs_only_the_folder() {
+        let p = parse_installed_pointer(br#"{"schema":1,"version":"1.0.0","dir":"dev","source":"local"}"#).unwrap();
+        assert_eq!((p.dir.as_str(), p.source, p.sha256.as_str()), ("dev", InstallSource::Local, ""));
+    }
+
+    #[test]
+    fn a_pointer_cannot_leave_its_add_on_or_name_the_data_folder() {
+        for bad in ["../other", "a/b", "/abs", "..", ".", "", "data", "DATA", "a\\b", "C:x", "con"] {
+            assert!(catalogue_pointer(|m| drop(m.insert("dir".into(), bad.into()))).is_err(), "{bad}");
+        }
     }
 }

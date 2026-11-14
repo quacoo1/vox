@@ -13,6 +13,9 @@
 //!   Session\Local State                               Electron's; read once for the key migration, never written
 //! ```
 //! Never create a folder named `cache` (case-insensitively it would collide with Chromium's `Cache`).
+//!
+//! Voice add-ons are the one thing outside the profile: their models are gigabytes, which must not roam
+//! (`%LOCALAPPDATA%\Vox\addons`, see [`addons_root`]).
 
 use std::path::{Path, PathBuf};
 
@@ -33,14 +36,19 @@ fn roaming_app_data() -> Result<PathBuf, StoreError> {
 
 #[cfg(windows)]
 fn known_folder_roaming() -> Option<PathBuf> {
+    known_folder(&windows::Win32::UI::Shell::FOLDERID_RoamingAppData)
+}
+
+#[cfg(windows)]
+fn known_folder(id: &windows::core::GUID) -> Option<PathBuf> {
     use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{FOLDERID_RoamingAppData, SHGetKnownFolderPath, KF_FLAG_DEFAULT};
+    use windows::Win32::UI::Shell::{SHGetKnownFolderPath, KF_FLAG_DEFAULT};
 
     // SAFETY: SHGetKnownFolderPath returns a CoTaskMem-allocated, NUL-terminated wide string on success, which is
     // read once and then freed exactly once.
     unsafe {
         use std::os::windows::ffi::OsStringExt;
-        let pwstr = SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, None).ok()?;
+        let pwstr = SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None).ok()?;
         let path = std::ffi::OsString::from_wide(pwstr.as_wide());
         CoTaskMemFree(Some(pwstr.0 as *const core::ffi::c_void));
         (!path.is_empty()).then(|| PathBuf::from(path))
@@ -54,6 +62,39 @@ fn known_folder_roaming() -> Option<PathBuf> {
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").filter(|v| !v.is_empty()).map(|h| PathBuf::from(h).join(".config")))
+}
+
+/// The per-machine data folder: `FOLDERID_LocalAppData` on Windows (falling back to `%LOCALAPPDATA%`), `$XDG_DATA_HOME`
+/// else `~/.local/share` on Linux (a relative `$XDG_DATA_HOME` is ignored, as the XDG spec says).
+pub fn local_data_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        known_folder(&windows::Win32::UI::Shell::FOLDERID_LocalAppData)
+            .or_else(|| std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()).map(PathBuf::from))
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .filter(|p| p.is_absolute())
+            .or_else(|| std::env::var_os("HOME").filter(|v| !v.is_empty()).map(|h| PathBuf::from(h).join(".local").join("share")))
+    }
+}
+
+/// Where voice add-ons live (docs/addons-design.md "Directories"): `VOX_ADDONS_DIR` when set (tests, QA, helper
+/// authors), else `%LOCALAPPDATA%\Vox\addons` or `~/.local/share/vox/addons`. Does not create it.
+pub fn addons_root() -> Option<PathBuf> {
+    addons_root_from(std::env::var_os("VOX_ADDONS_DIR"), local_data_dir())
+}
+
+fn addons_root_from(over: Option<std::ffi::OsString>, local: Option<PathBuf>) -> Option<PathBuf> {
+    if let Some(dir) = over.filter(|v| !v.is_empty()) {
+        // Absolute at once: Vox may be started from anywhere (the Explorer verb, a login item).
+        return std::path::absolute(PathBuf::from(dir)).ok();
+    }
+    // Lower case on Linux, like the master key's folder.
+    let folder = if cfg!(windows) { APP_NAME } else { "vox" };
+    Some(local?.join(folder).join("addons"))
 }
 
 /// A resolved profile folder.
@@ -148,6 +189,18 @@ mod tests {
         let p = roaming_app_data().unwrap();
         assert!(p.is_absolute());
         assert!(p.exists());
+    }
+
+    #[test]
+    fn addons_root_prefers_the_override_and_never_invents_a_home() {
+        let local = Some(PathBuf::from("base"));
+        let root = addons_root_from(None, local.clone()).unwrap();
+        assert!(root.ends_with(if cfg!(windows) { "base/Vox/addons" } else { "base/vox/addons" }), "{root:?}");
+        assert_eq!(addons_root_from(None, None), None);
+        // Empty counts as unset; a relative override is made absolute.
+        assert_eq!(addons_root_from(Some("".into()), local.clone()), Some(root));
+        let over = addons_root_from(Some("somewhere".into()), local).unwrap();
+        assert!(over.is_absolute() && over.ends_with("somewhere"), "{over:?}");
     }
 
     /// Creates `%APPDATA%\Vox-Demo` on this machine (harmless, but it touches the real AppData).
