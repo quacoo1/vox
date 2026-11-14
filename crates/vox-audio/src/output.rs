@@ -1032,9 +1032,8 @@ impl Sink for SimOutput {
     }
     fn is_simulated(&self) -> bool {
         #[cfg(test)]
-        if self.test_real {
-            return false;
-        }
+        return !self.test_real;
+        #[cfg(not(test))]
         true
     }
     #[cfg(test)]
