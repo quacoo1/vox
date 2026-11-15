@@ -35,12 +35,21 @@ use vox_core::text16::utf16_len;
 use vox_core::tts::{AudioBytes, TtsChunk, TtsSessionDone, TtsSessionStart};
 use vox_core::voices::{ApiKeyResult, Voice};
 use vox_core::providers::{provider_of, split_voice_id, Provider, ProviderCredentials};
-use vox_tts::CancelToken;
+use vox_tts::{CancelToken, SpeechProvider};
 
 use super::reader::Reader;
 use super::{spawn_worker, system_proxy_config, Core};
 use crate::command::{CatalogResult, Command, RequestId};
 use crate::update::{PreviewUpdate, UiUpdate, PREVIEW_FAILED, PREVIEW_FAILED_CONNECTION};
+
+/// Who to ask for voices besides ElevenLabs. The add-on host is always registered, but with nothing installed it must
+/// not count as a provider that answered, or a failed ElevenLabs list would turn into an empty page.
+pub fn voice_sources(mut providers: Vec<Arc<dyn SpeechProvider>>, addons_installed: bool) -> Vec<Arc<dyn SpeechProvider>> {
+    if !addons_installed {
+        providers.retain(|p| p.provider() != Provider::Addon);
+    }
+    providers
+}
 
 /// The `previewUrl` of a voice id, if known.
 pub fn preview_url<'a>(voices: &'a [Voice], voice_id: &str) -> Option<&'a str> {
@@ -149,7 +158,7 @@ impl Core {
         }
         self.maybe_recheck_proxy(false);
         let client = self.services.client.clone();
-        let others = self.services.engine.providers();
+        let others = voice_sources(self.services.engine.providers(), self.has_addons());
         let has_key = self.services.settings.has_api_key();
         let core = self.handle.clone();
         let spawned = spawn_worker("vox-voices", move || {

@@ -32,6 +32,13 @@ fn serialize_labels<S: serde::Serializer>(v: &[(String, String)], s: S) -> Resul
 }
 
 impl Voice {
+    /// Whether the voice lists offer a sample: an ElevenLabs voice needs its sample URL (some clones have none); every
+    /// other provider's voice is synthesized on the spot (the core's `preview_provider_voice`).
+    pub fn can_preview(&self) -> bool {
+        crate::providers::provider_of(&self.voice_id) != crate::providers::Provider::ElevenLabs
+            || self.preview_url.as_deref().is_some_and(|u| !crate::js::js_trim(u).is_empty())
+    }
+
     /// A label value (raw, untrimmed), `None` when absent.
     pub fn label(&self, key: &str) -> Option<&str> {
         self.labels.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())

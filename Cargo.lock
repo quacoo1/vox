@@ -6003,6 +6003,7 @@ dependencies = [
  "tiny_http",
  "tracing",
  "vox-core",
+ "vox-store",
  "vox-tts",
  "vox-win",
 ]
@@ -6021,6 +6022,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tracing",
+ "vox-addons",
  "vox-art",
  "vox-audio",
  "vox-bridge",

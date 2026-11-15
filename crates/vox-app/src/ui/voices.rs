@@ -76,7 +76,7 @@ impl Sample {
         }
     }
 
-    /// The preview button state of `v` (no button without a sample URL).
+    /// The preview button state of `v` (no button for an ElevenLabs voice without a sample URL).
     pub(crate) fn state_for(&self, v: &Voice) -> PreviewState {
         if !has_sample(v) {
             return PreviewState::None;
@@ -110,9 +110,9 @@ impl Sample {
     }
 }
 
-/// The voice has a sample URL (some clones have none).
+/// The row offers a sample ([`Voice::can_preview`]).
 fn has_sample(v: &Voice) -> bool {
-    v.preview_url.as_deref().is_some_and(|u| !js_trim(u).is_empty())
+    v.can_preview()
 }
 
 // ───────────────────────────── row view (pure) ─────────────────────────────
@@ -591,6 +591,18 @@ mod tests {
             description: None,
             preview_url: url.map(Into::into),
         }
+    }
+
+    #[test]
+    fn voices_of_other_providers_offer_a_sample_without_a_url() {
+        let sample = Sample::None;
+        for id in ["addon:fake-a:alpha", "polly:neural:Joanna", "windows:david"] {
+            assert_eq!(sample.state_for(&voice(id, "A", None, &[], None)), PreviewState::Ready, "{id}");
+        }
+        // An ElevenLabs voice still needs its sample URL.
+        assert_eq!(sample.state_for(&voice("JBFq", "George", None, &[], None)), PreviewState::None);
+        assert_eq!(sample.state_for(&voice("JBFq", "George", None, &[], Some(" "))), PreviewState::None);
+        assert_eq!(sample.state_for(&voice("JBFq", "George", None, &[], Some("https://x/a.mp3"))), PreviewState::Ready);
     }
 
     fn library() -> Vec<Voice> {

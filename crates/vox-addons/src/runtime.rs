@@ -1,11 +1,13 @@
 //! One installed add-on: its manifest, its version folder, its voices and its helper client.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use parking_lot::RwLock;
 use serde_json::Value;
 use vox_core::addons::{parse_manifest, parse_voices, AddonManifest, ManifestVoice};
+use vox_core::constants::ADDON_NOTICE_MAX;
 
 use crate::helper::{HelperClient, HelperError, HelperSpec, HelperTimeouts};
 
@@ -89,18 +91,51 @@ impl AddonRuntime {
         Ok(asked)
     }
 
+    /// The add-on's notice files as (file, text), each cut at [`ADDON_NOTICE_MAX`]. One that cannot be read is logged
+    /// and left out.
+    pub fn read_notices(&self) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for notice in &self.manifest.notices {
+            let path = self.dir.join(notice);
+            if !is_regular_file(&path) {
+                tracing::warn!(target: "addons", "{}: {notice} is not a file", self.id());
+                continue;
+            }
+            let mut bytes = Vec::new();
+            let read = std::fs::File::open(&path).and_then(|f| f.take(ADDON_NOTICE_MAX).read_to_end(&mut bytes));
+            match read {
+                Ok(_) => out.push((notice.clone(), String::from_utf8_lossy(&bytes).into_owned())),
+                Err(e) => tracing::warn!(target: "addons", "{}: cannot read {notice}: {e}", self.id()),
+            }
+        }
+        out
+    }
+
     /// The current key for `key` (a renamed voice keeps working through `voice_aliases`).
     pub fn resolve_voice<'a>(&'a self, key: &'a str) -> &'a str {
         self.manifest.voice_aliases.get(key).map_or(key, String::as_str)
     }
 }
 
-fn read_small(path: &Path) -> Result<Vec<u8>, String> {
-    let meta = std::fs::metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    if meta.len() > MAX_JSON {
+/// Reads a small regular file. Anything else (a pipe, a device, a folder) is refused before it is opened, since opening
+/// a pipe blocks and a device never ends; the read stops past the limit even if the file grows meanwhile.
+pub(crate) fn read_small(path: &Path) -> Result<Vec<u8>, String> {
+    if !is_regular_file(path) {
+        return Err(format!("{} is not a file", path.display()));
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|f| f.take(MAX_JSON + 1).read_to_end(&mut bytes))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    if bytes.len() as u64 > MAX_JSON {
         return Err(format!("{} is too big", path.display()));
     }
-    std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))
+    Ok(bytes)
+}
+
+/// A regular file, after following links.
+fn is_regular_file(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.is_file())
 }
 
 fn read_voices_file(dir: &Path) -> Option<Vec<ManifestVoice>> {

@@ -41,7 +41,7 @@ pieces meet; §5 (audio), §6 (files) and §7 (UI contract) are the deep dives f
 | `vox-tts` | lib | ElevenLabs client (system proxy, Windows cert store), error model, mapping, memo caches, key validation, preview download; `TtsEngine` (sessions, look-ahead, retries, billing, cached playback); mock synthesiser; WAV helper. | vox-core, vox-text | ureq (rustls + `platform-verifier`, gzip), icu_collator, sha2, hex, base64, url |
 | `vox-audio` | lib | The `Player`: decode (MP3/WAV), WSOLA time-stretch, resample, WASAPI output, output warmer, timeline/position/listening maths, gapless chunk joins, failure recovery. | vox-core | symphonia, cpal, rubato, rtrb |
 | `vox-win` | lib | Everything Win32 except audio/DPAPI/Slint windows: input hook, gesture machine, selection service + clipboard round trip, foreground info, UIPI probe, hotkeys, SMTC media keys, the tray icon (`notify_icon`, version 4), registry (Explorer verb, autostart, theme, proxy), single instance + Electron detection, system events, locale, window/monitor helpers (overlay subclass), shell helpers (notifications + AUMID registration). | vox-core | windows 0.62, winreg |
-| `vox-addons` | lib | Offline voice add-ons (addons-design.md, addons-protocol.md): the helper protocol, the contained helper client (one process per add-on, JSON lines over stdio, idle and absolute deadlines, cancel, crash budget), `AddonRuntime` (an add-on folder loaded), `AddonHost` (the `Provider::Addon` speech provider), and the `vox-addon-fake` test helper. | vox-core, vox-tts, vox-win | serde_json, base64, crossbeam-channel |
+| `vox-addons` | lib | Offline voice add-ons (addons-design.md, addons-protocol.md): the helper protocol, the contained helper client (one process per add-on, JSON lines over stdio, idle and absolute deadlines, cancel, crash budget), `AddonRuntime` (an add-on folder loaded), `AddonsRoot` (the add-ons folder on disk: startup scan and sweep), `AddonHost` (the `Provider::Addon` speech provider), and the `vox-addon-fake` test helper. | vox-core, vox-store, vox-tts, vox-win | serde_json, base64, crossbeam-channel |
 | `vox-bridge` | lib | Localhost HTTP bridge for the unchanged browser extension: request pipeline (pure) + its own listener (accept loop, per-connection threads; D-INT-16). | vox-core | httparse, socket2, windows (WinSock) |
 | `vox-art` | lib (**done**) | Procedural silk thumbnails/backdrop: `Art {width, height, rgba}`, `thumbnail(seed,w,h)`, `backdrop(w,h,dark)`, `accent(seed)`, `palette_for(seed)`. | — | tiny-skia |
 | `vox-app` | bin `vox.exe` | Bootstrap, the core thread (read controller + orchestration), Slint UI glue and page controllers, native window treatment, tray, screenshot harness. | all | slint =1.18.1, muda 0.21 (tray menu; the icon is `vox_win::notify_icon`, D-SH-18), anyhow |
@@ -50,8 +50,8 @@ pieces meet; §5 (audio), §6 (files) and §7 (UI contract) are the deep dives f
 Deviations from BRIEF's crate list (each with its reason in §8): the bridge does not use `tiny_http` (D-INT-16: no access to accepted sockets, no header cap, `Connection` dropped; tiny_http stays as the vox-tts test server); the tray icon is not `tray-icon` (D-SH-18: no `NOTIFYICON_VERSION_4`, so keyboard selection cannot open the window), its `muda` menus stay.
 
 Rules:
-- Library crates never depend on each other except `vox-tts → vox-text`, `vox-addons → vox-tts, vox-win` (an add-on is
-  a speech provider whose helper is a contained process; addons-design.md D6), and everything → `vox-core`. Only vox-app
+- Library crates never depend on each other except `vox-tts → vox-text`, `vox-addons → vox-tts, vox-win, vox-store` (an add-on
+  is a speech provider whose helper is a contained process, kept in its own folder; addons-design.md D6), and everything → `vox-core`. Only vox-app
   depends on Slint. Every library crate builds and tests alone: `cargo test -p vox-text` etc.
 - Errors: `thiserror` enums in libraries (`StoreError`, `SecretError`, `ExtractError`, `TtsError`, `DecodeError`,
   `OutputError`, `WinError`), `anyhow` in vox-app. vox-core has no error type except `json::LenientParseError`;
@@ -130,7 +130,7 @@ Data: `crates/vox-text/data/en-words.txt` (to be added by the owner: a permissiv
 
 | Module | Public surface | Spec |
 |---|---|---|
-| `paths` | `Profile::{resolve(demo), at, root, is_demo, settings_file, history_file, secrets_file, secrets_dpapi_file, window_state_file, ui_state_file, audio_cache_dir, logs_dir, log_file, local_state_candidates}` | persistence.md §1, §6.1 here |
+| `paths` | `Profile::{resolve(demo), at, root, is_demo, settings_file, history_file, secrets_file, secrets_dpapi_file, window_state_file, ui_state_file, audio_cache_dir, logs_dir, log_file, local_state_candidates}`, `local_data_dir()`, `addons_root()` (`VOX_ADDONS_DIR` override) | persistence.md §1, §6.1 here |
 | `fsutil` | `retry_busy`, `is_busy_error`, `write_file_atomic(path, data, backup)`, `write_file_atomic_sync` (no per-path lock), `read_json_file → JsonRead`, `load_with_backup → LoadOutcome`, `discard_corrupt_copy`, `remove_dir_all_retry` | persistence.md §2.1–§2.4 |
 | `json_doc` | `JsonDoc::{new(path, JsonDocOptions, Snapshot), schedule, flush, flush_sync, discard_corrupt_copy}`, `JsonDocOptions{debounce, max_wait, backup, retry_base, max_retries}` | persistence.md §2.5 |
 | `settings_store` | `SettingsStore::{open, get, update, subscribe, api_key, has_api_key, key_status, set_api_key, flush, flush_sync, read_settings_file_sync}`, `SettingsChange`, `KeyStatus`, `KeyStatusSource` | contracts.md §4.3–§4.5, persistence.md §3, §6.2 here |
@@ -838,7 +838,7 @@ Core (`core::timers::TimerId`): `RetentionInterval` (6 h, skipped while `Retenti
 `CreditsAfterRead` (1.5 s after a read settled), `CreditsReset` (`nextResetUnix` + 5 s; long waits re-armed),
 `Midnight` (local midnight + 1 s → `Refresh(Day)`, re-armed; also re-checked on resume/clock change), `MediaTick`
 (1 s SMTC position refresh while playing), `PreloadOutput` (1 s after core startup, whatever the window visibility;
-not with `null_output`). UI (`slint::Timer`): page debounces (Home/Analytics 700 ms for background refreshes only,
+not with `null_output`), `AddonIdle` (60 s while an add-on is installed: `host.reap_idle` on a worker). UI (`slint::Timer`): page debounces (Home/Analytics 700 ms for background refreshes only,
 History search 220 ms, settings retention 450 ms, cache re-measure 2.5 s), toast timers (+hover pause) and the 180 ms
 toast exits, widget auto-hide 4 s / hold retry 1.5 s, widget toast 2.5/5 s, chip exit 140 ms, hover poll 100 ms,
 drag-end poll 50 ms, 60 s "now" tick, the 30 Hz snapshot timer, main-window geometry save debounce 1 s, hotkey
@@ -1186,7 +1186,7 @@ sends `Command::Quit` it commits a pending History undo batch (its `RemoveReads`
    commands with `rx.try_iter()`, dispatching only `Command::Engine(..)` (billing known at stop time is persisted;
    everything else is dropped);
 5. in parallel ≤ 3 s: `settings.flush()`, `history.flush()`, `selection.flush(3 s)`, `cache.flush(..)`,
-   `bridge.stop()`;
+   `bridge.stop()`, `addons.host.shutdown(400 ms)` (each helper is quit, then killed);
 6. publish `UiUpdate::Quit` → the UI saves `window-state.json` synchronously (`main_window::current_state`), destroys
    the tray, hides the windows, arms its 4 s hard exit, quits the loop;
 7. `player.shutdown()` ×2 and `media.shutdown()`, each on a helper thread joined ≤ 500 ms; the core loop ends →
@@ -1243,7 +1243,11 @@ voice settings); the others add voices.
   and `addon:kittentts-2:bella` stay apart. The add-on host takes the single `Provider::Addon` slot in the engine and
   routes by the add-on id; it has no credentials, no card, and is left out of `AppInfo.providers`
   (`provider_statuses`). An add-on voice that cannot be read fails with `ReadErrorCode::Unknown` and an Open Voices
-  action, never `NoApiKey` (whose copy is about the ElevenLabs key).
+  action, never `NoApiKey` (whose copy is about the ElevenLabs key). At startup (not demo or shots) `app::run` scans
+  the add-ons folder (`core::addons::AddonServices::for_app`: small JSON files only, no helper started) and registers
+  the host; the read gate asks it whether the add-on is installed, loaded and healthy; the core sweeps leftovers on
+  `vox-addons-sweep` and quits idle helpers every 60 s (`TimerId::AddonIdle`). Add-on voices offer a sample
+  synthesized on the spot, like every non-ElevenLabs voice (`Voice::can_preview`).
 - **Credentials** (`vox_store::provider_secrets`): `providers-dpapi.bin`, one DPAPI (current user) blob of
   `{"<provider id>": {key, secret, region}}`, written atomically; missing or unreadable = nothing connected. Never
   logged (`ProviderCredentials`' `Debug` masks the key). Windows voices need none.
@@ -1438,6 +1442,7 @@ starts playing (§4.10).
 | `ui-state.json` | startup (`app::run` → `UiInit::analytics_range`) | range change | `{"analyticsRange":"30d"}` pretty | ignored by Electron |
 | `vox-icon.png` | — | (re)written at startup when missing or different, from the embedded `assets/vox-256.png` (not shots) | the app icon for the AUMID `IconUri` (D-SH-19) | ignored by Electron |
 | `logs\main.log`, `main.1.log` | — | append | `<ISO-UTC> <LEVEL> [scope] text`, 1 MiB rotation, key masking | same format |
+| Outside the profile: `%LOCALAPPDATA%\Vox\addons` (Linux `~/.local/share/vox/addons`; `VOX_ADDONS_DIR` overrides; never in demo or shots mode) | startup scan (`current.json`, `addon.json`, `voices.json`) | the add-on installer (later); the startup sweep deletes leftovers it made | addons-design.md "Directories" | none (new) |
 | export file (user path) | — | History export | pretty `{"app":"Vox","version":1,"exportedAt":…,"records":[…]}` via `<path>.tmp` | same |
 
 Never create `cache\`. Temp files left by a crash are never read and simply overwritten later.
@@ -6437,7 +6442,7 @@ pub fn media_state(snapshot: &PlayerSnapshot, media_keys: bool) -> MediaState
 #### `vox_app::core`
 
 ```rust
-pub struct Services { runtime: Runtime, settings: SettingsStore, history: HistoryStore, cache: AudioCache, client: ElevenLabsClient, engine: TtsEngine, player: Player, preview_player: Player, selection: SelectionService, hotkeys: Option<HotkeyService>, media: Option<MediaSession>, bridge: Arc<BridgeServer> }
+pub struct Services { runtime: Runtime, settings: SettingsStore, history: HistoryStore, cache: AudioCache, client: ElevenLabsClient, engine: TtsEngine, player: Player, preview_player: Player, selection: SelectionService, hotkeys: Option<HotkeyService>, media: Option<MediaSession>, bridge: Arc<BridgeServer>, bridge_playing: Arc<AtomicBool>, addons: Option<AddonServices> }
     // Every service handle the core owns (built by `app::run`, moved into the core thread).
 pub struct Core
     // The core's state.
@@ -6539,7 +6544,7 @@ impl Sessions {
 #### `vox_app::core::timers`
 
 ```rust
-pub enum TimerId { RetentionInterval, RetentionChange, HotkeySuspend, HistoryChangedThrottle, CreditsAfterRead, CreditsReset, Midnight, MediaTick, PreloadOutput }
+pub enum TimerId { RetentionInterval, RetentionChange, HotkeySuspend, HistoryChangedThrottle, CreditsAfterRead, CreditsReset, Midnight, MediaTick, PreloadOutput, AddonIdle }
     // Every core timer.
 pub struct Timers
     // The heap.

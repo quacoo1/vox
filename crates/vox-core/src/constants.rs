@@ -304,6 +304,12 @@ pub const ADDON_CANCEL_GRACE_MS: u64 = 2_000;
 /// How long a helper may take to exit after `quit` on shutdown; on remove it gets [`ADDON_REMOVE_GRACE_MS`].
 pub const ADDON_QUIT_GRACE_MS: u64 = 400;
 pub const ADDON_REMOVE_GRACE_MS: u64 = 2_000;
+/// How often the core quits idle helpers.
+pub const ADDON_IDLE_TICK_SEC: u64 = 60;
+/// How much of one add-on notice file reaches third-party-notices.txt.
+pub const ADDON_NOTICE_MAX: u64 = 256 << 10;
+/// A partial download older than this is deleted by the startup sweep.
+pub const ADDON_PART_MAX_AGE_SEC: u64 = 7 * 24 * 3600;
 /// Deadline of a `voices` request.
 pub const ADDON_VOICES_TIMEOUT_MS: u64 = 10_000;
 

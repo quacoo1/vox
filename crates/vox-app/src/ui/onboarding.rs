@@ -417,7 +417,7 @@ impl OnboardingController {
         let rows: Vec<VoiceRow> = list
             .iter()
             .map(|v| {
-                let preview = if v.preview_url.as_deref().is_none_or(|u| u.trim().is_empty()) {
+                let preview = if !v.can_preview() {
                     PreviewState::None
                 } else {
                     match &self.preview {
